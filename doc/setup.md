@@ -12,4 +12,6 @@ pip install jupyter numpy matplotlib plotly ipywidgets pandas ipykernel
 # create jupyter kernel
 python -m ipykernel install --user --name=morpheus-hypnolight --display-name="Python (MorpheusHypnoLight)"
 pip list
+
+.\.venv\Scripts\python.exe -m jupyter notebook --notebook-dir="D:\Projects\DreamMachine\MorpheusHypno\Simulator"
 ```
