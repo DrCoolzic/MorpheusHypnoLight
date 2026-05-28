@@ -1,0 +1,8 @@
+{
+    "python.defaultInterpreterPath": "D:/Projects/DreamMachine/MorpheusHypnoLight/.venv/Scripts/python.exe",
+    "jupyter.notebookFileRoot": "${workspaceFolder}",
+    "python.terminal.activateEnvironment": true,
+    "python.terminal.activateEnvInCurrentTerminal": true,
+    "jupyter.kernels.filter": [],
+    "notebook.defaultKernelPickerType": "mru"
+}
