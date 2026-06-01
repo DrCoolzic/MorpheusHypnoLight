@@ -4,5 +4,13 @@
     "python.terminal.activateEnvironment": true,
     "python.terminal.activateEnvInCurrentTerminal": true,
     "jupyter.kernels.filter": [],
-    "notebook.defaultKernelPickerType": "mru"
+    "notebook.defaultKernelPickerType": "mru",
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "cSpell.words": [
+        "dmconfig",
+        "dmutil",
+        "mpsim",
+        "MPSIM",
+        "simconfig"
+    ]
 }

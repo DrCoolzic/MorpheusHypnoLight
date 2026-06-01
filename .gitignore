@@ -1,0 +1,82 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# User-specific stuff:
+images/
+dev/
+mylib/
+test/
+sequences/
+*.dra
+Lampe_hypnagogique/
+_old/
+.VSCodeCounter
+dmconfig.json
+todo.txt
+doc/Media/
+doc/doxygen
+**/ffmpeg/
+sim/src/
+
+# Thumbnails
+._*
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# pyenv
+.python-version
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+venv-*/
+
+# mypy
+.mypy_cache/
+.pioenvs
+.piolibdeps
+.pio
+.vscode/
+!.vscode/tasks.json
+CMakeListsPrivate.txt
+CMakeLists.txt
+
+# CMake
+cmake-build-*/
+
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+/*.cbp
+
+
