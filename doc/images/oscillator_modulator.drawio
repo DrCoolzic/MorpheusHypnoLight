@@ -1,0 +1,37 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.6 Chrome/144.0.7559.236 Electron/40.8.4 Safari/537.36" version="29.6.6">
+  <diagram name="Page-1" id="drFHBI5DPLbqaFflwyKZ">
+    <mxGraphModel dx="815" dy="481" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="ycIcYofk5f_ZD_l_twRT-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Brightness Modulator&lt;div&gt;ESP32 LED Control&lt;/div&gt;" vertex="1">
+          <mxGeometry height="120" width="200" x="440" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="ycIcYofk5f_ZD_l_twRT-4" edge="1" parent="1" source="ycIcYofk5f_ZD_l_twRT-3" style="edgeStyle=orthogonalEdgeStyle;shape=flexArrow;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;width=16;endSize=6.525714285714286;" target="ycIcYofk5f_ZD_l_twRT-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ycIcYofk5f_ZD_l_twRT-3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Frequency Generator&lt;div&gt;ESP32 Software&lt;/div&gt;" vertex="1">
+          <mxGeometry height="120" width="200" x="160" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="ycIcYofk5f_ZD_l_twRT-5" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;shape=flexArrow;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;width=16;endSize=6.525714285714286;" value="Frequency">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="40" y="200" as="sourcePoint" />
+            <mxPoint x="160" y="200" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ycIcYofk5f_ZD_l_twRT-6" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;shape=flexArrow;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;width=14;endSize=6.9319999999999995;" value="Duty Cycle">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="40" y="240" as="sourcePoint" />
+            <mxPoint x="160" y="240" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ycIcYofk5f_ZD_l_twRT-7" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;shape=flexArrow;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;width=15.428571428571429;endSize=5;" target="ycIcYofk5f_ZD_l_twRT-2" value="Brightness">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="40" y="320" as="sourcePoint" />
+            <mxPoint x="580" y="320" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

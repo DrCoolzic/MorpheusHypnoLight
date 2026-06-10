@@ -12,5 +12,7 @@
         "mpsim",
         "MPSIM",
         "simconfig"
-    ]
+    ],
+	"files.autoSave": "afterDelay",
+    "editor.formatOnSave": true
 }
