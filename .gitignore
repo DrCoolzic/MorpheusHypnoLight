@@ -17,7 +17,7 @@ todo.txt
 doc/Media/
 doc/doxygen
 **/ffmpeg/
-sim/src/
+sim/src_origin/
 save/
 
 # Thumbnails
