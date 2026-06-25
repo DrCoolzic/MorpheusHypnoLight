@@ -25,7 +25,11 @@ save/
 
 # Distribution / packaging
 .Python
-build/
+
+# ESP-IDF build output (can be several hundred MB)
+firmware/build/
+firmware/sdkconfig.old
+firmware/**/__pycache__/
 develop-eggs/
 dist/
 downloads/
@@ -63,7 +67,6 @@ venv-*/
 .vscode/
 !.vscode/tasks.json
 CMakeListsPrivate.txt
-CMakeLists.txt
 
 # CMake
 cmake-build-*/

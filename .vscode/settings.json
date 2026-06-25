@@ -1,18 +1,26 @@
 {
-    "python.defaultInterpreterPath": "D:/Projects/DreamMachine/MorpheusHypnoLight/.venv/Scripts/python.exe",
-    "jupyter.notebookFileRoot": "${workspaceFolder}",
-    "python.terminal.activateEnvironment": true,
-    "python.terminal.activateEnvInCurrentTerminal": true,
-    "jupyter.kernels.filter": [],
-    "notebook.defaultKernelPickerType": "mru",
-    "python-envs.defaultEnvManager": "ms-python.python:system",
-    "cSpell.words": [
-        "dmconfig",
-        "dmutil",
-        "mpsim",
-        "MPSIM",
-        "simconfig"
-    ],
-	"files.autoSave": "afterDelay",
-    "editor.formatOnSave": true
+  "python.defaultInterpreterPath": "D:/Projects/DreamMachine/MorpheusHypnoLight/.venv/Scripts/python.exe",
+  "jupyter.notebookFileRoot": "${workspaceFolder}",
+  "python.terminal.activateEnvironment": true,
+  "python.terminal.activateEnvInCurrentTerminal": true,
+  "jupyter.kernels.filter": [],
+  "notebook.defaultKernelPickerType": "mru",
+  "python-envs.defaultEnvManager": "ms-python.python:system",
+  "cSpell.words": [
+    "dmconfig",
+    "dmutil",
+    "mpsim",
+    "MPSIM",
+    "simconfig"
+  ],
+  "files.autoSave": "afterDelay",
+  "editor.formatOnSave": true,
+  "idf.currentSetup": "C:\\esp\\v6.0.1\\esp-idf",
+  "idf.customExtraVars": {},
+  "clangd.path": "C:\\Espressif\\tools\\esp-clang\\esp-20.1.1_20250829\\esp-clang\\bin\\clangd.exe",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=**",
+    "--compile-commands-dir=d:\\Projects\\DreamMachine\\MorpheusHypnoLight\\build"
+  ]
 }
