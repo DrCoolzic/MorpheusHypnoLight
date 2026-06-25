@@ -4,20 +4,9 @@ __pycache__/
 *$py.class
 
 # User-specific stuff:
-dev/
-mylib/
-test/
-sequences/
-*.dra
-Lampe_hypnagogique/
-_old/
-.VSCodeCounter
-dmconfig.json
-todo.txt
-doc/Media/
-doc/doxygen
-**/ffmpeg/
 sim/src_origin/
+sim/test/
+.VSCodeCounter
 save/
 
 # Thumbnails

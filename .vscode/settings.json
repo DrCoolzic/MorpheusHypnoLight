@@ -15,6 +15,7 @@
   ],
   "files.autoSave": "afterDelay",
   "editor.formatOnSave": true,
+  "idf.extensionActivationMode": "always",
   "idf.currentSetup": "C:\\esp\\v6.0.1\\esp-idf",
   "idf.customExtraVars": {},
   "clangd.path": "C:\\Espressif\\tools\\esp-clang\\esp-20.1.1_20250829\\esp-clang\\bin\\clangd.exe",
@@ -22,5 +23,7 @@
     "--background-index",
     "--query-driver=**",
     "--compile-commands-dir=d:\\Projects\\DreamMachine\\MorpheusHypnoLight\\build"
-  ]
+  ],
+  "cmake.sourceDirectory": "D:/Projects/DreamMachine/MorpheusHypnoLight/firmware",
+  "cmake.configureOnOpen": false
 }
