@@ -43,9 +43,9 @@ Numerous experiments have shown that the position of the LEDs on the PCB has no 
 
 <img src="images/pcbled2.png" alt="Led" style="zoom: 50%;" />
 
-The eight peripheral groups are connected to four oscillators, each of which has adjustable frequency, brightness, and duty cycle settings. They use cold white LEDs with a power rating of approximately one watt each (with a current of about 330 mA). Therefore, each group driven with a current of 330 mA can provide a maximum power output of 4.5 watts, for a total output of about 32 watts for all eight groups combined.
+The eight peripheral groups are connected to four oscillators, each of which has adjustable frequency, brightness, and duty cycle settings. They use cold white LEDs with a power rating of approximately one watt each (with a current of about 330 mA). Therefore, each group driven with a current of 330 mA can provide a maximum power output of 4.5 watts, for a total output of about 36 watts for all eight groups combined.
 
-The central group uses four warm white LEDs rated at 3 W each but driven at about 2W (with a current of about 660 mA). Therefore, the central group can provide a maximum power output of 9 watts, 
+The central group uses four warm white LEDs rated at 3 W each but driven at about 2W (with a current of about 660 mA). Therefore, the central group can provide a maximum power output of 9 watts,
 
 ---
 
@@ -437,77 +437,11 @@ Central group:
 
 ## Hardware Prototype
 
-We will build a prototype to validate the hardware using the following main components
-
-- Power Supply
-- LEDs board
-- Electronic board
-- Experiment with a PWM Fan controlled by temperature sensors
-
-### Power Supply
-
-The prototype will be powered by  a [24V 5A 120W Power Supply with 5.5 x 2.5mm DC Output Jack](https://www.amazon.fr/Alimentation-Adaptateur-Transformateur-Convertisseur-Surveillance/dp/B0FWRG2X67/ref=sr_1_7?th=1).
-
-- This voltage will be used directly by the PicoBuck LED Buck Converters to power the LEDs
-- A [5A DC-DC Step Down Power Supply Buck Converter](https://fr.aliexpress.com/item/1005005921557535.html) will be used to provide 5V power to the ESP32
-
-### LEDs Board
-
-- We will use 32 x [1W High Power cool white 6500K LED with 20mm star pcb](https://fr.aliexpress.com/item/1005003381591196.html) for the 8 peripheral groups
-- We will use 4 x [3W High Power warm white LED with 20mm star pcb](https://fr.aliexpress.com/item/1005003381591196.html) for the central groups
-- The Led will be placed on a [150x150 aluminum plate](https://www.amazon.fr/Plaque-aluminium-5083-150mm/dp/B07NYV688B/ref=sr_1_6?th=1) (or a [150x150x25mm Aluminum Heat Sink radiator for LED heat dissipation](https://fr.aliexpress.com/item/32958588818.html)) using [ARCTIC TP-4 : High Performance Thermal Pad 100x100x0,5 mm](https://www.amazon.fr/ARCTIC-TP-4-thermique-performance-irrégularités/dp/B0FZV47ZNR/ref=sxin_10_pa_sp_search_thematic_sspa?th=1)
-
-### Electronic board
-
-For the prototype the electronic will be placed on a Universal Double-Sided prototype PCB Board or on a breadboard.
-
-The prototype uses three SparkFun PicoBuck LED drivers, each based on the AL8805 LED driver. The AL8805 is marked as "not recommended for new design" by its manufacturer, but it remains functionally equivalent to the AL8860 selected for the final product. The AL8860 is the recommended choice for the final PCB design.
-
-The main components will be placed on a [90x150 Prototype board](https://www.amazon.fr/gp/product/B0FDQDNRJ2/ref=ox_sc_act_title_1?smid=A524J1LH0U8IN&th=1):
-
-- An [ESP32-S3-DevKitC-1 8MB PSRAM 16MB FLASH N16R8 42Pin](https://fr.aliexpress.com/item/1005007173771226.html) development board using male and female 2.54mm pitch header connectors
-  ![Pinout](images/ESP32-S3_DevKitC-pinout.jpg)
-- 3 x [PicoBuck LED Driver](https://www.sparkfun.com/picobuck-led-driver.html) providing 9 outputs for the nine LED groups. Connection to the LEDs will be done using 12 x [3.5mm Screw Terminals](https://www.sparkfun.com/screw-terminals-3-5mm-pitch-2-pin.html) and connection to power supply will use a [DC Barrel Jack](https://www.sparkfun.com/dc-barrel-jack-adapter-female.html)
-- One Qwiic connector connected to connect the following test devices using I2C protocol
-  - 1-4 x [Adafruit I2C Quad rotary Encoder](https://learn.adafruit.com/adafruit-i2c-quad-rotary-encoder-breakout/arduino) used to test the oscillator behavior
-  - 1 x [SparkFun Qwiic OLED Display 128x128](https://www.sparkfun.com/sparkfun-qwiic-oled-display-1-5-in-128x128.html)
-- [DC-DC stepdown buck converter](https://fr.aliexpress.com/item/1005005921557535.html) to provide 5V to ESP32 Dev board
-
-Simplified breadboard schematic
-
-<img src="images/HypnoLight_bb.png" style="zoom:40%;" />
-
-### Power Budget
-
-The following table estimates the maximum power consumption of the prototype:
-
-| Component | Power | Notes |
-| --------- | ----- | ----- |
-| 8 peripheral LED groups | ~32 W | 4 × 1 W cold white LEDs per group |
-| Central LED group | ~4.5 W | 4 × 3 W warm white LEDs at ~330 mA (default) |
-| Central LED group (strap) | ~9 W | Same LEDs at ~660 mA with current-doubling strap |
-| LED driver losses | ~4 W | ~10 % buck converter losses at full LED power |
-| ESP32-S3 + peripherals | ~2.5 W | Dev board at 5 V, ~500 mA peak |
-| 5 V buck converter | ~0.5 W | Conversion losses |
-| PWM fan | ~1 W | 120 mm fan at moderate speed |
-| **Total (default)** | **~44 W** | Corresponds to ~1.8 A at 24 V |
-| **Total (central strap)** | **~49 W** | Corresponds to ~2.0 A at 24 V |
-
-The 24 V / 5 A / 120 W supply leaves a comfortable margin (about 2.5× the expected maximum load), leaving room for additional peripherals, measurement errors, and supply aging.
-
-### Thermal Considerations
-
-At full brightness, the LEDs dissipate most of their consumed power as heat. The 150 × 150 mm aluminum plate (or optional heatsink) combined with the PWM fan must keep the LED temperature below the rated maximum. The temperature sensors on the LED PCB will increase the fan speed if the temperature exceeds a defined threshold. Exact thermal calculations will depend on the final plate thickness, heatsink choice, and ambient conditions, and will be validated during prototype testing.
+The prototype construction details are documented in [HardwarePrototype.md](HardwarePrototype.md).
 
 ## Software Prototype
 
-TBD
-
-## Enclosure Prototype
-
-TBD
-
-Use FreeCAD with MCP to drive 3D printer
+The software architecture and firmware design are documented in [SoftwareArchitecture.md](SoftwareArchitecture.md).
 
 ## Useful References
 
