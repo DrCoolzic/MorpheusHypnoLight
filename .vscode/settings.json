@@ -25,5 +25,8 @@
     "--compile-commands-dir=d:\\Projects\\DreamMachine\\MorpheusHypnoLight\\build"
   ],
   "cmake.sourceDirectory": "D:/Projects/DreamMachine/MorpheusHypnoLight/firmware",
-  "cmake.configureOnOpen": false
+  "cmake.configureOnOpen": false,
+  "idf.monitorPort": "COM8",
+  "idf.flashType": "UART",
+  "idf.portWin": "COM8"
 }

@@ -8,7 +8,7 @@ The objective of this project is to create a device for visual and auditory stim
 
 ## Main Features
 
-### Must have (in V1)
+### Must have
 
 - **Remote Sequence Mode of Operation**: The sequences to play are selected and controlled remotely from an application that communicates using BLE or Wi-Fi. This application can control multiple machines simultaneously.
 - **Remote Real-time Mode of Operation**: Developers use this mode to control all machine parameters in real time without using sequences.
@@ -18,19 +18,19 @@ The objective of this project is to create a device for visual and auditory stim
 - 4 oscillators with sine, triangle, square, and custom waveforms, each with controllable frequency, duty cycle, brightness, and phase
 - Per-step oscillator-to-group assignment (each step can route oscillators to different LED groups)
 - Low Frequency Oscillator (LFO) modulation of oscillator parameters, including frequency modulation for rich FLS effects
-- Step-based sequence engine with linear interpolation and LFO modulation modes
+- Step-based sequence engine with linear interpolation or LFO modulation modes
 - Capability to pause and seek loaded sequences
 - Low-cost hardware (target: under $100)
-- Low-noise (large PWM-controlled fan)
+- Low-noise cooling using a large PWM temperature controlled fan
 - Compact and easy to carry with tripod mounting threads
 - WiFi web server interface
 
-### Could have (in V2)
+### Could have
 
 - **Local Sequence Mode of Operation**: Sequence selection and control is done locally, without the need for an external application. The sequences are stored locally on an SD card, and control is done using knobs, the touch screen, etc.
 - **Local Real-Time Mode of Operation**: This mode allows developers to control all machine parameters in real time without using sequences. In Sequence mode, control is done using knobs, the touch screen, etc.
 - Input devices: parameter controller (rotary knobs and switches), joystick, mouse, Touch screen
-- Output devices: sound output direct through plug or remote via BLE
+- Output devices: sound output direct through audio plug or remote via BLE
 - Store sequences locally on SD card
 
 ---
@@ -39,13 +39,13 @@ The objective of this project is to create a device for visual and auditory stim
 
 The LEDs are placed on a front panel PCB with an aluminum substrate for heat dissipation. In addition to the LEDs, the PCB contains temperature sensors that automatically activate the fan if the device overheats.
 
-Numerous experiments have shown that the position of the LEDs on the PCB has no effect on the user's perception. For instance, a diode that lights up in the top left or bottom right corner of the board is perceived by the user in exactly the same way. Consequently, the LEDs have been arranged into nine groups of four as follows:
+Numerous experiments have shown that the position of the LEDs on the PCB has no effect on the user's perception. For instance, a diode that lights up in the top left or bottom right corner of the board is perceived by the user in exactly the same way. Consequently, the LEDs have been arranged into nine groups of four LED as follows:
 
 <img src="images/pcbled2.png" alt="Led" style="zoom: 50%;" />
 
-The eight peripheral groups are connected to four oscillators, each of which has adjustable frequency, brightness, and duty cycle settings. They use cold white LEDs with a power rating of approximately one watt each. Therefore, each group can provide a maximum power output of four watts, for a total output of about 32 watts for all eight groups combined.
+The eight peripheral groups are connected to four oscillators, each of which has adjustable frequency, brightness, and duty cycle settings. They use cold white LEDs with a power rating of approximately one watt each (with a current of about 330 mA). Therefore, each group driven with a current of 330 mA can provide a maximum power output of 4.5 watts, for a total output of about 32 watts for all eight groups combined.
 
-The central group (group 9) uses four warm white LEDs rated at 3 W each. In the prototype, these are driven by a PicoBuck channel configured for the default current of approximately 330 mA, which gives about 1 W per LED (approximately 4.5 W total for the four LEDs in series). A current-doubling strap can be added to raise the current to about 660 mA, giving about 2 W per LED (approximately 9 W total). In the final product, the same circuit will use the AL8860 LED driver instead of the PicoBuck/AL8805, but the two drivers are functionally equivalent and the AL8860 is recommended for new designs.
+The central group uses four warm white LEDs rated at 3 W each but driven at about 2W (with a current of about 660 mA). Therefore, the central group can provide a maximum power output of 9 watts, 
 
 ---
 
@@ -93,6 +93,8 @@ The CTRL pin of the AL8860 operates in digital mode:
 - **CTRL < 0.4 V**: driver shut down, LED off
 
 This makes the CTRL pin ideal for direct connection to a PWM signal generated by the ESP32, through a 1 kΩ series resistor (R2) for protection.
+
+> Note: In the prototype we will use PicoBuck LED driver modules from SparkFun. They use the AL8805 LED driver instead of the AL8860, but the two drivers are functionally equivalent even though the AL8860 is recommended for new designs.
 
 ---
 
@@ -464,6 +466,7 @@ The prototype uses three SparkFun PicoBuck LED drivers, each based on the AL8805
 The main components will be placed on a [90x150 Prototype board](https://www.amazon.fr/gp/product/B0FDQDNRJ2/ref=ox_sc_act_title_1?smid=A524J1LH0U8IN&th=1):
 
 - An [ESP32-S3-DevKitC-1 8MB PSRAM 16MB FLASH N16R8 42Pin](https://fr.aliexpress.com/item/1005007173771226.html) development board using male and female 2.54mm pitch header connectors
+  ![Pinout](images/ESP32-S3_DevKitC-pinout.jpg)
 - 3 x [PicoBuck LED Driver](https://www.sparkfun.com/picobuck-led-driver.html) providing 9 outputs for the nine LED groups. Connection to the LEDs will be done using 12 x [3.5mm Screw Terminals](https://www.sparkfun.com/screw-terminals-3-5mm-pitch-2-pin.html) and connection to power supply will use a [DC Barrel Jack](https://www.sparkfun.com/dc-barrel-jack-adapter-female.html)
 - One Qwiic connector connected to connect the following test devices using I2C protocol
   - 1-4 x [Adafruit I2C Quad rotary Encoder](https://learn.adafruit.com/adafruit-i2c-quad-rotary-encoder-breakout/arduino) used to test the oscillator behavior

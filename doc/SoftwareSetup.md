@@ -1,22 +1,4 @@
-# Project Plan
-
-## Specifications
-
-- [x] Check / Update the MHLSpec_v2.md file.
-
-## Hardware
-
-Build the prototype using the MHLSpec_v2.md file.
-
-- [ ] Mount the ESP32-S3-DevKitC-1 board on the prototype board using male/female headers.
-- [ ] Mount the PicoBuck converter on the prototype board.
-- [ ] Solder and connect a QWIIC connector to the ESP32-S3-DevKitC-1 board.
-- [ ] Connect the power supply (5V and GND) to the PicoBuck converters.
-- [ ] Connect the input of the PicoBuck converters to the ESP32-S3-DevKitC-1 board.
-  - [ ] TBD list of pins used for LED: 8 (outer ring) using LEDC channels, one (central) using SDM
-- [ ] Connect the output of the PicoBuck converters to the LEDs.
-
-## Setup Software Development Environment
+# Setup Software Development Environment
 
 Software development for the ESP32-S3 will be done using the **ESP-IDF** framework inside **Visual Studio Code** (or the Devon/VS Code-based environment). The steps below describe the Windows installation procedure.
 
@@ -24,7 +6,7 @@ Reference: <https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/get-st
 
 > **Note:** The current Espressif documentation recommends the **ESP-IDF Installation Manager (EIM)** instead of the older standalone installer. As of June 2026, the EIM installs ESP-IDF **v6.0.1** by default.
 
-### Prerequisites
+## Prerequisites
 
 - [x] Windows 10 or 11 (64-bit)
 - [x] Git for Windows (from <https://git-scm.com/download/win>)
@@ -32,15 +14,15 @@ Reference: <https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/get-st
 - [ ] USB cable to connect the ESP32-S3-DevKitC-1 board
 - [ ] USB-to-UART driver for the ESP32-S3 DevKit (usually CP210x or CH340; Windows Update often installs it automatically)
 
-### Step 1: Download the ESP-IDF Installation Manager (EIM)
+## Step 1: Download the ESP-IDF Installation Manager (EIM)
 
 1. Go to the EIM download page: <https://dl.espressif.com/dl/eim/>
 2. Download the Windows installer for the **ESP-IDF Installation Manager** (e.g., `eim-gui-windows-x64.exe`).
 3. Double-click the installer to start it.
 
-### Step 2: Install ESP-IDF with the EIM
+## Step 2: Install ESP-IDF with the EIM
 
-#### GUI installation (recommended)
+### GUI installation (recommended)
 
 1. Launch the **ESP-IDF Installation Manager** after installation.
    <img src="images/EIM_01.png" alt="EIM" style="zoom:50%;" />
@@ -60,7 +42,7 @@ The EIM will install:
 - OpenOCD debugger
 - Required Python packages
 
-### Step 3: Verify the Installation from the ESP-IDF Command Prompt
+## Step 3: Verify the Installation from the ESP-IDF Command Prompt
 
 1. After installation, open the **ESP-IDF Command Prompt** shortcut (created in the Start menu).
 2. Run the following command to verify that the tools are available:
@@ -79,7 +61,7 @@ The EIM will install:
    idf.py build
    ```
 
-### Step 4: Install the ESP-IDF Extension in Visual Studio Code
+## Step 4: Install the ESP-IDF Extension in Visual Studio Code
 
 1. Open **Visual Studio Code**.
 2. Go to the **Extensions** view (Ctrl+Shift+X).
@@ -92,26 +74,31 @@ The EIM will install:
 7. Open the Command Palette (Ctrl+Shift+P) and run: **ESP-IDF: Select current ESP-IDF version**. Choose the version installed by the EIM (e.g., **v6.0.1**).
 8. If prompted, install the **clangd** extension (LLVM) for C/C++ code completion and navigation.
 
-### Step 5: Flash the Hello World Example from VS Code
+## Step 5: Flash the [Hello World Example](https://github.com/espressif/esp-idf/tree/master/examples/get-started/hello_world) from VS Code
+
+> **USB port:** The ESP32-S3-DevKitC-1 has two USB connectors. Always use the **`UART`** port (CP2102N USB-to-UART bridge) for flashing and monitoring. The `USB` port (native USB) is for DFU/JTAG and requires additional setup.
+>
+> **Driver:** The `UART` port requires the **CP210x** driver from Silicon Labs. Windows Update usually installs it automatically; if a yellow exclamation mark appears in Device Manager, download it from <https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers>. After connecting the board, a `COMx` entry should appear under **Ports (COM & LPT)**.
 
 1. In VS Code, open the folder:
    - `C:\esp\v6.0.1\esp-idf\examples\get-started\hello_world`
 2. Open the Command Palette and run: **ESP-IDF: Set Espressif Device Target**.
-3. Select **ESP32-S3**.
-4. Connect the ESP32-S3-DevKitC-1 board to the computer via USB.
-5. Run: **ESP-IDF: Build your Project**.
-6. Run: **ESP-IDF: Select Port to Use** and choose the COM port corresponding to the ESP32-S3.
-7. Run: **ESP-IDF: Flash your Project**.
-8. Run: **ESP-IDF: Monitor your Device** to view the serial output.
+3. Select **ESP32-S3**. When prompted for the OpenOCD configuration, choose **`ESP32-S3 chip (via builtin USB-JTAG)`** (this is the correct option for the DevKitC-1; the ESP-PROG options are for external JTAG adapters on custom PCBs).
+4. Connect the ESP32-S3-DevKitC-1 board to the computer via the **`UART`** USB port.
+5. Run: **ESP-IDF: Select Flash Method** and choose **`UART`**.
+6. Run: **ESP-IDF: Build your Project**.
+7. Run: **ESP-IDF: Select Port to Use** and choose the `COMx` port corresponding to the ESP32-S3 (visible in Device Manager).
+8. Run: **ESP-IDF: Flash your Project**.
+9. Run: **ESP-IDF: Monitor your Device** to view the serial output.
 
-### Step 6: Create the Morpheus HypnoLight Project
+## Step 6: Create the Morpheus HypnoLight Project
 
-1. In VS Code, run: **ESP-IDF: Create Project**.
+1. In VS Code, run: **ESP-IDF: Create New Empty Project**.
 2. Choose `D:\Projects\DreamMachine\MorpheusHypnoLight` as the parent directory and name the project `firmware`. This creates the folder `firmware/` inside the repository root.
 3. Set the target to **ESP32-S3**.
 4. Verify the build with `idf.py build` from the integrated terminal or from the ESP-IDF Command Prompt.
 
-#### Project Directory Structure
+### Project Directory Structure
 
 The ESP-IDF project lives in the `firmware/` subdirectory of the repository. Keeping it in a subdirectory (rather than at the repository root) prevents the large `build/` output folder from cluttering the rest of the project.
 
@@ -150,15 +137,10 @@ Each component under `components/` is an independent library with its own `CMake
 
 > **Note:** Add `firmware/build/` to `.gitignore` to avoid committing the several hundred MB of build artefacts.
 
-### Additional Notes
+## Additional Notes
 
 - Keep installation paths under 90 characters and avoid spaces or special characters.
 - If the ESP-IDF Command Prompt is not available, open a regular PowerShell or Command Prompt, navigate to the ESP-IDF directory, and run `export.ps1` or `export.bat` to activate the environment.
 - The same setup applies to the Devon/VS Code-based environment; once the ESP-IDF extension is configured, the workflow is identical.
 
 We need to see what MCP servers we can use for development.
-
-## Things to check
-
-- [ ] The ESP32-S3-DevKitC-1 board has 42 GPIO pins, but only 34 are available for use. We need to identify which pins are available for use and which are reserved for other purposes.
-- [ ] Can we use any GPIO pins for PWM?
