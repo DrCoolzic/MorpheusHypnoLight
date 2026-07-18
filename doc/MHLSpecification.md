@@ -15,10 +15,9 @@ The objective of this project is to create a device for visual and auditory stim
   - **Remote Real-time Mode of Operation**: Developers use this mode to control all machine parameters in real time without using sequences.
 
 - Bluetooth Low Energy connectivity, used to connect to the control application and potentially to a sound system
-- 8 outer LED groups (cold white), each driven by one of the 8 LEDC hardware channels, with the 4 oscillators dispatched to the groups via a routing table
-- 1 central LED group (warm white) driven by a dedicated Sigma-Delta Modulator (SDM) channel with linear or LFO brightness control
-- 4 oscillators with sine, triangle, square, and custom waveforms, each with controllable frequency, duty cycle, brightness, and phase
-- Per-step oscillator-to-group assignment (each step can route oscillators to different LED groups)
+- 4 outer LED banks (OG1..OG4, cold white), each containing 2 sub-groups of 4 LEDs and driven by one of 4 LEDC hardware channels
+- 1 central LED group (CG, warm white) driven by a dedicated LEDC hardware channel
+- 5 oscillators with sine, triangle, square, and custom waveforms, each with controllable frequency, duty cycle, brightness, and phase; oscillators 1-4 drive banks OG1-OG4 and oscillator 5 drives the central group
 - Low Frequency Oscillator (LFO) modulation of oscillator parameters, including frequency modulation for rich FLS effects
 - Step-based sequence engine with linear interpolation or LFO modulation modes
 - Capability to pause and seek loaded sequences
@@ -37,11 +36,11 @@ The objective of this project is to create a device for visual and auditory stim
 
 The LEDs are placed on a front panel PCB with an aluminum substrate for heat dissipation. In addition to the LEDs, the PCB contains temperature sensors that automatically activate the fan if the device overheats.
 
-Numerous experiments have shown that the position of the LEDs on the PCB has no effect on the user's perception. For instance, a diode that lights up in the top left or bottom right corner of the board is perceived by the user in exactly the same way. Consequently, the LEDs have been arranged into nine groups of four LED as follows:
+Numerous experiments have shown that the position of the LEDs on the PCB has no effect on the user's perception. For instance, a diode that lights up in the top left or bottom right corner of the board is perceived by the user in exactly the same way. Consequently, the LEDs have been arranged into four peripheral banks (OG1..OG4) plus one central group (CG), with each bank containing two sub-groups of four LEDs each:
 
 <img src="images/pcbled2.png" alt="Led" style="zoom: 50%;" />
 
-The eight peripheral groups are connected to four oscillators, each of which has adjustable frequency, brightness, and duty cycle settings. They use cold **white** LEDs with a power rating of approximately one watt each (with a current of about 330 mA). Therefore, each group driven with a current of 330 mA can provide a maximum power output of 4.5 watts, for a total output of about 36 watts for all eight groups combined.
+The four peripheral banks are connected to four oscillators, each of which has adjustable frequency, brightness, and duty cycle settings. They use cold **white** LEDs with a power rating of approximately one watt each (with a current of about 330 mA). Therefore, each sub-group driven with a current of 330 mA can provide a maximum power output of 4.5 watts, for a total output of about 36 watts for all eight sub-groups combined.
 
 The central group uses four **warm** white LEDs rated at 3 W each but driven at about 2W (with a current of about 660 mA). Therefore, the central group can provide a maximum power output of 9 watts,
 
@@ -51,15 +50,13 @@ The central group uses four **warm** white LEDs rated at 3 W each but driven at 
 
 ### Overview
 
-The device drives 9 LED groups using two distinct control paths:
+The device drives 9 LED groups using a single control path:
 
-- **Groups 1-8 (cold white, outer ring)**: driven by the 4 independent software oscillators via the 8 LEDC hardware channels of the ESP32-S3. Each group produces a flickering light signal with fully controllable frequency, duty cycle, brightness, and phase.
+- **5 software oscillators** drive 5 LEDC hardware channels of the ESP32-S3.
+- **Oscillators 1-4** drive the 4 outer banks (OG1..OG4). Each LEDC channel feeds the two sub-groups of one bank, so each bank produces a flickering light signal with fully controllable frequency, duty cycle, brightness, and phase.
+- **Oscillator 5** drives the central group (CG) on its own LEDC channel. It uses the same oscillator mechanism but is typically configured at a very low frequency (or 0 Hz) for smooth ambient brightness or breathing effects.
 
-- **Group 9 (warm white, central)**: driven by a dedicated Sigma-Delta Modulator (SDM) hardware channel. It does not flicker; its brightness is controlled smoothly via linear interpolation or LFO modulation.
-
-The 4 oscillators produce signal values that are dispatched to the 8 LEDC channels via a **dispatch table**, which is a step-level parameter: each step defines which oscillator drives which groups.
-
-A given LED group can be driven by at most one oscillator at a time. Unassigned groups remain off for the duration of the step.
+The mapping between oscillators and LEDC channels is fixed: oscillator *i* always writes to LEDC channel *i*. There is no dispatch table.
 
 ---
 
@@ -73,7 +70,7 @@ Using the analog control input of the AL8860 has serious limitations:
 - **Potential nonlinearity**
 - **Additional complexity** requiring D/A converters
 
-Therefore, brightness is controlled by pulse width modulation (PWM) applied to the CTRL pin of the AL8860. The same AL8860 circuit is used for all 9 groups, including the central group; only the signal source differs.
+Therefore, brightness is controlled by pulse width modulation (PWM) applied to the CTRL pin of the AL8860. The same AL8860 circuit is used for all 9 groups, all driven by PWM signals generated by the ESP32 LEDC peripheral.
 
 The schematic for one LED group is as follows:
 
@@ -96,20 +93,34 @@ This makes the CTRL pin ideal for direct connection to a PWM signal generated by
 
 ---
 
-### LED Control: Outer Groups (1-8)
+### LED Control: Oscillators and LEDC Channels
 
-Each group of LEDs is controlled by an oscillator, which allows the frequency, brightness and duty cycle parameters to be adjusted. The oscillator's output is connected to an LED driver that powers a group of four LEDs.
+All LED groups are driven by the same two-level PWM architecture: a software oscillator produces a low-frequency waveform, and an ESP32 LEDC hardware channel generates the high-frequency carrier. The oscillator value sets the instantaneous duty cycle of the carrier, giving independent control of flicker frequency, duty cycle, brightness, and phase.
 
 <img src="images/LED Control.png" alt="Led Control" style="zoom:80%;" />
 
+#### Fixed Oscillator-to-Channel Mapping
+
+The mapping between oscillators, LEDC channels, and LED groups is fixed. There is no dispatch table.
+
+|Oscillator|LEDC channel|LED group|Typical use|
+|----------|------------|---------|-----------|
+|1|0|OG1 (2 sub-groups)|FLS flicker|
+|2|1|OG2 (2 sub-groups)|FLS flicker|
+|3|2|OG3 (2 sub-groups)|FLS flicker|
+|4|3|OG4 (2 sub-groups)|FLS flicker|
+|5|4|CG (central)|Ambient / breathing|
+
+Oscillators 1-4 drive the four outer banks and are normally used in the 1-100 Hz flicker range. Oscillator 5 drives the central group; it uses the same mechanism but is typically run at 0 Hz (fixed brightness) or at a very low frequency (e.g. 0.1-0.5 Hz) for a smooth breathing effect.
+
 #### Two-Level PWM Modulation
 
-The oscillator parameters are: frequency (1-100 Hz), duty cycle (0-100%), brightness (0-100%), and phase (0-360 degrees).
+The oscillator parameters are: frequency (0-100 Hz), duty cycle (0-100%), brightness (0-100%), and phase (0-360 degrees).
 
 Since the signal driving the AL8860 CTRL pin must be a digital PWM signal, a two-level **PWM modulation** technique is used to independently control both brightness and the visible flicker frequency and duty cycle:
 
 - **Carrier signal**: High-frequency PWM (1 kHz), generated by the ESP32 LEDC hardware peripheral, controls the LED brightness via its duty cycle.
-- **Modulating signal**: Low-frequency waveform (1-100 Hz), generated in ESP32 software, creates the visible flashing effect. Its frequency and duty cycle determine the flicker parameters.
+- **Modulating signal**: Low-frequency waveform (0-100 Hz), generated in ESP32 software, creates the visible flashing effect. Its frequency and duty cycle determine the flicker parameters. A frequency of 0 Hz means a constant `osc_value` and therefore a fixed brightness.
 
 The two levels are combined as follows:
 
@@ -124,7 +135,7 @@ When `osc_value` is at its peak, the LEDC runs at full brightness duty cycle. Wh
 
 #### Brightness Modulator: ESP32 LEDC Peripheral
 
-The ESP32-S3 LEDC peripheral provides exactly 8 independent hardware PWM channels, one per outer LED group. Each channel is initialized at a fixed carrier frequency (1 kHz) with 10-bit resolution (0-1023 duty range).
+The ESP32-S3 LEDC peripheral provides 8 hardware PWM channels; 5 are used in this design. Each LEDC channel is initialized at a fixed carrier frequency (1 kHz) with 10-bit resolution (0-1023 duty range).
 
 Brightness is set by calling `ledcWrite(channel, duty)` where `duty` is proportional to the desired brightness level. Since the carrier frequency (1 kHz) is well above the flicker range and above the threshold of visual persistence, it is invisible to the eye: only the average brightness is perceived.
 
@@ -154,28 +165,25 @@ To handle continuously changing frequencies smoothly, a **Direct Digital Synthes
 ```c
 // Timer callback - runs at CALLBACK_RATE Hz (e.g. 1000 Hz)
 void osc_callback(void* arg) {
-    // 1. Compute all 4 oscillator values
+    // 1. Compute all 5 oscillator values
     for (int i = 0; i < NUM_OSC; i++) {
         osc_phase[i] += (LUT_SIZE * current_freq[i]) / CALLBACK_RATE_HZ;
         if (osc_phase[i] >= LUT_SIZE) osc_phase[i] -= LUT_SIZE;
         osc_value[i] = lut[i][(int)osc_phase[i]];
     }
 
-    // 2. Dispatch to LEDC channels (groups 1-8) via dispatch table
-    for (int ch = 0; ch < 8; ch++) {
-        int osc_id = dispatch_table[ch];
-        if (osc_id < 0) { ledcWrite(ch, 0); continue; }  // unassigned -> off
-        ledcWrite(ch, (int)(osc_value[osc_id] * current_brightness[osc_id] * MAX_DUTY));
+    // 2. Write each oscillator directly to its fixed LEDC channel
+    for (int ch = 0; ch < 5; ch++) {
+        ledcWrite(ch, (int)(osc_value[ch] * current_brightness[ch] * MAX_DUTY));
     }
-    // Group 9 (central) is handled independently by the SDM peripheral
 }
 ```
 
 This approach ensures:
 
-- Frequency changes are **instantaneous and glitch-free** for all 4 oscillators
+- Frequency changes are **instantaneous and glitch-free** for all 5 oscillators
 - Any waveform shape is supported by simply loading a different LUT
-- The dispatch is a cheap integer lookup per channel per tick
+- The LEDC update is a direct array write per channel per tick
 - Custom therapeutic waveform profiles can be loaded as arbitrary LUTs
 
 **Parameter update constraints:**
@@ -186,7 +194,6 @@ This approach ensures:
 |Brightness|Yes|Multiplied at callback time, no LUT rebuild|
 |Duty cycle|No (fixed per step)|LUT rebuilt once at step start|
 |Phase|Set once at step start|Initializes the phase accumulator|
-|Group assignment|Set once at step start|Updates the dispatch table|
 
 Duty cycle is kept fixed per step because changing it requires rebuilding the LUT. For FLS purposes this is not a limitation: the perceptual difference between smoothly swept duty cycle and step-wise updated duty cycle is negligible.
 
@@ -196,67 +203,15 @@ The **phase** parameter is useful when multiple oscillators are used, as it allo
 
 ---
 
-### LED Control: Central Group (Group 9)
-
-#### Role and Constraints
-
-The central group uses warm white LEDs and acts as a background ambient light source. It does not flicker and is never driven by one of the 4 main oscillators. Its only controllable parameter is **brightness**, which can evolve smoothly over the duration of a step using either linear interpolation or LFO modulation.
-
-#### Hardware: Sigma-Delta Modulator (SDM)
-
-The ESP32-S3 Sigma-Delta Modulator (SDM) peripheral is used to drive the central group's AL8860 CTRL pin. The SDM generates a high-frequency 1-bit pulse-density stream (internal clock ~1 MHz) whose average density corresponds to the desired duty cycle. This gives:
-
-- **Zero callback overhead**: the SDM hardware runs autonomously, no timer interrupt needed
-- **8-bit resolution**: 256 brightness levels
-- **Effective carrier ~78 kHz**: completely invisible, no risk of flicker artifact
-- **Simple API**: a single function call sets the brightness
-
-```c
-// One-time setup
-sdm_channel_handle_t sdm_chan;
-sdm_config_t config = {
-    .clk_src   = SDM_CLK_SRC_DEFAULT,
-    .gpio_num  = CENTRAL_LED_GPIO,
-    .sample_rate_hz = 1000000,
-};
-sdm_new_channel(&config, &sdm_chan);
-sdm_channel_enable(sdm_chan);
-
-// Update brightness from parameter layer (every 10-50 ms)
-// density range: -128 (off) to +127 (full brightness)
-int8_t density = (int8_t)(central_brightness * 255 - 128);
-sdm_channel_set_pulse_density(sdm_chan, density);
-```
-
-#### Brightness Control Modes
-
-The central brightness is updated by the **parameter layer** every 10-50 ms, independently of the oscillator callback. It supports the same two control modes as the main oscillators:
-
-```c
-// Parameter layer tick
-if (central_mode == LINEAR) {
-    central_brightness = start_b + (end_b - start_b) * (elapsed / duration);
-}
-else if (central_mode == LFO) {
-    float lfo_val  = evaluate_lfo(lfo_form, lfo_freq, t);  // 0.0 to 1.0
-    central_brightness = b_min + (b_max - b_min) * lfo_val;
-}
-sdm_channel_set_pulse_density(sdm_chan, brightness_to_density(central_brightness));
-```
-
-Example: a 5 Hz sine LFO between 30% and 50% brightness produces a gentle, slow breathing effect on the warm central light, updated at 100 Hz (every 10 ms = 20 samples per LFO period), giving a visually smooth curve.
-
----
-
 ## Sequence Mode of Operation
 
 ### Overview
 
-In normal mode of operation, the device is controlled by playing **sequences** composed of ordered **steps**. Each step has a fixed duration and defines, for each of the 4 oscillators, both the waveform parameters and the oscillator-to-group routing, as well as the brightness of the central group. Steps are played back one after another, with optional looping, pause, and seek capabilities.
+In normal mode of operation, the device is controlled by playing **sequences** composed of ordered **steps**. Each step has a fixed duration and defines the waveform parameters for each of the 5 oscillators. Oscillators 1-4 drive banks OG1-OG4 and oscillator 5 drives the central group. Steps are played back one after another, with optional looping, pause, and seek capabilities.
 
 ### Step Definition
 
-A step has one global parameter, a set of per-oscillator parameters for groups 1-8, and a dedicated parameter block for the central group:
+A step has one global parameter and a set of per-oscillator parameters for oscillators 1 to 5. Oscillators 1-4 drive the outer banks OG1-OG4; oscillator 5 drives the central group CG:
 
 **Global parameter:**
 
@@ -264,34 +219,26 @@ A step has one global parameter, a set of per-oscillator parameters for groups 1
 |---------|-----------|
 |`duration`|Duration of the step in seconds, common to all oscillators|
 
-**Per-oscillator parameters (repeated for oscillators 1 to 4), groups 1-8 only:**
+**Per-oscillator parameters (repeated for oscillators 1 to 5):**
 
 |Parameter|Description|
 |---------|-----------|
-|`groups`|List of LED groups (1-8) driven by this oscillator during this step|
 |`waveform`|Waveform shape: sine, square, triangle, or custom|
 |`duty`|Duty cycle: fixed value for the duration of the step (triggers LUT rebuild at step start)|
 |`phase`|Starting position in the LUT at the beginning of this step (0-360 degrees)|
 |`freq`|Frequency control: linear(start_hz, end_hz) or lfo(form, freq_hz, min_hz, max_hz)|
 |`brightness`|Brightness control: linear(start_%, end_%) or lfo(form, freq_hz, min_%, max_%)|
 
-**Central group parameters (group 9, always present):**
-
-|Parameter|Description|
-|---------|-----------|
-|`central_brightness`|Brightness control: linear(start_%, end_%) or lfo(form, freq_hz, min_%, max_%)|
-
 ### Parameter Control Modes
 
-The two dynamic parameters for the oscillators (freq and brightness) and the central brightness can independently use one of two control modes during a step:
+The two dynamic parameters for each oscillator (freq and brightness) can independently use one of two control modes during a step:
 
 #### Linear Mode
 
 The parameter interpolates smoothly and linearly from a start value to an end value over the duration of the step. Setting start and end to the same value keeps the parameter constant.
 
 ```text
-Example step - oscillator 1:
-  groups:     1, 5, 7
+Example step - oscillator 1 (drives OG1):
   duration:   20 s
   waveform:   sine
   duty:       50%
@@ -299,8 +246,13 @@ Example step - oscillator 1:
   freq:       linear  10 Hz -> 12 Hz
   brightness: linear  80%   -> 50%
 
-Central group:
-  central_brightness: linear  40% -> 40%   (constant)
+Example step - oscillator 5 (drives CG):
+  duration:   20 s
+  waveform:   sine
+  duty:       50%
+  phase:      0 degrees
+  freq:       0 Hz  (fixed brightness)
+  brightness: linear  40% -> 40%   (constant)
 ```
 
 At each parameter update tick, the current value is:
@@ -314,8 +266,7 @@ current_value = start + (end - start) * (elapsed / duration)
 Inspired by classic analog synthesizers (e.g., Korg MS-20/MS-50), a dedicated **Low Frequency Oscillator (LFO)** modulates the parameter rhythmically between a minimum and maximum value at a given LFO frequency and waveform shape. This creates organic, evolving parameter motion within a step.
 
 ```text
-Example step - oscillator 2:
-  groups:     2, 4, 6
+Example step - oscillator 2 (drives OG2):
   duration:   10 s
   waveform:   sine
   duty:       50%
@@ -323,8 +274,13 @@ Example step - oscillator 2:
   freq:       lfo  sine  2 Hz  10 Hz - 20 Hz
   brightness: lfo  triangle  0.5 Hz  60% - 90%
 
-Central group:
-  central_brightness: lfo  sine  5 Hz  30% - 50%
+Example step - oscillator 5 (drives CG):
+  duration:   10 s
+  waveform:   sine
+  duty:       50%
+  phase:      0 degrees
+  freq:       lfo  sine  0.2 Hz  (breathing)
+  brightness: lfo  sine  0.2 Hz  30% - 50%
 ```
 
 At each parameter update tick, the LFO value is evaluated and mapped to the parameter range:
@@ -350,30 +306,27 @@ flowchart TD
     SEQ --> P2["**Param Layer - Osc 2**\nfreq / brightness\nlinear or LFO"]
     SEQ --> P3["**Param Layer - Osc 3**\nfreq / brightness\nlinear or LFO"]
     SEQ --> P4["**Param Layer - Osc 4**\nfreq / brightness\nlinear or LFO"]
-    SEQ --> PC["**Param Layer - Central**\nbrightness only\nlinear or LFO"]
+    SEQ --> P5["**Param Layer - Osc 5**\nfreq / brightness / CG\nlinear or LFO"]
 
     P1 --> O1["**OSC 1**\nLUT + DDS\nphase accumulator"]
     P2 --> O2["**OSC 2**\nLUT + DDS\nphase accumulator"]
     P3 --> O3["**OSC 3**\nLUT + DDS\nphase accumulator"]
     P4 --> O4["**OSC 4**\nLUT + DDS\nphase accumulator"]
-    PC --> SDM["**SDM peripheral**\n~1 MHz hardware\n8-bit resolution"]
+    P5 --> O5["**OSC 5**\nLUT + DDS\nphase accumulator\n CG ambient"]
 
-    O1 --> DT["**DISPATCH TABLE**\nstep parameter\nch -> oscillator mapping"]
-    O2 --> DT
-    O3 --> DT
-    O4 --> DT
+    O1 --> LEDC["**LEDC - 5 channels**\n1 kHz carrier / 10-bit"]
+    O2 --> LEDC
+    O3 --> LEDC
+    O4 --> LEDC
+    O5 --> LEDC
 
-    DT --> LEDC["**LEDC - 8 channels**\n1 kHz carrier / 10-bit\ngroups 1-8"]
-    SDM --> AL9["**AL8860**\n333 mA - group 9"]
+    LEDC --> AL18["**AL8860 x8**\n333 mA each\n2 per bank"]
+    LEDC --> AL9["**AL8860**\n333 mA - CG"]
 
-    LEDC --> AL18["**AL8860 x8**\n333 mA each\ngroups 1-8"]
-
-    AL18 --> G18["**LED groups 1-8**\ncold white / flickering"]
-    AL9  --> G9["**LED group 9**\nwarm white / ambient"]
+    AL18 --> G18["**LED banks OG1..OG4**\ncold white / flickering"]
+    AL9  --> G9["**LED group CG**\nwarm white / ambient"]
 
     style SEQ      fill:#4A90D9,color:#fff,stroke:#2c6fad
-    style DT       fill:#E8A838,color:#fff,stroke:#b07820
-    style SDM      fill:#7B68EE,color:#fff,stroke:#5040cc
     style LEDC     fill:#7B68EE,color:#fff,stroke:#5040cc
     style AL18     fill:#5BAD6F,color:#fff,stroke:#3a8050
     style AL9      fill:#5BAD6F,color:#fff,stroke:#3a8050
@@ -385,11 +338,10 @@ flowchart TD
 
 |Layer|Update Rate|Responsibility|
 |-----|-----------|--------------|
-|Sequencer|Every few seconds|Advance to next step, rebuild LUTs, update dispatch table|
-|Parameter layer|Every 10-50 ms|Linear interp or LFO update for all oscillators and central group|
-|Phase accumulator|Every 1 ms (timer callback)|Drive all 4 oscillators, dispatch to 8 LEDC channels|
-|LEDC peripheral|Every 1 ms (carrier period)|Output PWM to AL8860 channels 1-8|
-|SDM peripheral|Autonomous (~1 MHz)|Output pulse-density signal to AL8860 channel 9|
+|Sequencer|Every few seconds|Advance to next step, rebuild LUTs|
+|Parameter layer|Every 10-50 ms|Linear interp or LFO update for all 5 oscillators|
+|Phase accumulator|Every 1 ms (timer callback)|Drive all 5 oscillators, write to 5 LEDC channels|
+|LEDC peripheral|Every 1 ms (carrier period)|Output PWM to AL8860 banks OG1..OG4 and central group CG|
 
 ## Real-Time Mode of Operation
 
@@ -397,23 +349,26 @@ In real-time mode, the notion of steps does not exist as it does in sequence mod
 
 ### Parameter Control Modes
 
-The two dynamic parameters for the oscillators (freq and brightness) and the central brightness can independently use one of two control modes:
+The two dynamic parameters for each oscillator (freq and brightness) can independently use one of two control modes:
 
 #### Fixed Value Mode
 
 The parameters stay constant.
 
 ```text
-Example step - oscillator 1:
-  groups:     1, 5, 7
+Example - oscillator 1 (drives OG1):
   waveform:   sine
   duty:       50%
   phase:      0 degrees
   freq:       10 Hz
   brightness: 80%
 
-Central group:
-  central_brightness: 40%
+Example - oscillator 5 (drives CG):
+  waveform:   sine
+  duty:       50%
+  phase:      0 degrees
+  freq:       0 Hz
+  brightness: 40%
 ```
 
 #### LFO Mode (Low Frequency Oscillator Modulation)
@@ -421,16 +376,19 @@ Central group:
 Works as described in the `Sequence mode`
 
 ```text
-Example step - oscillator 2:
-  groups:     2, 4, 6
+Example - oscillator 2 (drives OG2):
   waveform:   sine
   duty:       50%
   phase:      90 degrees
   freq:       lfo  sine  2 Hz  10 Hz - 20 Hz
   brightness: lfo  triangle  0.5 Hz  60% - 90%
 
-Central group:
-  central_brightness: lfo  sine  5 Hz  30% - 50%
+Example - oscillator 5 (drives CG):
+  waveform:   sine
+  duty:       50%
+  phase:      0 degrees
+  freq:       lfo  sine  0.2 Hz  (breathing)
+  brightness: lfo  sine  0.2 Hz  30% - 50%
 ```
 
 ## Hardware Prototype
