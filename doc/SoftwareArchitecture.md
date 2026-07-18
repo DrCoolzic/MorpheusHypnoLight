@@ -94,8 +94,8 @@ Oscillator timer callback (1 kHz)
     ↓
 Dispatch table (channel → oscillator)
     ↓
-LEDC peripheral (8 channels) → outer LED groups 1–8
-SDM peripheral (1 channel)   → central LED group 9
+LEDC peripheral (8 channels) → outer LED groups OG1–OG8
+SDM peripheral (1 channel)   → central LED group CG
 ```
 
 ## Runtime Architecture (FreeRTOS)

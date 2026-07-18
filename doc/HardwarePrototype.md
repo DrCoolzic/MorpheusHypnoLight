@@ -19,10 +19,15 @@ The main components used for the prototype are:
 - [5A DC-DC Step Down Power Supply Buck Converter](https://fr.aliexpress.com/item/1005005921557535.html) for 5V ESP32 power
 - [12V DC-DC Step Down Power Supply Buck Converter](https://fr.aliexpress.com/item/1005010319587802.html) for 12V fan power
 - 4× [Adafruit I2C Quad Rotary Encoder](https://learn.adafruit.com/adafruit-i2c-quad-rotary-encoder-breakout/arduino)
-- 1× [I2C OLED Display 128×64 SSD1306](https://fr.aliexpress.com/item/1005011852817482.html)
-- TMP36 temperature sensor
+- [I2C OLED Display 128×64 SSD1306](https://fr.aliexpress.com/item/1005011852817482.html)
+- [TMP36 temperature sensor](https://fr.aliexpress.com/item/1005007666012953.html)
+- [4-pin SM04B-SRSS-TB connector for QWIIC](https://fr.aliexpress.com/item/1005012597457629.html)
+- [2.54 mm KF2510 3+1P KF2510-4AW Male Housing Connector White Straight Pin Header 4pin](https://fr.aliexpress.com/item/1005004714218238.html)
 
 > **Note:** The PicoBuck uses the AL8805 LED driver, which is functionally equivalent to the AL8860 selected for the final product. The AL8860 is the recommended choice for the final PCB design.
+>
+
+![PicoBuck Schematic](images/picobuck_sch.png)
 
 ## Power Supply
 
@@ -87,68 +92,60 @@ The prototype consists of two electronics assemblies connected via QWIIC/STEMMA 
 - **Main electronics**: ESP32-S3-DevKitC-1, PicoBuck converters, LED star groups, fan, temperature sensor
 - **Control electronics**: 4× Adafruit NeoRotary 4 (I2C quad rotary encoder + NeoPixels), 1× I2C OLED display
 
-![Prototype](images/HypnoLight_bb.png)
-
-> **Note1:** Fan wiring is not yet shown in the schematic.
->
-> **Note2**: LED Groups are are shown in the schematic as one LED but in fact each group contains 4 LED connected in series as shown below
-
-![4LED](images/PicoBuck_4led.png)
-
 ### Main electronics
 
-Composed of:
+**Composed of**:
 
-- 36 LEDs plus temperature sensor mounted on an aluminum plate
-- One prototype board with the ESP32 devkit, two DC-DC converters, and a QWIIC connector
-- Three PicoBuck boards
+- An 15x15 cm aluminum plate with
+  - [x] 36 (9x4) LEDs mounted with thermal pad
+  - [ ] a temperature sensor
+  - [x] One 6x9 cm prototype board with
+    - [x] An ESP32-S3 devkit,
+    - [x] A 5V DC-DC Buck converter
+    - [ ] A 12V DC-DC Buck converter
+    - [x] A 2 Pin power connector
+    - [ ] A 4 pins QWIIC connector
+    <img src="images/qwiic.png" alt="QWIIC connector" style="zoom:50%;" />
+    - [ ] A 4 pins PWM fan connector
+    ![Fan connector](images/fan_pwm_con.png)
 
-**Power supply:**
+  - [x] Three PicoBuck boards
 
-- [ ] Connect the 24 V power supply to the input of each PicoBuck converter (VIN+ / VIN−).
-- [ ] Connect GND of the 24 V supply to the GND rail of the prototype board.
-- [ ] Power the ESP32-S3-DevKitC-1 via its `UART` USB port during development, or via the 5 V / 3.3 V header pins in the final prototype.
+![Main Electronics](images/HypnoLight.png)
 
-**PicoBuck converters (×3):**
+> **Note1**: LED Groups are are shown in the schematic as one LED but in fact each group contains 4 LED connected in series as shown below
+![4LED](images/PicoBuck_4led.png)
 
-- [ ] Mount the three PicoBuck converters on the prototype board.
-- [ ] Connect each PicoBuck output (VOUT+ / VOUT−) to the corresponding LED star group.
-- [ ] Connect each PicoBuck DIM pin to the corresponding ESP32-S3 GPIO (LEDC/PWM):
-  - PicoBuck 1 → GPIO4 (OG1), GPIO5 (OG2), GPIO6 (OG3)
-  - PicoBuck 2 → GPIO7 (OG4), GPIO15 (CG), GPIO16 (OG5)
-  - PicoBuck 3 → GPIO17 (OG6), GPIO18 (OG7), GPIO8 (OG8)
+**Wiring**:
 
-**LED star groups:**
-
-- [ ] Connect each LED star group anode (+) to the corresponding PicoBuck output VOUT+.
-- [ ] Connect all LED star group cathodes (−) to GND.
-
-**Temperature sensor (TMP36):**
-
-- [ ] Connect TMP36 VCC to 3.3 V.
-- [ ] Connect TMP36 GND to GND.
-- [ ] Connect TMP36 VOUT to GPIO9 (ADC1_CH8).
-
-**QWIIC connector (I2C to Control electronics):**
-
-- [ ] Solder a QWIIC connector to the prototype board.
-- [ ] Connect SDA to GPIO1, SCL to GPIO2, VCC to 3.3 V, GND to GND.
-
-**Fan:**
-
-- [ ] Connect the 12V buck converter input to the 24V supply rail.
-- [ ] Connect the 12V buck converter output to the fan power supply (12V).
-- [ ] Connect fan tachometer output to GPIO10.
-- [ ] Connect fan PWM control input to GPIO11.
+- [x] Connect the 24 V power supply to the input of the 3 PicoBuck converter (VIN+ / VIN−) using 18 AWG wires
+- [ ] Connect the 24 V power supply to prototype board power connector
+- [x] Connect the power connector to the 5V DC-DC converter inputs
+- [ ] Connect the power connector to the 12V DC-DC converter inputs
+- [x] Connect the 5V DC-DC converter outputs to the 5V and GND pins of the ESP32-S3-DevKitC-1
+- [x] Connect the PicoBuck inputs pins to the ESP32-S3-DevKitC-1 GPIO pins
+- [x] Connect in series the 4 LEDs of each group (nine) using 22 AWG wires
+- [x] Connect OG1, OG2, OG3 to PicoBuck_1 outputs using 22 AWG wires
+- [x] Connect OG4, CG, OG5 to PicoBuck_2 outputs using 22 AWG wires
+- [x] Connect OG6, OG7, OG8 to PicoBuck_3 outputs using 22 AWG wires
+  - [x] PicoBuck_1 → GPIO4 (OG1), GPIO5 (OG2), GPIO6 (OG3)
+  - [x] PicoBuck_2 → GPIO7 (OG4), GPIO15 (CG), GPIO16 (OG5)
+  - [x] PicoBuck_3 → GPIO17 (OG6), GPIO18 (OG7), GPIO8 (OG8)
+  - [x] Connect the GND pins of the PicoBuck converters to the GND pin(s) of the ESP32-S3-DevKitC-1
+- [ ] For the QWIIC connector: Connect SDA to GPIO1, SCL to GPIO2, VCC to 3.3 V, GND to GND.
+- [ ] For the PWM Fan Connector: Connect the 12V DC-DC converter outputs to the V+ and GND pins, TACH pin to GPIO10, PWM pin to GPIO11
+- [ ] Connect the temperature sensor power and ground to the 3.3V and GND pins of the ESP32
+- [ ] Connect the temperature sensor output to GPIO9
 
 ### Control electronics
 
 The Control electronics is a standalone device connected to the Main electronics via a QWIIC/STEMMA QT cable. All components on this device communicate with the ESP32-S3 over the shared I2C bus (GPIO1/GPIO2).
 
-**Components:**
+**Components (to be connected in a later prototype phase):**
 
-- 4× [Adafruit NeoRotary 4](https://www.adafruit.com/product/5752) — I2C quad rotary encoder with NeoPixel ring (seesaw-based, each has a configurable I2C address)
-- 1× I2C OLED display (SSD1306 or equivalent, 128×64)
+> **Note:** The NeoRotary encoders and OLED display are not connected in the first hardware bring-up phase. The initial firmware will be controlled and monitored via the serial interface.
+
+<img src="images/ControlBoard_bb.png" alt="Control" style="zoom:40%;" />
 
 **I2C addressing:**
 

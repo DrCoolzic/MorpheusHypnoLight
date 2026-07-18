@@ -10,8 +10,10 @@ The objective of this project is to create a device for visual and auditory stim
 
 ### Must have
 
-- **Remote Sequence Mode of Operation**: The sequences to play are selected and controlled remotely from an application that communicates using BLE or Wi-Fi. This application can control multiple machines simultaneously.
-- **Remote Real-time Mode of Operation**: Developers use this mode to control all machine parameters in real time without using sequences.
+- Two modes of operation
+  - **Remote Sequence Mode of Operation**: The sequences to play are selected and controlled remotely from an application that communicates using BLE or Wi-Fi. This application can control multiple machines simultaneously.
+  - **Remote Real-time Mode of Operation**: Developers use this mode to control all machine parameters in real time without using sequences.
+
 - Bluetooth Low Energy connectivity, used to connect to the control application and potentially to a sound system
 - 8 outer LED groups (cold white), each driven by one of the 8 LEDC hardware channels, with the 4 oscillators dispatched to the groups via a routing table
 - 1 central LED group (warm white) driven by a dedicated Sigma-Delta Modulator (SDM) channel with linear or LFO brightness control
@@ -22,16 +24,12 @@ The objective of this project is to create a device for visual and auditory stim
 - Capability to pause and seek loaded sequences
 - Low-cost hardware (target: under $100)
 - Low-noise cooling using a large PWM temperature controlled fan
-- Compact and easy to carry with tripod mounting threads
+- Compact and easy to carry with [tripod mounting threads](https://www.amazon.fr/ruthex-Lot-pannes-%C3%A0-souder/dp/B0F1B8GC7Z?th=1) - [Hexagonal Insert for Tripod Mounting](https://www.amazon.fr/QUARKZMAN-Entra%C3%AEnement-Hexagonal-Connecteur-Fixation/dp/B0G138HB36/ref=sr_1_49_sspa)
 - WiFi web server interface
 
 ### Could have
 
-- **Local Sequence Mode of Operation**: Sequence selection and control is done locally, without the need for an external application. The sequences are stored locally on an SD card, and control is done using knobs, the touch screen, etc.
-- **Local Real-Time Mode of Operation**: This mode allows developers to control all machine parameters in real time without using sequences. In Sequence mode, control is done using knobs, the touch screen, etc.
-- Input devices: parameter controller (rotary knobs and switches), joystick, mouse, Touch screen
-- Output devices: sound output direct through audio plug or remote via BLE
-- Store sequences locally on SD card
+- **Local Real-Time Mode of Operation**: This mode allows developers to control all machine parameters in real time without using sequences by connecting through a QWIIC connector some input devices
 
 ---
 
@@ -43,9 +41,9 @@ Numerous experiments have shown that the position of the LEDs on the PCB has no 
 
 <img src="images/pcbled2.png" alt="Led" style="zoom: 50%;" />
 
-The eight peripheral groups are connected to four oscillators, each of which has adjustable frequency, brightness, and duty cycle settings. They use cold white LEDs with a power rating of approximately one watt each (with a current of about 330 mA). Therefore, each group driven with a current of 330 mA can provide a maximum power output of 4.5 watts, for a total output of about 36 watts for all eight groups combined.
+The eight peripheral groups are connected to four oscillators, each of which has adjustable frequency, brightness, and duty cycle settings. They use cold **white** LEDs with a power rating of approximately one watt each (with a current of about 330 mA). Therefore, each group driven with a current of 330 mA can provide a maximum power output of 4.5 watts, for a total output of about 36 watts for all eight groups combined.
 
-The central group uses four warm white LEDs rated at 3 W each but driven at about 2W (with a current of about 660 mA). Therefore, the central group can provide a maximum power output of 9 watts,
+The central group uses four **warm** white LEDs rated at 3 W each but driven at about 2W (with a current of about 660 mA). Therefore, the central group can provide a maximum power output of 9 watts,
 
 ---
 
@@ -79,7 +77,7 @@ Therefore, brightness is controlled by pulse width modulation (PWM) applied to t
 
 The schematic for one LED group is as follows:
 
-<img src="images/LedDriver.png" style="zoom:130%;" />
+<img src="images/LedDriver.png">
 
 The AL8860 is a buck (step-down) constant-current LED driver. Its role is to regulate the current through the LEDs at a fixed value determined by the sense resistor R1. With R1 = 300 mΩ, the regulated LED current is:
 
@@ -138,12 +136,12 @@ The low-frequency modulating signal is generated entirely in ESP32 software usin
 
 All waveforms are normalized to the range 0.0-1.0. Each waveform has a **frequency** and a **duty cycle** parameter. The meaning of duty cycle depends on the waveform type:
 
-| Waveform | Duty Cycle Meaning | FLS Effect |
-| -------- | ------------------ | ---------- |
-| Square | Fraction of period at HIGH level (classic PWM) | Sharp, stroboscopic pulses |
-| Triangle | Fraction of period in ascending phase (0% or 100% gives a sawtooth variant) | Linear fade in/out, asymmetry controllable |
-| Sine | Not applicable (fixed shape) | Gentle, organic stimulation |
-| Custom | Encoded in the LUT (user-defined shape) | Any specific FLS therapeutic profile |
+|Waveform|Duty Cycle Meaning|FLS Effect|
+|----------|------------------|----------|
+|Square|Fraction of period at HIGH level (classic PWM)|Sharp, stroboscopic pulses|
+|Triangle|Fraction of period in ascending phase (0% or 100% gives a sawtooth variant)|Linear fade in/out, asymmetry controllable|
+|Sine|Not applicable (fixed shape)|Gentle, organic stimulation|
+|Custom|Encoded in the LUT (user-defined shape)|Any specific FLS therapeutic profile|
 
 Note: sawtooth is not a separate waveform type. It is a degenerate case of the triangle waveform obtained by setting duty cycle to 0% (instant rise then full fall ramp) or 100% (full rise ramp then instant fall).
 
@@ -182,13 +180,13 @@ This approach ensures:
 
 **Parameter update constraints:**
 
-| Parameter | Dynamic during step? | Mechanism |
-| --------- | -------------------- | --------- |
-| Frequency | Yes | DDS phase increment updated each parameter tick |
-| Brightness | Yes | Multiplied at callback time, no LUT rebuild |
-| Duty cycle | No (fixed per step) | LUT rebuilt once at step start |
-| Phase | Set once at step start | Initializes the phase accumulator |
-| Group assignment | Set once at step start | Updates the dispatch table |
+|Parameter|Dynamic during step?|Mechanism|
+|---------|--------------------|---------|
+|Frequency|Yes|DDS phase increment updated each parameter tick|
+|Brightness|Yes|Multiplied at callback time, no LUT rebuild|
+|Duty cycle|No (fixed per step)|LUT rebuilt once at step start|
+|Phase|Set once at step start|Initializes the phase accumulator|
+|Group assignment|Set once at step start|Updates the dispatch table|
 
 Duty cycle is kept fixed per step because changing it requires rebuilding the LUT. For FLS purposes this is not a limitation: the perceptual difference between smoothly swept duty cycle and step-wise updated duty cycle is negligible.
 
@@ -262,26 +260,26 @@ A step has one global parameter, a set of per-oscillator parameters for groups 1
 
 **Global parameter:**
 
-| Parameter | Description |
-| --------- | ----------- |
-| `duration` | Duration of the step in seconds, common to all oscillators |
+|Parameter|Description|
+|---------|-----------|
+|`duration`|Duration of the step in seconds, common to all oscillators|
 
 **Per-oscillator parameters (repeated for oscillators 1 to 4), groups 1-8 only:**
 
-| Parameter | Description |
-| --------- | ----------- |
-| `groups` | List of LED groups (1-8) driven by this oscillator during this step |
-| `waveform` | Waveform shape: sine, square, triangle, or custom |
-| `duty` | Duty cycle: fixed value for the duration of the step (triggers LUT rebuild at step start) |
-| `phase` | Starting position in the LUT at the beginning of this step (0-360 degrees) |
-| `freq` | Frequency control: linear(start_hz, end_hz) or lfo(form, freq_hz, min_hz, max_hz) |
-| `brightness` | Brightness control: linear(start_%, end_%) or lfo(form, freq_hz, min_%, max_%) |
+|Parameter|Description|
+|---------|-----------|
+|`groups`|List of LED groups (1-8) driven by this oscillator during this step|
+|`waveform`|Waveform shape: sine, square, triangle, or custom|
+|`duty`|Duty cycle: fixed value for the duration of the step (triggers LUT rebuild at step start)|
+|`phase`|Starting position in the LUT at the beginning of this step (0-360 degrees)|
+|`freq`|Frequency control: linear(start_hz, end_hz) or lfo(form, freq_hz, min_hz, max_hz)|
+|`brightness`|Brightness control: linear(start_%, end_%) or lfo(form, freq_hz, min_%, max_%)|
 
 **Central group parameters (group 9, always present):**
 
-| Parameter | Description |
-| --------- | ----------- |
-| `central_brightness` | Brightness control: linear(start_%, end_%) or lfo(form, freq_hz, min_%, max_%) |
+|Parameter|Description|
+|---------|-----------|
+|`central_brightness`|Brightness control: linear(start_%, end_%) or lfo(form, freq_hz, min_%, max_%)|
 
 ### Parameter Control Modes
 
@@ -385,13 +383,13 @@ flowchart TD
 
 ### Timing Layers Summary
 
-| Layer | Update Rate | Responsibility |
-| ----- | ----------- | -------------- |
-| Sequencer | Every few seconds | Advance to next step, rebuild LUTs, update dispatch table |
-| Parameter layer | Every 10-50 ms | Linear interp or LFO update for all oscillators and central group |
-| Phase accumulator | Every 1 ms (timer callback) | Drive all 4 oscillators, dispatch to 8 LEDC channels |
-| LEDC peripheral | Every 1 ms (carrier period) | Output PWM to AL8860 channels 1-8 |
-| SDM peripheral | Autonomous (~1 MHz) | Output pulse-density signal to AL8860 channel 9 |
+|Layer|Update Rate|Responsibility|
+|-----|-----------|--------------|
+|Sequencer|Every few seconds|Advance to next step, rebuild LUTs, update dispatch table|
+|Parameter layer|Every 10-50 ms|Linear interp or LFO update for all oscillators and central group|
+|Phase accumulator|Every 1 ms (timer callback)|Drive all 4 oscillators, dispatch to 8 LEDC channels|
+|LEDC peripheral|Every 1 ms (carrier period)|Output PWM to AL8860 channels 1-8|
+|SDM peripheral|Autonomous (~1 MHz)|Output pulse-density signal to AL8860 channel 9|
 
 ## Real-Time Mode of Operation
 
@@ -411,8 +409,8 @@ Example step - oscillator 1:
   waveform:   sine
   duty:       50%
   phase:      0 degrees
-  freq:       linear  10 Hz
-  brightness: linear  80%
+  freq:       10 Hz
+  brightness: 80%
 
 Central group:
   central_brightness: 40%
@@ -468,6 +466,7 @@ The software architecture and firmware design are documented in [SoftwareArchite
 - [SparkFun Qwiic OLED - (1.3in., 128x64) - SparkFun Electronics](https://www.sparkfun.com/sparkfun-qwiic-oled-1-3in-128x64.html)
 - [SparkFun Qwiic OLED Display (1.5 in., 128x128) - SparkFun Electronics](https://www.sparkfun.com/sparkfun-qwiic-oled-display-1-5-in-128x128.html)
 - [GitHub PicoBuck: Three-channel current driver for LEDs](https://github.com/sparkfun/PicoBuck)
+- [Prototyping with I²C has never been easier.](https://www.sparkfun.com/qwiic)
 
 ## Adafruit References
 
