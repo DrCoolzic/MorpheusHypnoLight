@@ -37,6 +37,10 @@ The prototype is powered by a 24V 5A 120W supply:
 - A 5V DC-DC buck converter provides power to the ESP32-S3-DevKitC-1.
 - A 12V DC-DC buck converter provides power to the PWM fan.
 
+> **Important — Power source conflict:** The ESP32-S3-DevKitC-1 can be powered either from the on-board USB port(s) or from the external `5V` pin, but these two sources are mutually exclusive. If the 5V DC-DC converter is connected to the DevKit `5V` pin while the USB cable is also plugged in, the USB 5V rail and the converter output will be in parallel. Depending on the converter design, this may cause backfeeding and could damage the converter or the USB port.
+>
+> **Always isolate the 5V DC-DC converter output (e.g., with a jumper) before connecting a USB cable for development.**
+
 ## Power Budget
 
 |Component|Power|Notes|
@@ -111,9 +115,10 @@ The prototype consists of two electronics assemblies connected via QWIIC/STEMMA 
 
   - [x] Three PicoBuck boards
 
-![Main Electronics](images/HypnoLight.png)
+![Main Electronics](images/HypnoLight_bb.png)
+![Main Schematic](images/HypnoLight_schem.png)
 
-> **Note1**: LED Groups are are shown in the schematic as one LED but in fact each group contains 4 LED connected in series as shown below
+> **Note1**: LED Groups are shown in the schematic as one LED but in fact each group contains 4 LEDs connected in series as shown below
 ![4LED](images/PicoBuck_4led.png)
 
 **Wiring**:
@@ -123,6 +128,7 @@ The prototype consists of two electronics assemblies connected via QWIIC/STEMMA 
 - [x] Connect the power connector to the 5V DC-DC converter inputs
 - [ ] Connect the power connector to the 12V DC-DC converter inputs
 - [x] Connect the 5V DC-DC converter outputs to the 5V and GND pins of the ESP32-S3-DevKitC-1
+- [ ] Add a jumper in the 5V line so the converter can be isolated when a USB cable is plugged in for development
 - [x] Connect the PicoBuck inputs pins to the ESP32-S3-DevKitC-1 GPIO pins
 - [x] Connect in series the 4 LEDs of each group (nine) using 22 AWG wires
 - [x] Connect OG1, OG2, OG3 to PicoBuck_1 outputs using 22 AWG wires

@@ -9,6 +9,12 @@
   "cSpell.words": [
     "dmconfig",
     "dmutil",
+    "gpio",
+    "gpios",
+    "hpoint",
+    "ledc",
+    "LEDC",
+    "LOGI",
     "mpsim",
     "MPSIM",
     "simconfig"
@@ -28,5 +34,8 @@
   "cmake.configureOnOpen": false,
   "idf.monitorPort": "COM8",
   "idf.flashType": "UART",
-  "idf.portWin": "COM8"
+  "idf.portWin": "COM8",
+  "idf.openOcdConfigs": [
+    "board/esp32s3-builtin.cfg"
+  ]
 }
