@@ -23,7 +23,7 @@ firmware/
 │   └── main.c              # app_main(): initialization
 └── components/             # Application components
     ├── oscillator/         # Software oscillator engine (LUT + DDS)
-    ├── led_control/        # LEDC + SDM dispatch and output
+    ├── led_control/        # Fixed LEDC channel output
     ├── sequence/           # Sequence engine (steps, interpolation, LFO)
     └── comms/              # BLE / Wi-Fi communication layer
 ```
@@ -32,7 +32,7 @@ firmware/
 
 ### `oscillator`
 
-Responsible for generating the four low-frequency flicker signals that drive the eight outer LED groups.
+Responsible for generating the five low-frequency signals that drive the four peripheral banks (PB1..PB4) and the central group (CG).
 
 - **Waveforms**: sine, square, triangle, custom (via LUT).
 - **Parameters per oscillator**: frequency, duty cycle, brightness, phase.
@@ -47,23 +47,21 @@ Responsible for generating the four low-frequency flicker signals that drive the
 
 ### `led_control`
 
-Routes oscillator values to the LEDC hardware channels and drives the central group via the SDM peripheral.
+Writes oscillator values to the five fixed LEDC hardware channels.
 
-- **Outer groups 1–8**: 8 LEDC channels at 1 kHz carrier, 10-bit resolution.
-- **Central group 9**: 1 SDM channel at ~1 MHz, 8-bit effective brightness.
-- **Dispatch table**: per-step mapping `channel → oscillator_id`.
+- **PB1–PB4**: LEDC channels 0–3 at a common carrier frequency and 10-bit resolution. Each channel controls the two LED sub-groups in its peripheral bank.
+- **CG**: LEDC channel 4, using the same configuration as the peripheral banks.
+- **Fixed mapping**: oscillator 1 → PB1 / LEDC 0, oscillator 2 → PB2 / LEDC 1, oscillator 3 → PB3 / LEDC 2, oscillator 4 → PB4 / LEDC 3, and oscillator 5 → CG / LEDC 4.
 - **Public API** (to be defined):
   - `led_control_init()`
-  - `led_control_set_dispatch_table(mapping[8])`
-  - `led_control_update_outer(ledc_channel, value)`
-  - `led_control_set_central_brightness(percent)`
+  - `led_control_update(oscillator_id, value)`
 
 ### `sequence`
 
 Implements the sequence engine: steps, timing, parameter interpolation and LFO modulation.
 
-- A **step** defines duration, per-oscillator waveform/duty/phase, dynamic frequency/brightness (linear or LFO), and central group brightness.
-- The sequencer advances steps, rebuilds oscillator LUTs, updates the dispatch table, and ticks the parameter layer every 10–50 ms.
+- A **step** defines duration plus per-oscillator waveform/duty/phase and dynamic frequency/brightness (linear or LFO) for all five oscillators.
+- The sequencer advances steps, rebuilds oscillator LUTs, and ticks the parameter layer every 10–50 ms.
 - **Public API** (to be defined):
   - `sequence_load(const sequence_t *seq)`
   - `sequence_play()`, `sequence_pause()`, `sequence_seek(position)`
@@ -92,10 +90,12 @@ Parameter layer (linear / LFO update every 10–50 ms)
     ↓
 Oscillator timer callback (1 kHz)
     ↓
-Dispatch table (channel → oscillator)
-    ↓
-LEDC peripheral (8 channels) → outer LED groups OG1–OG8
-SDM peripheral (1 channel)   → central LED group CG
+LEDC peripheral (5 fixed channels)
+    ├── channel 0 → PB1
+    ├── channel 1 → PB2
+    ├── channel 2 → PB3
+    ├── channel 3 → PB4
+    └── channel 4 → CG
 ```
 
 ## Runtime Architecture (FreeRTOS)
@@ -106,7 +106,7 @@ Proposed FreeRTOS tasks and timers:
 
 |Task / Timer|Period|Responsibility|
 |------------|------|--------------|
-|`oscillator_timer`|1 ms (1 kHz)|Update DDS phase accumulators, compute oscillator values, dispatch to LEDC channels.|
+|`oscillator_timer`|1 ms (1 kHz)|Update DDS phase accumulators, compute oscillator values, and write the five fixed LEDC channels.|
 |`sequencer_task`|10–50 ms|Advance sequence steps, update parameter layer, rebuild LUTs, apply LFOs.|
 |`input_task`|50–100 ms|Poll I2C rotary encoders and update parameters or sequence.|
 |`display_task`|100–250 ms|Refresh the OLED display with current status.|
@@ -143,8 +143,7 @@ For Visual Studio Code, use the ESP-IDF extension commands:
 
 The following ESP-IDF configuration options will be required or important for the project. They are typically set via `idf.py menuconfig` and committed in `sdkconfig`:
 
-- **LEDC**: 8 channels, 10-bit resolution, 1 kHz frequency.
-- **SDM**: 1 channel for the central group.
+- **LEDC**: 5 channels, 10-bit resolution, using a common carrier frequency for PB1..PB4 and CG.
 - **I2C**: master mode on GPIO1 (SDA) / GPIO2 (SCL) for the QWIIC bus.
 - **FreeRTOS**: 1 kHz tick rate for the oscillator timer callback.
 - **BLE / Wi-Fi**: enable as needed for the `comms` component.

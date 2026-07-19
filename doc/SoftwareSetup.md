@@ -149,7 +149,7 @@ MorpheusHypnoLight/
     │   │   ├── CMakeLists.txt
     │   │   ├── oscillator.h
     │   │   └── oscillator.c
-    │   ├── led_control/        ← LED group routing and SDM central channel
+    │   ├── led_control/        ← fixed LEDC channel output
     │   │   ├── CMakeLists.txt
     │   │   ├── led_control.h
     │   │   └── led_control.c
@@ -174,4 +174,4 @@ Each component under `components/` is an independent library with its own `CMake
 - If the ESP-IDF Command Prompt is not available, open a regular PowerShell or Command Prompt, navigate to the ESP-IDF directory, and run `export.ps1` or `export.bat` to activate the environment.
 - The same setup applies to the Devon/VS Code-based environment; once the ESP-IDF extension is configured, the workflow is identical.
 
-Once the firmware is built and flashed, the next step is to test the LED outputs with the simple LEDC/SDM test program in `firmware/main/main.c`.
+Once the firmware is built and flashed, the next step is to test the LED outputs with the simple LEDC test program in `firmware/main/main.c`.

@@ -47,7 +47,7 @@ MorpheusHypnoLight/
 
 - **MCU**: ESP32-S3-DevKitC-1 (N16R8 module, 8MB PSRAM, 16MB flash)
 - **LED drivers**: 3× SparkFun PicoBuck (AL8805, 9 channels total) for the prototype; final PCB will use AL8860 LED drivers
-- **LEDs**: 32× 1W cold white (outer groups) + 4× 3W warm white (central group)
+- **LEDs**: 32× 1W cold white (PB1..PB4 peripheral banks) + 4× 3W warm white (CG central group)
 - **Power**: 24V / 5A supply, 5V buck converter for the ESP32
 - **Cooling**: PWM-controlled fan driven by a TMP36 temperature sensor
 - **Control interface**: 4× Adafruit NeoRotary 4 (I2C rotary encoders) + 1× I2C OLED display

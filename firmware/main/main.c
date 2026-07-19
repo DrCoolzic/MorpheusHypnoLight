@@ -2,12 +2,9 @@
  * Simple LED hardware test for the Morpheus HypnoLight prototype.
  *
  * This program initializes all LED control outputs and runs a short visual
- * test sequence. It uses ESP-IDF LEDC for 8 groups (7 outer cold white
- * groups + 1 central warm white group). The ESP32-S3 only has 8 LEDC
- * channels, so the 8th outer group (OG8) is not tested here. The central group
- * normally uses the SDM peripheral in the final architecture, but LEDC is used
- * here temporarily to verify that the hardware wiring and PicoBuck driver
- * respond correctly.
+ * test sequence. It uses ESP-IDF LEDC for 5 groups: 4 peripheral LED banks
+ * (PB1..PB4) plus 1 central group (CG). Each bank shares one LEDC channel,
+ * driving its two sub-groups with the same signal.
  */
 
 #include "driver/ledc.h"
@@ -17,13 +14,12 @@
 
 static const char *TAG = "led_test";
 
-/* GPIO mapping for the 7 tested outer LED groups (OG) and the central group
- * (CG). These pins drive the DIM inputs of the PicoBuck LED drivers. OG8
- * (GPIO8) is not tested in this version because all 8 LEDC channels are used by
- * the other groups. */
-static const int og_gpios[7] = {4, 5, 6, 7, 16, 17, 18};
+/* GPIO mapping for the 4 peripheral LED banks (PB1..PB4) and the central group
+ * (CG). These pins drive the DIM inputs of the PicoBuck LED drivers.
+ * Each bank has 2 LED sub-groups wired in parallel to the same GPIO. */
+static const int pb_gpios[4] = {4, 5, 6, 7};
 static const int cg_gpio = 15;
-#define NUM_OUTER_GROUPS 7
+#define NUM_OUTER_GROUPS 4
 
 /* LEDC configuration.
  * 20 kHz carrier frequency, 10-bit resolution -> duty range 0..1023.
@@ -34,9 +30,9 @@ static const int cg_gpio = 15;
 #define LEDC_RESOLUTION LEDC_TIMER_10_BIT
 #define LEDC_MAX_DUTY 1023
 
-#define CENTRAL_LEDC_CHANNEL 7
+#define CENTRAL_LEDC_CHANNEL 4
 
-/* Configure one LEDC timer and bind 8 group GPIOs to channels. */
+/* Configure one LEDC timer and bind 5 group GPIOs to channels. */
 static void ledc_init(void) {
   ledc_timer_config_t ledc_timer = {
       .speed_mode = LEDC_MODE,
@@ -47,11 +43,10 @@ static void ledc_init(void) {
   };
   ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
 
-  /* Bind each tested outer group GPIO to a distinct LEDC channel with duty = 0.
-   */
+  /* Bind each outer bank GPIO to a distinct LEDC channel with duty = 0. */
   for (int i = 0; i < NUM_OUTER_GROUPS; i++) {
     ledc_channel_config_t ledc_channel = {
-        .gpio_num = og_gpios[i],
+        .gpio_num = pb_gpios[i],
         .speed_mode = LEDC_MODE,
         .channel = (ledc_channel_t)i,
         .timer_sel = LEDC_TIMER,
@@ -73,7 +68,7 @@ static void ledc_init(void) {
   ESP_ERROR_CHECK(ledc_channel_config(&central_channel));
 }
 
-/* Update the LEDC duty for a single outer group or the central group. */
+/* Update the LEDC duty for an outer bank or the central group. */
 static void set_outer_brightness(int channel, int duty) {
   ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, (ledc_channel_t)channel, duty));
   ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, (ledc_channel_t)channel));
@@ -87,7 +82,7 @@ static void set_central_brightness(int duty) {
       ledc_update_duty(LEDC_MODE, (ledc_channel_t)CENTRAL_LEDC_CHANNEL));
 }
 
-/* Turn off all tested groups by setting their LEDC duty to zero. */
+/* Turn off all groups by setting their LEDC duty to zero. */
 static void all_groups_off(void) {
   for (int i = 0; i < NUM_OUTER_GROUPS; i++) {
     set_outer_brightness(i, 0);
@@ -106,11 +101,11 @@ void app_main(void) {
    * brightness due to floating/unconfigured GPIOs. */
   all_groups_off();
 
-  ESP_LOGI(TAG, "Sequential test: each group ON for 500 ms");
-  /* Light up each tested outer group one at a time at 50% brightness. */
+  ESP_LOGI(TAG, "Sequential test: each bank ON for 1 s");
+  /* Light up each outer bank one at a time at 50% brightness. */
   for (int i = 0; i < NUM_OUTER_GROUPS; i++) {
     set_outer_brightness(i, LEDC_MAX_DUTY / 2);
-    vTaskDelay(pdMS_TO_TICKS(500));
+    vTaskDelay(pdMS_TO_TICKS(1000));
     set_outer_brightness(i, 0);
     vTaskDelay(pdMS_TO_TICKS(200));
   }
@@ -121,9 +116,8 @@ void app_main(void) {
   vTaskDelay(pdMS_TO_TICKS(1000));
   set_central_brightness(0);
 
-  ESP_LOGI(TAG, "Global fade in/out on all tested outer groups");
-  /* Fade all tested outer groups from off to full brightness and back to off.
-   */
+  ESP_LOGI(TAG, "Global fade in/out on all outer banks");
+  /* Fade all outer banks from off to full brightness and back to off. */
   for (int step = 0; step <= 10; step++) {
     int duty = (LEDC_MAX_DUTY * step) / 10;
     for (int i = 0; i < NUM_OUTER_GROUPS; i++) {

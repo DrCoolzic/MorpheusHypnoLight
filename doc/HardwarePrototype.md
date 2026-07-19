@@ -7,7 +7,7 @@ The prototype is built on a set of boards connected via QWIIC/STEMMA QT cables:
 
 ## Components
 
-The main components used for the prototype are:
+The components used for the prototype are:
 
 - [ESP32-S3-DevKitC-1 8MB PSRAM 16MB FLASH N16R8 42Pin](https://fr.aliexpress.com/item/1005007173771226.html) development board
 - 3× [PicoBuck LED Driver](https://www.sparkfun.com/picobuck-led-driver.html)
@@ -18,11 +18,11 @@ The main components used for the prototype are:
 - [24V 5A 120W Power Supply](https://www.amazon.fr/Alimentation-Adaptateur-Transformateur-Convertisseur-Surveillance/dp/B0FWRG2X67/ref=sr_1_7?th=1)
 - [5A DC-DC Step Down Power Supply Buck Converter](https://fr.aliexpress.com/item/1005005921557535.html) for 5V ESP32 power
 - [12V DC-DC Step Down Power Supply Buck Converter](https://fr.aliexpress.com/item/1005010319587802.html) for 12V fan power
-- 4× [Adafruit I2C Quad Rotary Encoder](https://learn.adafruit.com/adafruit-i2c-quad-rotary-encoder-breakout/arduino)
-- [I2C OLED Display 128×64 SSD1306](https://fr.aliexpress.com/item/1005011852817482.html)
 - [TMP36 temperature sensor](https://fr.aliexpress.com/item/1005007666012953.html)
 - [4-pin SM04B-SRSS-TB connector for QWIIC](https://fr.aliexpress.com/item/1005012597457629.html)
 - [2.54 mm KF2510 3+1P KF2510-4AW Male Housing Connector White Straight Pin Header 4pin](https://fr.aliexpress.com/item/1005004714218238.html)
+- 4× [Adafruit I2C Quad Rotary Encoder](https://learn.adafruit.com/adafruit-i2c-quad-rotary-encoder-breakout/arduino)
+- [I2C OLED Display 128×64 SSD1306](https://fr.aliexpress.com/item/1005011852817482.html)
 
 > **Note:** The PicoBuck uses the AL8805 LED driver, which is functionally equivalent to the AL8860 selected for the final product. The AL8860 is the recommended choice for the final PCB design.
 >
@@ -80,14 +80,14 @@ The following pins must **not** be used as general-purpose I/O:
 
 > **Note on GPIO39–42:** These are **safe to use** as general-purpose I/O (they are JTAG pins only when the JTAG interface is actively enabled via software/OpenOCD, not by default in application code).
 
-For the prototype we need 14 GPIO pins:
+For the prototype we need 10 GPIO pins:
 
-- 8 LEDC/PWM GPIO pins for the signals that control the 8 LED outer groups (OG1-OG8): GPIO4, GPIO5, GPIO6, GPIO7, GPIO16, GPIO17, GPIO18, GPIO8
-- 1 SDM GPIO pin for the signal that controls the LED center group (CG): GPIO15
+- 4 LEDC/PWM GPIO pins for the signals that control the 4 peripheral banks (PB1-PB4), each containing 2 LED sub-groups: GPIO4, GPIO5, GPIO6, GPIO7
+- 1 LEDC/PWM GPIO pin for the signal that controls the central LED group (CG): GPIO15
 - 2 I2C GPIO pins for the SDA/SCL signals that go to the QWIIC connector: GPIO1 (SDA), GPIO2 (SCL)
-- 1 Analog GPIO pin connected to the TMP36 temperature sensor: GPIO9 (ADC1_CH8)
-- 1 GPIO pin for fan tachometer input: GPIO10
-- 1 GPIO pin to control the fan PWM: GPIO11
+- 1 Analog GPIO pin connected to the TMP36 temperature sensor: GPIO16 (ADC2_CH5)
+- 1 GPIO pin for fan tachometer input: GPIO17
+- 1 GPIO pin to control the fan PWM: GPIO18
 
 ## Prototype wiring
 
@@ -106,14 +106,15 @@ The prototype consists of two electronics assemblies connected via QWIIC/STEMMA 
   - [x] One 6x9 cm prototype board with
     - [x] An ESP32-S3 devkit,
     - [x] A 5V DC-DC Buck converter
+    - [x] A 5V Jumper so the converter can be isolated when a USB cable is plugged in for development
     - [ ] A 12V DC-DC Buck converter
     - [x] A 2 Pin power connector
     - [ ] A 4 pins QWIIC connector
     <img src="images/qwiic.png" alt="QWIIC connector" style="zoom:50%;" />
     - [ ] A 4 pins PWM fan connector
     ![Fan connector](images/fan_pwm_con.png)
-
   - [x] Three PicoBuck boards
+  - [x] Five 10 kΩ pull-down resistors on the LEDC/PWM control lines
 
 ![Main Electronics](images/HypnoLight_bb.png)
 ![Main Schematic](images/HypnoLight_schem.png)
@@ -127,21 +128,25 @@ The prototype consists of two electronics assemblies connected via QWIIC/STEMMA 
 - [ ] Connect the 24 V power supply to prototype board power connector
 - [x] Connect the power connector to the 5V DC-DC converter inputs
 - [ ] Connect the power connector to the 12V DC-DC converter inputs
-- [x] Connect the 5V DC-DC converter outputs to the 5V and GND pins of the ESP32-S3-DevKitC-1
-- [ ] Add a jumper in the 5V line so the converter can be isolated when a USB cable is plugged in for development
-- [x] Connect the PicoBuck inputs pins to the ESP32-S3-DevKitC-1 GPIO pins
-- [x] Connect in series the 4 LEDs of each group (nine) using 22 AWG wires
-- [x] Connect OG1, OG2, OG3 to PicoBuck_1 outputs using 22 AWG wires
-- [x] Connect OG4, CG, OG5 to PicoBuck_2 outputs using 22 AWG wires
-- [x] Connect OG6, OG7, OG8 to PicoBuck_3 outputs using 22 AWG wires
-  - [x] PicoBuck_1 → GPIO4 (OG1), GPIO5 (OG2), GPIO6 (OG3)
-  - [x] PicoBuck_2 → GPIO7 (OG4), GPIO15 (CG), GPIO16 (OG5)
-  - [x] PicoBuck_3 → GPIO17 (OG6), GPIO18 (OG7), GPIO8 (OG8)
+- [x] Connect the 5V DC-DC converter GND output to the GND pins of the ESP32-S3-DevKitC-1
+- [x] Connect the 5V DC-DC converter 5V output to the jumper input and the jumper output to the 5V pins of the ESP32-S3-DevKitC-1
+- [x] Connect in series the 4 LEDs of each group of LEDs (nine) using 22 AWG wires
+- [x] Connect the three outputs of the three PicoBuck the the nine group of LEDs using 22 AWG wires
+- [x] Connect the inputs of the PicoBuck to the GPIO pins using 22 AWG wires
+  - [x] GPIO4 to PicoBuck_1 IN1 and PicoBuck_2 IN1
+  - [x] GPIO5 to PicoBuck_3 IN1 and IN2
+  - [x] GPIO6 to PicoBuck_2 IN3 and PicoBuck_3 IN3
+  - [x] GPIO7 to PicoBuck_1 IN2 and IN3
+  - [x] GPIO15 to PicoBuck_2 IN2
+  - [x] Connect one 10 kΩ pull-down resistor from each LEDC/PWM control line (GPIO4, GPIO5, GPIO6, GPIO7, GPIO15) to GND
   - [x] Connect the GND pins of the PicoBuck converters to the GND pin(s) of the ESP32-S3-DevKitC-1
+
+> **PWM safety note:** During ESP32 reset and boot, the LEDC/PWM GPIOs are high impedance until the firmware configures them. The 10 kΩ pull-down resistors hold the PicoBuck inputs low during this interval, preventing an unintended full-brightness flash.
+
 - [ ] For the QWIIC connector: Connect SDA to GPIO1, SCL to GPIO2, VCC to 3.3 V, GND to GND.
-- [ ] For the PWM Fan Connector: Connect the 12V DC-DC converter outputs to the V+ and GND pins, TACH pin to GPIO10, PWM pin to GPIO11
+- [ ] For the PWM Fan Connector: Connect the 12V DC-DC converter outputs to the V+ and GND pins, TACH pin to GPIO17, PWM pin to GPIO18
 - [ ] Connect the temperature sensor power and ground to the 3.3V and GND pins of the ESP32
-- [ ] Connect the temperature sensor output to GPIO9
+- [ ] Connect the temperature sensor output to GPIO16
 
 ### Control electronics
 
