@@ -9,7 +9,7 @@
 
 #include "driver/ledc.h"
 #include "esp_log.h"
-#include "freertos/FreeRTOS.h"
+#include "freertos/FreeRTOS.h" // IWYU pragma: keep
 #include "freertos/task.h"
 
 static const char *TAG = "led_test";
@@ -23,7 +23,7 @@ static const int cg_gpio = 15;
 
 /* LEDC configuration.
  * 20 kHz carrier frequency, 10-bit resolution -> duty range 0..1023.
- * 20 kHz is above audible range and keeps the central group flicker-free. */
+ * 20 kHz is above visible range and keeps the central group flicker-free. */
 #define LEDC_TIMER LEDC_TIMER_0
 #define LEDC_MODE LEDC_LOW_SPEED_MODE
 #define LEDC_FREQUENCY 20000
@@ -31,6 +31,8 @@ static const int cg_gpio = 15;
 #define LEDC_MAX_DUTY 1023
 
 #define CENTRAL_LEDC_CHANNEL 4
+#define TEST_RUN_COUNT 3
+#define TEST_PAUSE_MS 5000
 
 /* Configure one LEDC timer and bind 5 group GPIOs to channels. */
 static void ledc_init(void) {
@@ -69,70 +71,70 @@ static void ledc_init(void) {
 }
 
 /* Update the LEDC duty for an outer bank or the central group. */
-static void set_outer_brightness(int channel, int duty) {
+static void set_brightness(int channel, int duty) {
   ESP_ERROR_CHECK(ledc_set_duty(LEDC_MODE, (ledc_channel_t)channel, duty));
   ESP_ERROR_CHECK(ledc_update_duty(LEDC_MODE, (ledc_channel_t)channel));
-}
-
-/* Update the LEDC duty for the central group. */
-static void set_central_brightness(int duty) {
-  ESP_ERROR_CHECK(
-      ledc_set_duty(LEDC_MODE, (ledc_channel_t)CENTRAL_LEDC_CHANNEL, duty));
-  ESP_ERROR_CHECK(
-      ledc_update_duty(LEDC_MODE, (ledc_channel_t)CENTRAL_LEDC_CHANNEL));
 }
 
 /* Turn off all groups by setting their LEDC duty to zero. */
 static void all_groups_off(void) {
   for (int i = 0; i < NUM_OUTER_GROUPS; i++) {
-    set_outer_brightness(i, 0);
+    set_brightness(i, 0);
   }
-  set_central_brightness(0);
+  set_brightness(CENTRAL_LEDC_CHANNEL, 0);
 }
 
 /* Main test sequence.
- * The sequence runs once then returns. If the 24 V LED supply is not yet
- * connected when the test starts, press the RESET button to replay it. */
+ * The sequence runs five times, with all LEDs off for five seconds between
+ * runs. If the 24 V LED supply is not yet connected when the test starts,
+ * press the RESET button to replay it. */
 void app_main(void) {
   ESP_LOGI(TAG, "Initializing LED test outputs");
   ledc_init();
 
-  /* Start with all outputs off so the LEDs do not stay at maximum
-   * brightness due to floating/unconfigured GPIOs. */
-  all_groups_off();
+  for (int test_run = 0; test_run < TEST_RUN_COUNT; test_run++) {
+    ESP_LOGI(TAG, "Starting test run %d/%d", test_run + 1, TEST_RUN_COUNT);
 
-  ESP_LOGI(TAG, "Sequential test: each bank ON for 1 s");
-  /* Light up each outer bank one at a time at 50% brightness. */
-  for (int i = 0; i < NUM_OUTER_GROUPS; i++) {
-    set_outer_brightness(i, LEDC_MAX_DUTY / 2);
-    vTaskDelay(pdMS_TO_TICKS(1000));
-    set_outer_brightness(i, 0);
-    vTaskDelay(pdMS_TO_TICKS(200));
-  }
-
-  ESP_LOGI(TAG, "Central group ON for 1 s");
-  /* Light up the central group at 50% brightness using LEDC. */
-  set_central_brightness(LEDC_MAX_DUTY / 2);
-  vTaskDelay(pdMS_TO_TICKS(1000));
-  set_central_brightness(0);
-
-  ESP_LOGI(TAG, "Global fade in/out on all outer banks");
-  /* Fade all outer banks from off to full brightness and back to off. */
-  for (int step = 0; step <= 10; step++) {
-    int duty = (LEDC_MAX_DUTY * step) / 10;
+    ESP_LOGI(TAG, "Sequential test: each peripheral bank ON for 2 s");
+    /* Light up each outer bank one at a time at 50% brightness. */
     for (int i = 0; i < NUM_OUTER_GROUPS; i++) {
-      set_outer_brightness(i, duty);
+      set_brightness(i, LEDC_MAX_DUTY / 2);
+      vTaskDelay(pdMS_TO_TICKS(2000));
+      set_brightness(i, 0);
+      vTaskDelay(pdMS_TO_TICKS(200));
     }
-    vTaskDelay(pdMS_TO_TICKS(100));
-  }
-  for (int step = 10; step >= 0; step--) {
-    int duty = (LEDC_MAX_DUTY * step) / 10;
-    for (int i = 0; i < NUM_OUTER_GROUPS; i++) {
-      set_outer_brightness(i, duty);
+
+    ESP_LOGI(TAG, "Central group ON for 2 s");
+    /* Light up the central group at 50% brightness using LEDC. */
+    set_brightness(CENTRAL_LEDC_CHANNEL, LEDC_MAX_DUTY / 2);
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    set_brightness(CENTRAL_LEDC_CHANNEL, 0);
+
+    ESP_LOGI(TAG, "Global fade in/out on all LEDs");
+    /* Fade all LEDs from off to full brightness and back to off. */
+    for (int step = 0; step <= 10; step++) {
+      int duty = (LEDC_MAX_DUTY * step) / 10;
+      for (int i = 0; i < NUM_OUTER_GROUPS; i++) {
+        set_brightness(i, duty);
+      }
+      set_brightness(CENTRAL_LEDC_CHANNEL, duty);
+      vTaskDelay(pdMS_TO_TICKS(100));
     }
-    vTaskDelay(pdMS_TO_TICKS(100));
+    for (int step = 10; step >= 0; step--) {
+      int duty = (LEDC_MAX_DUTY * step) / 10;
+      for (int i = 0; i < NUM_OUTER_GROUPS; i++) {
+        set_brightness(i, duty);
+      }
+      set_brightness(CENTRAL_LEDC_CHANNEL, duty);
+      vTaskDelay(pdMS_TO_TICKS(100));
+    }
+
+    all_groups_off();
+    if (test_run < TEST_RUN_COUNT - 1) {
+      ESP_LOGI(TAG, "LEDs off; waiting 5 s before the next test run");
+      vTaskDelay(pdMS_TO_TICKS(TEST_PAUSE_MS));
+    }
   }
 
-  all_groups_off();
-  ESP_LOGI(TAG, "Test complete");
+  ESP_LOGI(TAG, "All test runs complete");
 }

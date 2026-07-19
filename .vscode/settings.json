@@ -12,23 +12,28 @@
     "gpio",
     "gpios",
     "hpoint",
+    "Hypno",
     "ledc",
     "LEDC",
     "LOGI",
     "mpsim",
     "MPSIM",
+    "Pico",
     "simconfig"
   ],
   "files.autoSave": "afterDelay",
   "editor.formatOnSave": true,
   "idf.extensionActivationMode": "always",
   "idf.currentSetup": "C:\\esp\\v6.0.1\\esp-idf",
+  "idf.sdkconfigFilePath": "D:/Projects/DreamMachine/MorpheusHypnoLight/firmware/sdkconfig",
+  "idf.buildPath": "${workspaceFolder}/firmware/build",
+  "idf.buildPathWin": "${workspaceFolder}\\firmware\\build",
   "idf.customExtraVars": {},
   "clangd.path": "C:\\Espressif\\tools\\esp-clang\\esp-20.1.1_20250829\\esp-clang\\bin\\clangd.exe",
   "clangd.arguments": [
     "--background-index",
     "--query-driver=**",
-    "--compile-commands-dir=d:\\Projects\\DreamMachine\\MorpheusHypnoLight\\build"
+    "--compile-commands-dir=d:\\Projects\\DreamMachine\\MorpheusHypnoLight\\firmware\\build"
   ],
   "cmake.sourceDirectory": "D:/Projects/DreamMachine/MorpheusHypnoLight/firmware",
   "cmake.configureOnOpen": false,
@@ -37,5 +42,6 @@
   "idf.portWin": "COM8",
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
-  ]
+  ],
+  "C_Cpp.default.compileCommands": "${workspaceFolder}/firmware/build/compile_commands.json"
 }
