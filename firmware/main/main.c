@@ -12,6 +12,7 @@
 #include "freertos/FreeRTOS.h" // IWYU pragma: keep
 #include "freertos/task.h"
 #include "led_control.h"
+#include "oscillator.h"
 
 static const char *TAG = "led_test";
 
@@ -24,6 +25,7 @@ static const char *TAG = "led_test";
  * starts, press the RESET button to replay it. */
 void app_main(void) {
   ESP_LOGI(TAG, "Initializing LED test outputs");
+  ESP_ERROR_CHECK(oscillator_init());
   ESP_ERROR_CHECK(led_control_init());
   ESP_ERROR_CHECK(led_control_all_off());
 
