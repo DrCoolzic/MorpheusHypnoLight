@@ -35,33 +35,35 @@ firmware/
 Responsible for generating the five low-frequency signals that drive the four peripheral banks (PB1..PB4) and the central group (CG).
 
 - **Waveforms**: sine, square, triangle, custom (via LUT).
-- **Parameters per oscillator**: frequency, duty cycle, brightness, phase.
+- **Parameters per oscillator**: frequency, duty cycle, and phase. The current frequency is supplied by the parameter layer.
+- **Output**: normalized instantaneous waveform value `osc_value` in the range `[0.0, 1.0]`.
 - **Implementation**: pre-computed Look-Up Table (LUT) rebuilt at step start, Direct Digital Synthesis (DDS) phase accumulator updated in a 1 kHz timer callback.
 - **Public API** (to be defined as the code is written):
   - `oscillator_init()`
   - `oscillator_set_waveform(id, shape, duty)`
   - `oscillator_set_frequency(id, hz)`
-  - `oscillator_set_brightness(id, percent)`
   - `oscillator_set_phase(id, degrees)`
   - `oscillator_tick()` — returns the current value of all oscillators
 
 ### `led_control`
 
-Writes oscillator values to the five fixed LEDC hardware channels.
+Converts the normalized oscillator waveform and current brightness into the duty cycle written to the five fixed LEDC hardware channels. It does not evaluate step timing, interpolation, or LFOs.
 
 - **PB1–PB4**: LEDC channels 0–3 at a common carrier frequency and 10-bit resolution. Each channel controls the two LED sub-groups in its peripheral bank.
 - **CG**: LEDC channel 4, using the same configuration as the peripheral banks.
-- **Fixed mapping**: oscillator 1 → PB1 / LEDC 0, oscillator 2 → PB2 / LEDC 1, oscillator 3 → PB3 / LEDC 2, oscillator 4 → PB4 / LEDC 3, and oscillator 5 → CG / LEDC 4.
-- **Public API** (to be defined):
-  - `led_control_init()`
-  - `led_control_update(oscillator_id, value)`
+- **Fixed mapping**: API oscillator IDs 0–3 map to PB1–PB4 / LEDC channels 0–3; ID 4 maps to CG / LEDC channel 4.
+- **Duty calculation**: `final_duty = osc_value × current_brightness`, with both inputs normalized to `[0.0, 1.0]`. Out-of-range values are clamped; invalid oscillator IDs and non-finite input values return an error.
+- **Public API**:
+  - `esp_err_t led_control_init(void)`
+  - `esp_err_t led_control_update(uint8_t oscillator_id, float osc_value, float current_brightness)`
+  - `esp_err_t led_control_all_off(void)`
 
 ### `sequence`
 
 Implements the sequence engine: steps, timing, parameter interpolation and LFO modulation.
 
 - A **step** defines duration plus per-oscillator waveform/duty/phase and dynamic frequency/brightness (linear or LFO) for all five oscillators.
-- The sequencer advances steps, rebuilds oscillator LUTs, and ticks the parameter layer every 10–50 ms.
+- The sequencer advances steps and rebuilds oscillator LUTs. Its parameter layer evaluates and publishes `current_frequency` and `current_brightness` every 10–50 ms.
 - **Public API** (to be defined):
   - `sequence_load(const sequence_t *seq)`
   - `sequence_play()`, `sequence_pause()`, `sequence_seek(position)`
@@ -87,8 +89,12 @@ The full signal flow is shown in the product specification; at firmware level it
 Sequencer (step advance every few seconds)
     ↓
 Parameter layer (linear / LFO update every 10–50 ms)
+    └── publishes current_frequency and current_brightness
     ↓
 Oscillator timer callback (1 kHz)
+    └── computes osc_value from the waveform and current_frequency
+    ↓
+led_control: final_duty = osc_value × current_brightness
     ↓
 LEDC peripheral (5 fixed channels)
     ├── channel 0 → PB1
@@ -106,8 +112,8 @@ Proposed FreeRTOS tasks and timers:
 
 |Task / Timer|Period|Responsibility|
 |------------|------|--------------|
-|`oscillator_timer`|1 ms (1 kHz)|Update DDS phase accumulators, compute oscillator values, and write the five fixed LEDC channels.|
-|`sequencer_task`|10–50 ms|Advance sequence steps, update parameter layer, rebuild LUTs, apply LFOs.|
+|`oscillator_timer`|1 ms (1 kHz)|Read current parameters, update DDS phase accumulators, compute waveform values, and update the five LEDC channels through `led_control`.|
+|`sequencer_task`|10–50 ms|Advance sequence steps, evaluate and publish current frequency/brightness, rebuild LUTs, and apply LFOs.|
 |`input_task`|50–100 ms|Poll I2C rotary encoders and update parameters or sequence.|
 |`display_task`|100–250 ms|Refresh the OLED display with current status.|
 |`comms_task`|event-driven|Handle BLE/Wi-Fi events and dispatch commands.|
@@ -116,8 +122,8 @@ Proposed FreeRTOS tasks and timers:
 
 **Inter-task communication:**
 
-- `oscillator` publishes current values directly to `led_control` from the timer callback (shared state protected by critical section).
-- `sequence` writes target parameters to a shared structure read by `oscillator` and `led_control`.
+- `sequence` writes `current_frequency` and `current_brightness` to a shared structure read by `oscillator` (protected by a critical section).
+- `oscillator` calls `led_control` from the timer callback with the calculated `osc_value` and the current brightness.
 - `comms` posts commands to a FreeRTOS queue consumed by `sequence` or `input_task`.
 
 ## Build, Flash and Monitor
