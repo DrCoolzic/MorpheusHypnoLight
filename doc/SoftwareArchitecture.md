@@ -151,8 +151,29 @@ The following ESP-IDF configuration options will be required or important for th
 
 - **LEDC**: 5 channels, 10-bit resolution, using a common carrier frequency for PB1..PB4 and CG.
 - **I2C**: master mode on GPIO1 (SDA) / GPIO2 (SCL) for the QWIIC bus.
-- **FreeRTOS**: 1 kHz tick rate for the oscillator timer callback.
+- **ESP Timer**: periodic task-dispatched callback at 1 kHz for `oscillator_tick()` and LEDC output updates. The application does not rely on the FreeRTOS tick rate for oscillator timing.
 - **BLE / Wi-Fi**: enable as needed for the `comms` component.
+
+## Testing
+
+### Visual Hardware Test
+
+The current `main` application includes a visual oscillator test that uses a task-dispatched `esp_timer` callback at 1 kHz. The callback calls `oscillator_tick()` and applies each normalized waveform value to `led_control` at a fixed 50% brightness.
+
+The test stages are:
+
+- PB1: 2 Hz square waveform with 50% duty cycle.
+- PB2: 2 Hz square waveform with 25% duty cycle.
+- PB3: 0.25 Hz triangle waveform.
+- PB4: 0.25 Hz sine waveform.
+- CG: 0 Hz fixed output, independent of waveform and phase.
+- PB1 and PB2: 2 Hz square waveforms with a 180-degree phase offset.
+
+This validates the oscillator-to-LEDC pipeline on hardware, including waveforms, duty cycle, frequency, zero-frequency behavior, and relative phase. It does not replace deterministic unit tests of individual LUT samples or DDS phase increments.
+
+### Deferred Unit Tests
+
+A future ESP-IDF Unity test application will be separate from the production firmware. It will build and flash independently, then run Unity `TEST_CASE` functions over the serial monitor. The first oscillator unit tests should cover initialization, zero-frequency output, waveform phase, DDS phase advancement, custom LUT copying, and argument validation.
 
 ## TBD / Future Sections
 
