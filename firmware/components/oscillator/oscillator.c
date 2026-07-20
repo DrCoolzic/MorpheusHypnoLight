@@ -7,6 +7,9 @@
 #include <math.h>
 #include <stdbool.h>
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
 /** @brief Pi used for the sine-wave LUT calculation. */
 #define OSCILLATOR_PI 3.14159265358979323846f
 
@@ -22,6 +25,9 @@ typedef struct {
 
 /** @brief State indexed by fixed oscillator ID. */
 static oscillator_state_t oscillator_states[OSCILLATOR_COUNT];
+
+/** @brief Serialized access to LUT, phase, and frequency state. */
+static portMUX_TYPE oscillator_lock = portMUX_INITIALIZER_UNLOCKED;
 
 /**
  * @brief Clamp a finite waveform sample to the normalized range.
@@ -152,6 +158,7 @@ esp_err_t oscillator_init(void) {
       .custom_lut = NULL,
   };
 
+  taskENTER_CRITICAL(&oscillator_lock);
   for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
        oscillator_id++) {
     oscillator_state_t *state = &oscillator_states[oscillator_id];
@@ -159,6 +166,7 @@ esp_err_t oscillator_init(void) {
     state->phase = 0.0f;
     state->frequency_hz = 0.0f;
   }
+  taskEXIT_CRITICAL(&oscillator_lock);
 
   return ESP_OK;
 }
@@ -170,9 +178,11 @@ esp_err_t oscillator_set_static(uint8_t oscillator_id,
     return ESP_ERR_INVALID_ARG;
   }
 
+  taskENTER_CRITICAL(&oscillator_lock);
   oscillator_state_t *state = &oscillator_states[oscillator_id];
   build_lut(state, config);
   state->phase = phase_degrees_to_lut_position(config->phase_degrees);
+  taskEXIT_CRITICAL(&oscillator_lock);
 
   return ESP_OK;
 }
@@ -184,7 +194,10 @@ esp_err_t oscillator_set_frequency(uint8_t oscillator_id, float frequency_hz) {
     return ESP_ERR_INVALID_ARG;
   }
 
+  taskENTER_CRITICAL(&oscillator_lock);
   oscillator_states[oscillator_id].frequency_hz = frequency_hz;
+  taskEXIT_CRITICAL(&oscillator_lock);
+
   return ESP_OK;
 }
 
@@ -194,6 +207,7 @@ esp_err_t oscillator_tick(float osc_values[OSCILLATOR_COUNT]) {
     return ESP_ERR_INVALID_ARG;
   }
 
+  taskENTER_CRITICAL(&oscillator_lock);
   for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
        oscillator_id++) {
     oscillator_state_t *state = &oscillator_states[oscillator_id];
@@ -211,6 +225,7 @@ esp_err_t oscillator_tick(float osc_values[OSCILLATOR_COUNT]) {
       state->phase -= OSCILLATOR_LUT_SIZE;
     }
   }
+  taskEXIT_CRITICAL(&oscillator_lock);
 
   return ESP_OK;
 }

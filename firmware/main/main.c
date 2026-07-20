@@ -14,17 +14,29 @@
 #include "freertos/task.h"
 #include "led_control.h"
 #include "oscillator.h"
+#include "sequence.h"
 
 static const char *TAG = "led_test";
 
 #define TEST_RUN_COUNT 1
 #define TEST_PAUSE_MS 5000
 #define OSCILLATOR_TICK_PERIOD_US 1000
+#define SEQUENCE_TICK_PERIOD_US (SEQUENCE_TICK_PERIOD_MS * 1000U)
 #define OSCILLATOR_TEST_BRIGHTNESS 0.5f
 #define OSCILLATOR_TEST_SHORT_DURATION_MS 4000
 #define OSCILLATOR_TEST_LONG_DURATION_MS 8000
+#define LINEAR_TEST_DURATION_MS 4000
 
-static float oscillator_test_brightness[OSCILLATOR_COUNT];
+/**
+ * @brief Evaluate realtime parameter controls at the fixed sequence rate.
+ *
+ * @param[in] arg Unused esp_timer callback argument.
+ */
+static void sequence_timer_callback(void *arg) {
+  (void)arg;
+
+  ESP_ERROR_CHECK(sequence_tick());
+}
 
 /**
  * @brief Generate waveform samples and apply them to the LED outputs.
@@ -38,13 +50,14 @@ static void oscillator_timer_callback(void *arg) {
   (void)arg;
 
   float osc_values[OSCILLATOR_COUNT];
+  float brightnesses[OSCILLATOR_COUNT];
   ESP_ERROR_CHECK(oscillator_tick(osc_values));
+  ESP_ERROR_CHECK(sequence_get_realtime_brightness(brightnesses));
 
   for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
        oscillator_id++) {
-    ESP_ERROR_CHECK(
-        led_control_update(oscillator_id, osc_values[oscillator_id],
-                           oscillator_test_brightness[oscillator_id]));
+    ESP_ERROR_CHECK(led_control_update(oscillator_id, osc_values[oscillator_id],
+                                       brightnesses[oscillator_id]));
   }
 }
 
@@ -54,12 +67,7 @@ static void oscillator_timer_callback(void *arg) {
  * The caller must stop the oscillator timer before calling this function.
  */
 static void reset_oscillator_visual_stage(void) {
-  ESP_ERROR_CHECK(oscillator_init());
-
-  for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
-       oscillator_id++) {
-    oscillator_test_brightness[oscillator_id] = 0.0f;
-  }
+  ESP_ERROR_CHECK(sequence_init());
 }
 
 /**
@@ -82,9 +90,9 @@ static void configure_oscillator_visual_test(
       .custom_lut = NULL,
   };
 
-  ESP_ERROR_CHECK(oscillator_set_static(oscillator_id, &config));
-  ESP_ERROR_CHECK(oscillator_set_frequency(oscillator_id, frequency_hz));
-  oscillator_test_brightness[oscillator_id] = brightness;
+  ESP_ERROR_CHECK(sequence_realtime_set_static(oscillator_id, &config));
+  ESP_ERROR_CHECK(sequence_realtime_set_frequency(oscillator_id, frequency_hz));
+  ESP_ERROR_CHECK(sequence_realtime_set_brightness(oscillator_id, brightness));
 }
 
 /**
@@ -93,14 +101,20 @@ static void configure_oscillator_visual_test(
  * The function waits one FreeRTOS tick after stopping the timer so an already
  * dispatched callback completes before the next stage changes oscillator state.
  *
- * @param[in] timer Periodic esp_timer that advances the DDS state.
+ * @param[in] oscillator_timer Periodic esp_timer that advances DDS state.
+ * @param[in] sequence_timer Periodic esp_timer that evaluates parameter ramps.
  * @param[in] duration_ms Visual test duration in milliseconds.
  */
-static void run_oscillator_visual_stage(esp_timer_handle_t timer,
+static void run_oscillator_visual_stage(esp_timer_handle_t oscillator_timer,
+                                        esp_timer_handle_t sequence_timer,
                                         uint32_t duration_ms) {
-  ESP_ERROR_CHECK(esp_timer_start_periodic(timer, OSCILLATOR_TICK_PERIOD_US));
+  ESP_ERROR_CHECK(
+      esp_timer_start_periodic(sequence_timer, SEQUENCE_TICK_PERIOD_US));
+  ESP_ERROR_CHECK(
+      esp_timer_start_periodic(oscillator_timer, OSCILLATOR_TICK_PERIOD_US));
   vTaskDelay(pdMS_TO_TICKS(duration_ms));
-  ESP_ERROR_CHECK(esp_timer_stop(timer));
+  ESP_ERROR_CHECK(esp_timer_stop(oscillator_timer));
+  ESP_ERROR_CHECK(esp_timer_stop(sequence_timer));
   vTaskDelay(1);
   ESP_ERROR_CHECK(led_control_all_off());
 }
@@ -112,39 +126,46 @@ static void run_oscillator_visual_stage(esp_timer_handle_t timer,
  * The timer callback advances DDS state at 1 kHz and passes the generated
  * values to led_control.
  *
- * @param[in] timer Periodic esp_timer used for all visual test stages.
+ * @param[in] oscillator_timer Periodic esp_timer used for DDS generation.
+ * @param[in] sequence_timer Periodic esp_timer used for parameter evaluation.
  */
-static void run_oscillator_visual_test(esp_timer_handle_t timer) {
+static void run_oscillator_visual_test(esp_timer_handle_t oscillator_timer,
+                                       esp_timer_handle_t sequence_timer) {
   ESP_LOGI(TAG, "Oscillator test: PB1 square 2 Hz, 50%% duty");
   reset_oscillator_visual_stage();
   configure_oscillator_visual_test(0, OSCILLATOR_WAVEFORM_SQUARE, 0.5f, 0.0f,
                                    2.0f, OSCILLATOR_TEST_BRIGHTNESS);
-  run_oscillator_visual_stage(timer, OSCILLATOR_TEST_SHORT_DURATION_MS);
+  run_oscillator_visual_stage(oscillator_timer, sequence_timer,
+                              OSCILLATOR_TEST_SHORT_DURATION_MS);
 
   ESP_LOGI(TAG, "Oscillator test: PB2 square 2 Hz, 25%% duty");
   reset_oscillator_visual_stage();
   configure_oscillator_visual_test(1, OSCILLATOR_WAVEFORM_SQUARE, 0.25f, 0.0f,
                                    2.0f, OSCILLATOR_TEST_BRIGHTNESS);
-  run_oscillator_visual_stage(timer, OSCILLATOR_TEST_SHORT_DURATION_MS);
+  run_oscillator_visual_stage(oscillator_timer, sequence_timer,
+                              OSCILLATOR_TEST_SHORT_DURATION_MS);
 
   ESP_LOGI(TAG, "Oscillator test: PB3 triangle 0.25 Hz");
   reset_oscillator_visual_stage();
   configure_oscillator_visual_test(2, OSCILLATOR_WAVEFORM_TRIANGLE, 0.5f, 0.0f,
                                    0.25f, OSCILLATOR_TEST_BRIGHTNESS);
-  run_oscillator_visual_stage(timer, OSCILLATOR_TEST_LONG_DURATION_MS);
+  run_oscillator_visual_stage(oscillator_timer, sequence_timer,
+                              OSCILLATOR_TEST_LONG_DURATION_MS);
 
   ESP_LOGI(TAG, "Oscillator test: PB4 sine 0.25 Hz");
   reset_oscillator_visual_stage();
   configure_oscillator_visual_test(3, OSCILLATOR_WAVEFORM_SINE, 0.5f, 0.0f,
                                    0.25f, OSCILLATOR_TEST_BRIGHTNESS);
-  run_oscillator_visual_stage(timer, OSCILLATOR_TEST_LONG_DURATION_MS);
+  run_oscillator_visual_stage(oscillator_timer, sequence_timer,
+                              OSCILLATOR_TEST_LONG_DURATION_MS);
 
   ESP_LOGI(TAG, "Oscillator test: CG fixed output at 0 Hz");
   reset_oscillator_visual_stage();
   configure_oscillator_visual_test(LED_CONTROL_CG_OSCILLATOR_ID,
                                    OSCILLATOR_WAVEFORM_SINE, 0.5f, 180.0f, 0.0f,
                                    OSCILLATOR_TEST_BRIGHTNESS);
-  run_oscillator_visual_stage(timer, OSCILLATOR_TEST_SHORT_DURATION_MS);
+  run_oscillator_visual_stage(oscillator_timer, sequence_timer,
+                              OSCILLATOR_TEST_SHORT_DURATION_MS);
 
   ESP_LOGI(TAG, "Oscillator test: PB1/PB2 square 2 Hz, 180 degree offset");
   reset_oscillator_visual_stage();
@@ -152,7 +173,26 @@ static void run_oscillator_visual_test(esp_timer_handle_t timer) {
                                    2.0f, OSCILLATOR_TEST_BRIGHTNESS);
   configure_oscillator_visual_test(1, OSCILLATOR_WAVEFORM_SQUARE, 0.5f, 180.0f,
                                    2.0f, OSCILLATOR_TEST_BRIGHTNESS);
-  run_oscillator_visual_stage(timer, OSCILLATOR_TEST_SHORT_DURATION_MS);
+  run_oscillator_visual_stage(oscillator_timer, sequence_timer,
+                              OSCILLATOR_TEST_SHORT_DURATION_MS);
+
+  ESP_LOGI(TAG, "Sequence test: PB1 linear brightness 0%% to 100%% over 4 s");
+  reset_oscillator_visual_stage();
+  configure_oscillator_visual_test(0, OSCILLATOR_WAVEFORM_SINE, 0.5f, 0.0f,
+                                   0.0f, 0.0f);
+  ESP_ERROR_CHECK(
+      sequence_realtime_linear_brightness(0, 1.0f, LINEAR_TEST_DURATION_MS));
+  run_oscillator_visual_stage(oscillator_timer, sequence_timer,
+                              LINEAR_TEST_DURATION_MS);
+
+  ESP_LOGI(TAG, "Sequence test: PB2 linear frequency 0 Hz to 2 Hz over 4 s");
+  reset_oscillator_visual_stage();
+  configure_oscillator_visual_test(1, OSCILLATOR_WAVEFORM_SINE, 0.5f, 0.0f,
+                                   0.0f, OSCILLATOR_TEST_BRIGHTNESS);
+  ESP_ERROR_CHECK(
+      sequence_realtime_linear_frequency(1, 2.0f, LINEAR_TEST_DURATION_MS));
+  run_oscillator_visual_stage(oscillator_timer, sequence_timer,
+                              LINEAR_TEST_DURATION_MS);
 }
 
 /* Main test sequence.
@@ -161,7 +201,7 @@ static void run_oscillator_visual_test(esp_timer_handle_t timer) {
  * starts, press the RESET button to replay it. */
 void app_main(void) {
   ESP_LOGI(TAG, "Initializing LED test outputs");
-  ESP_ERROR_CHECK(oscillator_init());
+  ESP_ERROR_CHECK(sequence_init());
   ESP_ERROR_CHECK(led_control_init());
   ESP_ERROR_CHECK(led_control_all_off());
 
@@ -170,8 +210,15 @@ void app_main(void) {
       .arg = NULL,
       .name = "oscillator_test",
   };
+  const esp_timer_create_args_t sequence_timer_args = {
+      .callback = sequence_timer_callback,
+      .arg = NULL,
+      .name = "sequence_test",
+  };
   esp_timer_handle_t oscillator_timer;
+  esp_timer_handle_t sequence_timer;
   ESP_ERROR_CHECK(esp_timer_create(&oscillator_timer_args, &oscillator_timer));
+  ESP_ERROR_CHECK(esp_timer_create(&sequence_timer_args, &sequence_timer));
 
   for (int test_run = 0; test_run < TEST_RUN_COUNT; test_run++) {
     ESP_LOGI(TAG, "Starting test run %d/%d", test_run + 1, TEST_RUN_COUNT);
@@ -213,7 +260,7 @@ void app_main(void) {
       vTaskDelay(pdMS_TO_TICKS(100));
     }
 
-    run_oscillator_visual_test(oscillator_timer);
+    run_oscillator_visual_test(oscillator_timer, sequence_timer);
 
     ESP_ERROR_CHECK(led_control_all_off());
     if (test_run < TEST_RUN_COUNT - 1) {
@@ -223,5 +270,6 @@ void app_main(void) {
   }
 
   ESP_ERROR_CHECK(esp_timer_delete(oscillator_timer));
+  ESP_ERROR_CHECK(esp_timer_delete(sequence_timer));
   ESP_LOGI(TAG, "All test runs complete");
 }

@@ -60,14 +60,24 @@ Converts the normalized oscillator waveform and current brightness into the duty
 
 ### `sequence`
 
-Implements the sequence engine: steps, timing, parameter interpolation and LFO modulation.
+Owns the current parameters for all oscillators. The initial implementation supports realtime mode only; sequence playback and LFOs will be added later.
 
-- A **step** defines duration plus per-oscillator waveform/duty/phase and dynamic frequency/brightness (linear or LFO) for all five oscillators.
-- The sequencer advances steps and rebuilds oscillator LUTs. Its parameter layer evaluates and publishes `current_frequency` and `current_brightness` every 10–50 ms.
-- **Public API** (to be defined):
-  - `sequence_load(const sequence_t *seq)`
-  - `sequence_play()`, `sequence_pause()`, `sequence_seek(position)`
-  - `sequence_tick()` — called from the main loop or a FreeRTOS task
+- **Realtime mode**: a single indefinite live step. UI or communication commands apply parameter changes immediately.
+- **Static parameters**: waveform, duty cycle, and phase are forwarded to `oscillator_set_static()` for the affected oscillator only.
+- **Parameter controls**: frequency and brightness each use either `CONSTANT` or `LINEAR` control. The existing `sequence_realtime_set_frequency()` and `sequence_realtime_set_brightness()` setters apply a value immediately and select `CONSTANT`. The linear APIs capture the current value and interpolate to the requested target.
+- **Deterministic evaluation**: `sequence_tick()` runs every 10 ms. Linear durations must be positive multiples of 10 ms. On the final tick, the target is assigned exactly and the control automatically returns to `CONSTANT`.
+- **Dynamic parameters**: each frequency value is forwarded to `oscillator_set_frequency()` without resetting DDS phase; brightness is published as a synchronized five-value snapshot for the 1 kHz output timer.
+- **Sequence mode**: reserved for the later step engine. It will add playback, pause, seek, looping, stored steps, and LFOs.
+- **Public API**:
+  - `esp_err_t sequence_init(void)`
+  - `sequence_mode_t sequence_get_mode(void)`
+  - `esp_err_t sequence_realtime_set_static(uint8_t oscillator_id, const oscillator_static_config_t *config)`
+  - `esp_err_t sequence_realtime_set_frequency(uint8_t oscillator_id, float frequency_hz)`
+  - `esp_err_t sequence_realtime_set_brightness(uint8_t oscillator_id, float brightness)`
+  - `esp_err_t sequence_realtime_linear_frequency(uint8_t oscillator_id, float target_frequency_hz, uint32_t duration_ms)`
+  - `esp_err_t sequence_realtime_linear_brightness(uint8_t oscillator_id, float target_brightness, uint32_t duration_ms)`
+  - `esp_err_t sequence_tick(void)`
+  - `esp_err_t sequence_get_realtime_brightness(float brightnesses[OSCILLATOR_COUNT])`
 
 ### `comms`
 
@@ -113,7 +123,8 @@ Proposed FreeRTOS tasks and timers:
 |Task / Timer|Period|Responsibility|
 |------------|------|--------------|
 |`oscillator_timer`|1 ms (1 kHz)|Read current parameters, call `oscillator_tick()`, then pass each waveform value and effective brightness to `led_control`.|
-|`sequencer_task`|10–50 ms|Advance sequence steps, evaluate and publish current frequency/brightness, rebuild LUTs, and apply LFOs.|
+|`sequence_timer`|10 ms|Call `sequence_tick()` to evaluate realtime linear frequency and brightness controls.|
+|`sequencer_task`|10–50 ms|Future sequence playback: advance stored steps, apply static settings, and apply LFOs.|
 |`input_task`|50–100 ms|Poll I2C rotary encoders and update parameters or sequence.|
 |`display_task`|100–250 ms|Refresh the OLED display with current status.|
 |`comms_task`|event-driven|Handle BLE/Wi-Fi events and dispatch commands.|
@@ -122,8 +133,8 @@ Proposed FreeRTOS tasks and timers:
 
 **Inter-task communication:**
 
-- `sequence` writes `current_frequency` and `current_brightness` to a shared structure read by the oscillator timer (protected by a critical section).
-- The oscillator timer calls `oscillator_tick()` and passes each returned `osc_value` with its current brightness to `led_control`.
+- `sequence` protects realtime state with a critical section. It calculates a linear frequency update while protected, releases the sequence lock, then publishes it to `oscillator`; this avoids inverse lock acquisition with the 1 kHz output path.
+- The oscillator timer calls `oscillator_tick()`, obtains a synchronized brightness snapshot from `sequence`, and passes each `osc_value` with its current brightness to `led_control`.
 - `comms` posts commands to a FreeRTOS queue consumed by `sequence` or `input_task`.
 
 ## Build, Flash and Monitor
@@ -158,7 +169,7 @@ The following ESP-IDF configuration options will be required or important for th
 
 ### Visual Hardware Test
 
-The current `main` application includes a visual oscillator test that uses a task-dispatched `esp_timer` callback at 1 kHz. The callback calls `oscillator_tick()` and applies each normalized waveform value to `led_control` at a fixed 50% brightness.
+The current `main` application includes a visual oscillator test using task-dispatched `esp_timer` callbacks: one at 1 kHz calls `oscillator_tick()` and updates `led_control`, and a second at 10 ms calls `sequence_tick()` to evaluate realtime parameter ramps.
 
 The test stages are:
 
@@ -168,8 +179,10 @@ The test stages are:
 - PB4: 0.25 Hz sine waveform.
 - CG: 0 Hz fixed output, independent of waveform and phase.
 - PB1 and PB2: 2 Hz square waveforms with a 180-degree phase offset.
+- PB1: linear brightness ramp from 0% to 100% over 4 seconds at 0 Hz.
+- PB2: linear frequency ramp from 0 Hz to 2 Hz over 4 seconds at 50% brightness.
 
-This validates the oscillator-to-LEDC pipeline on hardware, including waveforms, duty cycle, frequency, zero-frequency behavior, and relative phase. It does not replace deterministic unit tests of individual LUT samples or DDS phase increments.
+This validates the oscillator-to-LEDC pipeline on hardware, including waveforms, duty cycle, frequency, zero-frequency behavior, relative phase, and visible realtime linear ramps. It does not replace deterministic unit tests of individual LUT samples, DDS phase increments, or sequence tick interpolation.
 
 ### Deferred Unit Tests
 
