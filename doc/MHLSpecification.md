@@ -1,4 +1,4 @@
-# Morpheus HypnoLight Project
+# Morpheus HypnoLight Device
 
 ## Objective
 

@@ -70,7 +70,7 @@ Owns the current parameters for all oscillators. The initial implementation supp
 - **Sequence mode**: reserved for the later step engine. It will add playback, pause, seek, looping, stored steps, and LFOs.
 - **Public API**:
   - `esp_err_t sequence_init(void)`
-  - `sequence_mode_t sequence_get_mode(void)`
+  - `sequence_operating_mode_t sequence_get_operating_mode(void)`
   - `esp_err_t sequence_realtime_set_static(uint8_t oscillator_id, const oscillator_static_config_t *config)`
   - `esp_err_t sequence_realtime_set_frequency(uint8_t oscillator_id, float frequency_hz)`
   - `esp_err_t sequence_realtime_set_brightness(uint8_t oscillator_id, float brightness)`

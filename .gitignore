@@ -8,6 +8,7 @@ sim/src_origin/
 sim/test/
 .VSCodeCounter
 save/
+tools/
 
 # Thumbnails
 ._*

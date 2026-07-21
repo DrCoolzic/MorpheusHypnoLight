@@ -15,9 +15,9 @@
 
 /** @brief Operating modes supported by the future sequence engine. */
 typedef enum {
-  SEQUENCE_MODE_REALTIME,
-  SEQUENCE_MODE_SEQUENCE,
-} sequence_mode_t;
+  SEQUENCE_OPERATING_MODE_REALTIME,
+  SEQUENCE_OPERATING_MODE_SEQUENCE,
+} sequence_operating_mode_t;
 
 /** @brief Fixed evaluation interval for realtime parameter controls. */
 #define SEQUENCE_TICK_PERIOD_MS 10U
@@ -46,7 +46,7 @@ typedef struct {
  * @brief Initialize realtime parameter state and all oscillator generators.
  *
  * All brightness and frequency values start at zero. The initial mode is
- * SEQUENCE_MODE_REALTIME.
+ * SEQUENCE_OPERATING_MODE_REALTIME.
  *
  * @return ESP_OK on success; otherwise, an error returned by oscillator_init().
  */
@@ -55,12 +55,12 @@ esp_err_t sequence_init(void);
 /**
  * @brief Return the current operating mode.
  *
- * The initial implementation always returns SEQUENCE_MODE_REALTIME. Sequence
- * playback mode will be added with step loading and timing support.
+ * The initial implementation always returns SEQUENCE_OPERATING_MODE_REALTIME.
+ * Sequence playback mode will be added with step loading and timing support.
  *
  * @return Current sequence operating mode.
  */
-sequence_mode_t sequence_get_mode(void);
+sequence_operating_mode_t sequence_get_operating_mode(void);
 
 /**
  * @brief Apply static waveform configuration in realtime mode.

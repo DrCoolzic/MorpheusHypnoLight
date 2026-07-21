@@ -14,7 +14,8 @@
 static portMUX_TYPE sequence_lock = portMUX_INITIALIZER_UNLOCKED;
 
 /** @brief Current mode until sequence playback is implemented. */
-static sequence_mode_t sequence_mode = SEQUENCE_MODE_REALTIME;
+static sequence_operating_mode_t sequence_operating_mode =
+    SEQUENCE_OPERATING_MODE_REALTIME;
 
 /** @brief Realtime state indexed by fixed oscillator ID. */
 static sequence_realtime_oscillator_t realtime_oscillators[OSCILLATOR_COUNT];
@@ -87,7 +88,7 @@ esp_err_t sequence_init(void) {
   }
 
   taskENTER_CRITICAL(&sequence_lock);
-  sequence_mode = SEQUENCE_MODE_REALTIME;
+  sequence_operating_mode = SEQUENCE_OPERATING_MODE_REALTIME;
   for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
        oscillator_id++) {
     realtime_oscillators[oscillator_id].static_config = default_static_config;
@@ -105,10 +106,10 @@ esp_err_t sequence_init(void) {
   return ESP_OK;
 }
 
-/** @copydoc sequence_get_mode */
-sequence_mode_t sequence_get_mode(void) {
+/** @copydoc sequence_get_operating_mode */
+sequence_operating_mode_t sequence_get_operating_mode(void) {
   taskENTER_CRITICAL(&sequence_lock);
-  const sequence_mode_t mode = sequence_mode;
+  const sequence_operating_mode_t mode = sequence_operating_mode;
   taskEXIT_CRITICAL(&sequence_lock);
 
   return mode;

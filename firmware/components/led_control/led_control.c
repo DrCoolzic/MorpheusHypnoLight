@@ -15,7 +15,7 @@
 #define LED_CONTROL_MODE LEDC_LOW_SPEED_MODE
 
 /** @brief Fixed PWM carrier frequency for all LED control outputs. */
-#define LED_CONTROL_FREQUENCY_HZ 20000
+#define LED_CONTROL_FREQUENCY_HZ 1000
 
 /** @brief LEDC duty resolution used for brightness control. */
 #define LED_CONTROL_RESOLUTION LEDC_TIMER_10_BIT
