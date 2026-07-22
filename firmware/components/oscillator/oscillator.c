@@ -124,9 +124,7 @@ static void build_lut(oscillator_state_t *state,
  * @return true when valid; otherwise false.
  */
 static bool static_config_is_valid(const oscillator_static_config_t *config) {
-  if (config == NULL || !isfinite(config->duty_cycle) ||
-      !isfinite(config->phase_degrees) || config->duty_cycle < 0.0f ||
-      config->duty_cycle > OSCILLATOR_CYCLE ||
+  if (config == NULL || !isfinite(config->phase_degrees) ||
       config->waveform < OSCILLATOR_WAVEFORM_SINE ||
       config->waveform > OSCILLATOR_WAVEFORM_CUSTOM) {
     return false;
@@ -152,7 +150,6 @@ static bool static_config_is_valid(const oscillator_static_config_t *config) {
 esp_err_t oscillator_init(void) {
   const oscillator_static_config_t default_config = {
       .waveform = OSCILLATOR_WAVEFORM_SINE,
-      .duty_cycle = 0.5f,
       .phase_degrees = 0.0f,
       .custom_lut = NULL,
   };
@@ -162,7 +159,7 @@ esp_err_t oscillator_init(void) {
        oscillator_id++) {
     oscillator_state_t *state = &oscillator_states[oscillator_id];
     state->waveform = default_config.waveform;
-    state->duty_cycle = default_config.duty_cycle;
+    state->duty_cycle = 0.5f;
     state->uses_lut = true;
     build_lut(state, &default_config);
     state->phase = 0.0f;
@@ -182,7 +179,6 @@ esp_err_t oscillator_set_static(uint8_t oscillator_id,
   taskENTER_CRITICAL(&oscillator_lock);
   oscillator_state_t *state = &oscillator_states[oscillator_id];
   state->waveform = config->waveform;
-  state->duty_cycle = config->duty_cycle;
   state->uses_lut = (config->waveform == OSCILLATOR_WAVEFORM_SINE) ||
                     (config->waveform == OSCILLATOR_WAVEFORM_CUSTOM);
   if (state->uses_lut) {
@@ -202,6 +198,19 @@ esp_err_t oscillator_set_frequency(uint8_t oscillator_id, float frequency_hz) {
 
   taskENTER_CRITICAL(&oscillator_lock);
   oscillator_states[oscillator_id].frequency_hz = frequency_hz;
+  taskEXIT_CRITICAL(&oscillator_lock);
+
+  return ESP_OK;
+}
+
+esp_err_t oscillator_set_duty_cycle(uint8_t oscillator_id, float duty_cycle) {
+  if (oscillator_id >= OSCILLATOR_COUNT || !isfinite(duty_cycle) ||
+      duty_cycle < 0.0f || duty_cycle > OSCILLATOR_CYCLE) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  taskENTER_CRITICAL(&oscillator_lock);
+  oscillator_states[oscillator_id].duty_cycle = duty_cycle;
   taskEXIT_CRITICAL(&oscillator_lock);
 
   return ESP_OK;

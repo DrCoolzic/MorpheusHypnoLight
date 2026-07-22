@@ -121,10 +121,50 @@ esp_err_t led_engine_set_brightness_modulator(uint8_t oscillator_id,
                                               const modulator_config_t *config);
 
 /**
+ * @brief Set a constant oscillator duty cycle.
+ *
+ * Convenience wrapper that configures the duty modulator in static mode.
+ *
+ * @param[in] oscillator_id Oscillator ID in the range 0 to 4.
+ * @param[in] duty_cycle Normalized duty cycle in [0.0, 1.0].
+ *
+ * @return ESP_OK on success, or ESP_ERR_INVALID_ARG for invalid input.
+ */
+esp_err_t led_engine_set_duty_cycle(uint8_t oscillator_id, float duty_cycle);
+
+/**
+ * @brief Start a linear duty-cycle ramp from an explicit start value.
+ *
+ * @param[in] oscillator_id Oscillator ID in the range 0 to 4.
+ * @param[in] start_value Starting normalized duty cycle in [0.0, 1.0].
+ * @param[in] end_value Target normalized duty cycle in [0.0, 1.0].
+ * @param[in] duration_ms Ramp duration in milliseconds.
+ *
+ * @return ESP_OK on success, or ESP_ERR_INVALID_ARG for invalid input.
+ */
+esp_err_t led_engine_linear_duty_cycle(uint8_t oscillator_id, float start_value,
+                                       float end_value, uint32_t duration_ms);
+
+/**
+ * @brief Configure the duty cycle modulator for one oscillator.
+ *
+ * This low-level setter is intended for the step engine. It accepts any
+ * valid modulator configuration (static, linear, or LFO).
+ *
+ * @param[in] oscillator_id Oscillator ID in the range 0 to 4.
+ * @param[in] config Modulator configuration to apply.
+ *
+ * @return ESP_OK on success, or an error for invalid input.
+ */
+esp_err_t led_engine_set_duty_cycle_modulator(uint8_t oscillator_id,
+                                              const modulator_config_t *config);
+
+/**
  * @brief Evaluate all modulators and update the LED outputs.
  *
- * Call this function from the 1 kHz timer callback. It evaluates the frequency
- * and brightness modulators for every oscillator, advances the oscillator,
+ * Call this function from the 1 kHz timer callback. It evaluates the
+ * frequency, brightness, and duty modulators for every oscillator, applies
+ * the resulting frequency and duty to the oscillator, advances the waveform,
  * and writes each channel through `led_control_update()`.
  *
  * @return ESP_OK on success, or an error propagated from a called component.

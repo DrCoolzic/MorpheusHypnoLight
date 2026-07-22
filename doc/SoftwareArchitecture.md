@@ -39,14 +39,15 @@ Responsible for generating the five low-frequency signals that drive the four pe
 - **Waveforms**: sine, square, triangle, custom.
   - **Sine** and **custom** are pre-computed into a 64-sample LUT when static parameters change.
   - **Square** and **triangle** are generated directly from the phase accumulator and duty cycle each tick.
-- **Static parameters per oscillator**: waveform, duty cycle, and phase. They are applied at a sequence-step boundary through `oscillator_set_static()`; sine and custom rebuild the LUT, while square and triangle only store the new parameters.
-- **Dynamic parameter per oscillator**: frequency. The parameter layer updates it with `oscillator_set_frequency()` without rebuilding any LUT.
+- **Static parameters per oscillator**: waveform and phase. They are applied at a sequence-step boundary through `oscillator_set_static()`; sine and custom rebuild the LUT, while square and triangle only store the new waveform and phase.
+- **Dynamic parameters per oscillator**: frequency and duty cycle. Both are updated on the fly through `oscillator_set_frequency()` and `oscillator_set_duty_cycle()` without rebuilding any LUT.
 - **Output**: normalized instantaneous waveform values `osc_values[5]` in the range `[0.0, 1.0]`. At 0 Hz, an oscillator returns a constant `1.0` independently of its static waveform configuration.
 - **Implementation**: Direct Digital Synthesis (DDS) phase accumulator updated by `oscillator_tick()` at 1 kHz. Sine and custom use a 64-sample LUT; square and triangle are computed from phase and duty. The component is independent of LEDC and brightness control.
 - **Public API**:
   - `esp_err_t oscillator_init(void)`
   - `esp_err_t oscillator_set_static(uint8_t oscillator_id, const oscillator_static_config_t *config)`
   - `esp_err_t oscillator_set_frequency(uint8_t oscillator_id, float frequency_hz)`
+  - `esp_err_t oscillator_set_duty_cycle(uint8_t oscillator_id, float duty_cycle)`
   - `esp_err_t oscillator_tick(float osc_values[OSCILLATOR_COUNT])`
 
 ### `led_control`
@@ -152,17 +153,21 @@ Encapsulates the per-oscillator signal chain: a frequency modulator, a brightnes
 - **Per oscillator**:
   - `frequency_modulator`: instance of the `modulator` component. Output is in Hz and forwarded to `oscillator_set_frequency()`.
   - `brightness_modulator`: instance of the `modulator` component. Output is normalized `[0.0, 1.0]` and forwarded to `led_control_update()` as `current_brightness`.
-  - `oscillator`: generates the waveform from `oscillator_static_config_t` and the current frequency.
-- **Evaluation**: at each 1 kHz tick the engine evaluates the frequency and brightness modulators, calls `oscillator_tick()`, and passes `osc_value` and `brightness` to `led_control_update()`.
+  - `duty_modulator`: instance of the `modulator` component. Output is normalized `[0.0, 1.0]` and forwarded to `oscillator_set_duty_cycle()`.
+  - `oscillator`: generates the waveform from `oscillator_static_config_t`, the current frequency, and the current duty cycle.
+- **Evaluation**: at each 1 kHz tick the engine evaluates the frequency, brightness, and duty modulators, applies them through `oscillator_set_frequency()` and `oscillator_set_duty_cycle()`, then calls `oscillator_tick()`, and passes `osc_value` and `brightness` to `led_control_update()`.
 - **Public API**:
   - `esp_err_t led_engine_init(void)`
   - `esp_err_t led_engine_set_static(uint8_t oscillator_id, const oscillator_static_config_t *config)`
   - `esp_err_t led_engine_set_frequency(uint8_t oscillator_id, float frequency_hz)`
   - `esp_err_t led_engine_set_brightness(uint8_t oscillator_id, float brightness)`
+  - `esp_err_t led_engine_set_duty_cycle(uint8_t oscillator_id, float duty_cycle)`
   - `esp_err_t led_engine_linear_frequency(uint8_t oscillator_id, float start_value, float end_value, uint32_t duration_ms)`
   - `esp_err_t led_engine_linear_brightness(uint8_t oscillator_id, float start_value, float end_value, uint32_t duration_ms)`
+  - `esp_err_t led_engine_linear_duty_cycle(uint8_t oscillator_id, float start_value, float end_value, uint32_t duration_ms)`
   - `esp_err_t led_engine_set_frequency_modulator(uint8_t oscillator_id, const modulator_config_t *config)`
   - `esp_err_t led_engine_set_brightness_modulator(uint8_t oscillator_id, const modulator_config_t *config)`
+  - `esp_err_t led_engine_set_duty_cycle_modulator(uint8_t oscillator_id, const modulator_config_t *config)`
   - `esp_err_t led_engine_tick(void)`
   - `esp_err_t led_engine_all_off(void)`
 
@@ -196,10 +201,12 @@ flowchart LR
         direction TB
         FM[frequency_modulator<br/>static / linear / lfo]
         BM[brightness_modulator<br/>static / linear / lfo]
-        OSC[oscillator<br/>waveform, duty_cycle, phase]
+        DM[duty_modulator<br/>static / linear / lfo]
+        OSC[oscillator<br/>waveform, phase]
     end
 
     FM -- frequency_hz --> OSC
+    DM -- duty_cycle --> OSC
     OSC -- osc_value --> LED
     BM -- brightness --> LED
 
@@ -220,7 +227,7 @@ Proposed FreeRTOS tasks and timers:
 
 |Task / Timer|Period|Responsibility|
 |------------|------|--------------|
-|`led_engine_timer`|1 ms (1 kHz)|Call `led_engine_tick()` to evaluate all modulators, advance the oscillator, and pass each waveform value and effective brightness to `led_control`.|
+|`led_engine_timer`|1 ms (1 kHz)|Call `led_engine_tick()` to evaluate frequency, brightness, and duty modulators, apply `oscillator_set_frequency()` / `oscillator_set_duty_cycle()`, advance the oscillator, and pass each waveform value and effective brightness to `led_control`.|
 |`sequencer_task`|10–50 ms|Future sequence playback: advance stored steps and dispatch modulator configurations to `led_engine`.|
 |`input_task`|50–100 ms|Poll I2C rotary encoders and update parameters or sequence.|
 |`display_task`|100–250 ms|Refresh the OLED display with current status.|
@@ -270,8 +277,8 @@ The current `main` application includes a visual oscillator test using a single 
 
 The test stages use full per-channel brightness values; the global brightness multiplier is set to 0.5 in `app_main()` (`led_control_set_global_brightness(0.5f)`), scaling the effective output to 50% to reduce eye strain:
 
-- PB1: 2 Hz square waveform with 50% duty cycle.
-- PB2: 2 Hz square waveform with 25% duty cycle.
+- PB1: 2 Hz square waveform with 50% duty cycle (set dynamically via `led_engine_set_duty_cycle()`).
+- PB2: 2 Hz square waveform with 25% duty cycle (set dynamically via `led_engine_set_duty_cycle()`).
 - PB3: 0.25 Hz triangle waveform.
 - PB4: 0.25 Hz sine waveform.
 - CG: 0 Hz fixed output, independent of waveform and phase.

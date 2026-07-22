@@ -64,12 +64,12 @@ static void configure_oscillator_visual_test(
     float phase_degrees, float frequency_hz, float brightness) {
   const oscillator_static_config_t config = {
       .waveform = waveform,
-      .duty_cycle = duty_cycle,
       .phase_degrees = phase_degrees,
       .custom_lut = NULL,
   };
 
   ESP_ERROR_CHECK(led_engine_set_static(oscillator_id, &config));
+  ESP_ERROR_CHECK(led_engine_set_duty_cycle(oscillator_id, duty_cycle));
   ESP_ERROR_CHECK(led_engine_set_frequency(oscillator_id, frequency_hz));
   ESP_ERROR_CHECK(led_engine_set_brightness(oscillator_id, brightness));
 }

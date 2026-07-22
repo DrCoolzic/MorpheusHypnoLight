@@ -21,8 +21,10 @@ static portMUX_TYPE led_engine_lock = portMUX_INITIALIZER_UNLOCKED;
 typedef struct {
   modulator_state_t frequency_modulator;
   modulator_state_t brightness_modulator;
+  modulator_state_t duty_modulator;
   float current_frequency;
   float current_brightness;
+  float current_duty_cycle;
 } led_engine_oscillator_t;
 
 /** @brief State indexed by fixed oscillator ID. */
@@ -62,6 +64,23 @@ static float clamp_brightness(float brightness) {
   return brightness;
 }
 
+/**
+ * @brief Clamp a duty cycle to the normalized range.
+ *
+ * @param[in] duty_cycle Duty cycle value to clamp.
+ *
+ * @return Clamped duty cycle.
+ */
+static float clamp_duty_cycle(float duty_cycle) {
+  if (duty_cycle < 0.0f) {
+    return 0.0f;
+  }
+  if (duty_cycle > 1.0f) {
+    return 1.0f;
+  }
+  return duty_cycle;
+}
+
 esp_err_t led_engine_init(void) {
   const esp_err_t error = oscillator_init();
   if (error != ESP_OK) {
@@ -74,8 +93,10 @@ esp_err_t led_engine_init(void) {
     led_engine_oscillator_t *osc = &led_engine_oscillators[oscillator_id];
     modulator_init(&osc->frequency_modulator);
     modulator_init(&osc->brightness_modulator);
+    modulator_init(&osc->duty_modulator);
     osc->current_frequency = 0.0f;
     osc->current_brightness = 0.0f;
+    osc->current_duty_cycle = 0.5f;
   }
   taskEXIT_CRITICAL(&led_engine_lock);
 
@@ -217,9 +238,75 @@ led_engine_set_brightness_modulator(uint8_t oscillator_id,
   return ESP_OK;
 }
 
+esp_err_t led_engine_set_duty_cycle(uint8_t oscillator_id, float duty_cycle) {
+  if (oscillator_id >= OSCILLATOR_COUNT || !isfinite(duty_cycle) ||
+      duty_cycle < 0.0f || duty_cycle > 1.0f) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  const modulator_config_t config = {
+      .mode = MODULATOR_MODE_STATIC,
+      .static_config = {.value = duty_cycle},
+  };
+
+  return led_engine_set_duty_cycle_modulator(oscillator_id, &config);
+}
+
+esp_err_t led_engine_linear_duty_cycle(uint8_t oscillator_id, float start_value,
+                                       float end_value, uint32_t duration_ms) {
+  if (oscillator_id >= OSCILLATOR_COUNT || !isfinite(start_value) ||
+      !isfinite(end_value) || start_value < 0.0f || start_value > 1.0f ||
+      end_value < 0.0f || end_value > 1.0f || duration_ms == 0U) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  const modulator_config_t config = {
+      .mode = MODULATOR_MODE_LINEAR,
+      .linear_config =
+          {
+              .start_value = start_value,
+              .end_value = end_value,
+              .duration_ms = duration_ms,
+          },
+  };
+
+  return led_engine_set_duty_cycle_modulator(oscillator_id, &config);
+}
+
+esp_err_t
+led_engine_set_duty_cycle_modulator(uint8_t oscillator_id,
+                                    const modulator_config_t *config) {
+  if (oscillator_id >= OSCILLATOR_COUNT || config == NULL) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  modulator_state_t temp_state;
+  const esp_err_t error = modulator_init(&temp_state);
+  if (error != ESP_OK) {
+    return error;
+  }
+
+  if (modulator_set_config(&temp_state, config) != ESP_OK) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  taskENTER_CRITICAL(&led_engine_lock);
+  led_engine_oscillator_t *osc = &led_engine_oscillators[oscillator_id];
+  osc->duty_modulator = temp_state;
+  if (config->mode == MODULATOR_MODE_STATIC) {
+    osc->current_duty_cycle = config->static_config.value;
+  } else if (config->mode == MODULATOR_MODE_LINEAR) {
+    osc->current_duty_cycle = config->linear_config.start_value;
+  }
+  taskEXIT_CRITICAL(&led_engine_lock);
+
+  return ESP_OK;
+}
+
 esp_err_t led_engine_tick(void) {
   float frequencies[OSCILLATOR_COUNT];
   float brightnesses[OSCILLATOR_COUNT];
+  float duty_cycles[OSCILLATOR_COUNT];
 
   taskENTER_CRITICAL(&led_engine_lock);
   for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
@@ -229,12 +316,15 @@ esp_err_t led_engine_tick(void) {
                        &frequencies[oscillator_id]);
     modulator_evaluate(&osc->brightness_modulator, 1.0f,
                        &brightnesses[oscillator_id]);
+    modulator_evaluate(&osc->duty_modulator, 1.0f, &duty_cycles[oscillator_id]);
 
     frequencies[oscillator_id] = clamp_frequency(frequencies[oscillator_id]);
     brightnesses[oscillator_id] = clamp_brightness(brightnesses[oscillator_id]);
+    duty_cycles[oscillator_id] = clamp_duty_cycle(duty_cycles[oscillator_id]);
 
     osc->current_frequency = frequencies[oscillator_id];
     osc->current_brightness = brightnesses[oscillator_id];
+    osc->current_duty_cycle = duty_cycles[oscillator_id];
   }
   taskEXIT_CRITICAL(&led_engine_lock);
 
@@ -242,6 +332,15 @@ esp_err_t led_engine_tick(void) {
        oscillator_id++) {
     const esp_err_t error =
         oscillator_set_frequency(oscillator_id, frequencies[oscillator_id]);
+    if (error != ESP_OK) {
+      return error;
+    }
+  }
+
+  for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
+       oscillator_id++) {
+    const esp_err_t error =
+        oscillator_set_duty_cycle(oscillator_id, duty_cycles[oscillator_id]);
     if (error != ESP_OK) {
       return error;
     }

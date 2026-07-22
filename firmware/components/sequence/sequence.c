@@ -76,7 +76,6 @@ static void configure_linear_control(sequence_linear_control_t *control,
 esp_err_t sequence_init(void) {
   const oscillator_static_config_t default_static_config = {
       .waveform = OSCILLATOR_WAVEFORM_SINE,
-      .duty_cycle = 0.5f,
       .phase_degrees = 0.0f,
       .custom_lut = NULL,
   };

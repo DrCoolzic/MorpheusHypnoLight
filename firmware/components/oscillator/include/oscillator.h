@@ -35,13 +35,13 @@ typedef enum {
 /**
  * @brief Static waveform settings applied at a sequence-step boundary.
  *
- * duty_cycle is used by square and triangle waveforms. phase_degrees defines
- * the initial LUT position. custom_lut must point to OSCILLATOR_LUT_SIZE
- * normalized samples when waveform is OSCILLATOR_WAVEFORM_CUSTOM.
+ * phase_degrees defines the initial LUT position. custom_lut must point to
+ * OSCILLATOR_LUT_SIZE normalized samples when waveform is
+ * OSCILLATOR_WAVEFORM_CUSTOM. duty_cycle is a dynamic parameter and is set
+ * separately through oscillator_set_duty_cycle().
  */
 typedef struct {
   oscillator_waveform_t waveform;
-  float duty_cycle;
   float phase_degrees;
   const float *custom_lut;
 } oscillator_static_config_t;
@@ -83,6 +83,20 @@ esp_err_t oscillator_set_static(uint8_t oscillator_id,
  * @return ESP_OK on success or ESP_ERR_INVALID_ARG for invalid input.
  */
 esp_err_t oscillator_set_frequency(uint8_t oscillator_id, float frequency_hz);
+
+/**
+ * @brief Set the dynamic duty cycle for square and triangle waveforms.
+ *
+ * This value is normalized to [0.0, 1.0]. It has no effect on sine or custom
+ * LUT waveforms. The duty cycle can be changed at runtime without rebuilding a
+ * LUT.
+ *
+ * @param[in] oscillator_id Oscillator ID in the range 0 to 4.
+ * @param[in] duty_cycle Duty cycle in the inclusive range [0.0, 1.0].
+ *
+ * @return ESP_OK on success or ESP_ERR_INVALID_ARG for invalid input.
+ */
+esp_err_t oscillator_set_duty_cycle(uint8_t oscillator_id, float duty_cycle);
 
 /**
  * @brief Advance DDS state by one nominal tick and return all waveform values.
