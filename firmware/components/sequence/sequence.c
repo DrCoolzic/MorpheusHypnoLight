@@ -1,287 +1,294 @@
 /**
  * @file sequence.c
- * @brief Realtime parameter implementation for the HypnoLight sequence engine.
+ * @brief Step-based playback engine for HypnoLight sequences.
  */
 #include "sequence.h"
 
 #include <math.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-/** @brief Serialized access to realtime parameter state. */
+#include "led_engine.h"
+#include "modulator.h"
+
+/** @brief Serialized access to sequence playback state. */
 static portMUX_TYPE sequence_lock = portMUX_INITIALIZER_UNLOCKED;
 
-/** @brief Current mode until sequence playback is implemented. */
-static sequence_operating_mode_t sequence_operating_mode =
-    SEQUENCE_OPERATING_MODE_REALTIME;
+/** @brief Loaded sequence steps. */
+static sequence_step_t sequence_steps[SEQUENCE_MAX_STEPS];
 
-/** @brief Realtime state indexed by fixed oscillator ID. */
-static sequence_realtime_oscillator_t realtime_oscillators[OSCILLATOR_COUNT];
+/** @brief Number of valid steps currently loaded. */
+static uint32_t sequence_step_count = 0U;
 
-/** @brief Evaluation state for one linear realtime parameter control. */
-typedef struct {
-  float start_value;
-  float target_value;
-  uint32_t elapsed_ticks;
-  uint32_t total_ticks;
-} sequence_linear_control_t;
+/** @brief Index of the step currently being played. */
+static uint32_t sequence_current_step = 0U;
 
-/** @brief Linear frequency controls indexed by fixed oscillator ID. */
-static sequence_linear_control_t frequency_controls[OSCILLATOR_COUNT];
+/** @brief Elapsed time inside the current step, in milliseconds. */
+static uint32_t sequence_elapsed_ms = 0U;
 
-/** @brief Linear brightness controls indexed by fixed oscillator ID. */
-static sequence_linear_control_t brightness_controls[OSCILLATOR_COUNT];
+/** @brief Whether playback is currently active. */
+static bool sequence_playing = false;
 
 /**
- * @brief Check whether a value is a normalized finite brightness factor.
+ * @brief Validate a static oscillator configuration without modifying hardware.
  *
- * @param[in] brightness Value to validate.
+ * @param[in] config Static configuration to validate.
  *
- * @return true when brightness is in the inclusive range [0.0, 1.0].
+ * @return true when the configuration can be applied to the oscillator.
  */
-static bool brightness_is_valid(float brightness) {
-  return isfinite(brightness) && brightness >= 0.0f && brightness <= 1.0f;
+static bool static_config_is_valid(const oscillator_static_config_t *config) {
+  if (config == NULL || !isfinite(config->phase_degrees) ||
+      config->waveform < OSCILLATOR_WAVEFORM_SINE ||
+      config->waveform > OSCILLATOR_WAVEFORM_CUSTOM) {
+    return false;
+  }
+
+  if (config->waveform != OSCILLATOR_WAVEFORM_CUSTOM) {
+    return true;
+  }
+
+  if (config->custom_lut == NULL) {
+    return false;
+  }
+
+  for (uint8_t i = 0; i < OSCILLATOR_LUT_SIZE; i++) {
+    if (!isfinite(config->custom_lut[i])) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**
- * @brief Check whether a duration is representable by the fixed tick period.
+ * @brief Validate one per-oscillator step entry.
  *
- * @param[in] duration_ms Requested ramp duration in milliseconds.
+ * The modulator configurations are checked by attempting to apply them to a
+ * scratch modulator state.
  *
- * @return true when duration_ms produces at least one whole evaluation tick.
+ * @param[in] oscillator_step Per-oscillator step data.
+ *
+ * @return true when all fields are valid.
  */
-static bool duration_is_valid(uint32_t duration_ms) {
-  return duration_ms > 0U && duration_ms % SEQUENCE_TICK_PERIOD_MS == 0U;
+static bool
+oscillator_step_is_valid(const sequence_oscillator_step_t *oscillator_step) {
+  if (oscillator_step == NULL) {
+    return false;
+  }
+
+  if (!static_config_is_valid(&oscillator_step->static_config)) {
+    return false;
+  }
+
+  modulator_state_t scratch;
+  if (modulator_init(&scratch) != ESP_OK) {
+    return false;
+  }
+
+  if (modulator_set_config(&scratch, &oscillator_step->frequency_modulator) !=
+          ESP_OK ||
+      modulator_set_config(&scratch, &oscillator_step->brightness_modulator) !=
+          ESP_OK ||
+      modulator_set_config(&scratch, &oscillator_step->duty_modulator) !=
+          ESP_OK) {
+    return false;
+  }
+
+  return true;
 }
 
 /**
- * @brief Configure linear evaluation state for a parameter.
+ * @brief Validate a complete sequence step.
  *
- * @param[out] control Control state to initialize.
- * @param[in] start_value Value active at ramp start.
- * @param[in] target_value Value to reach.
- * @param[in] duration_ms Ramp duration in milliseconds.
+ * @param[in] step Step to validate.
+ *
+ * @return true when the step can be loaded.
  */
-static void configure_linear_control(sequence_linear_control_t *control,
-                                     float start_value, float target_value,
-                                     uint32_t duration_ms) {
-  control->start_value = start_value;
-  control->target_value = target_value;
-  control->elapsed_ticks = 0U;
-  control->total_ticks = duration_ms / SEQUENCE_TICK_PERIOD_MS;
+static bool step_is_valid(const sequence_step_t *step) {
+  if (step == NULL || step->duration_ms == 0U) {
+    return false;
+  }
+
+  for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
+       oscillator_id++) {
+    if (!oscillator_step_is_valid(&step->oscillators[oscillator_id])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * @brief Apply one step's configuration to the led_engine.
+ *
+ * This function must be called outside the sequence critical section because it
+ * acquires its own locks inside led_engine and oscillator.
+ *
+ * @param[in] step_index Zero-based index of the step to apply.
+ *
+ * @return ESP_OK on success, or an error propagated from led_engine.
+ */
+static esp_err_t apply_step(uint32_t step_index) {
+  if (step_index >= sequence_step_count) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  const sequence_step_t *step = &sequence_steps[step_index];
+
+  for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
+       oscillator_id++) {
+    const sequence_oscillator_step_t *oscillator_step =
+        &step->oscillators[oscillator_id];
+
+    esp_err_t error =
+        led_engine_set_static(oscillator_id, &oscillator_step->static_config);
+    if (error != ESP_OK) {
+      return error;
+    }
+
+    error = led_engine_set_frequency_modulator(
+        oscillator_id, &oscillator_step->frequency_modulator);
+    if (error != ESP_OK) {
+      return error;
+    }
+
+    error = led_engine_set_brightness_modulator(
+        oscillator_id, &oscillator_step->brightness_modulator);
+    if (error != ESP_OK) {
+      return error;
+    }
+
+    error = led_engine_set_duty_cycle_modulator(
+        oscillator_id, &oscillator_step->duty_modulator);
+    if (error != ESP_OK) {
+      return error;
+    }
+  }
+
+  return ESP_OK;
 }
 
 esp_err_t sequence_init(void) {
-  const oscillator_static_config_t default_static_config = {
-      .waveform = OSCILLATOR_WAVEFORM_SINE,
-      .phase_degrees = 0.0f,
-      .custom_lut = NULL,
-  };
-
-  esp_err_t error = oscillator_init();
-  if (error != ESP_OK) {
-    return error;
-  }
-
   taskENTER_CRITICAL(&sequence_lock);
-  sequence_operating_mode = SEQUENCE_OPERATING_MODE_REALTIME;
-  for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
-       oscillator_id++) {
-    realtime_oscillators[oscillator_id].static_config = default_static_config;
-    realtime_oscillators[oscillator_id].frequency_hz = 0.0f;
-    realtime_oscillators[oscillator_id].brightness = 0.0f;
-    realtime_oscillators[oscillator_id].frequency_mode =
-        SEQUENCE_PARAMETER_CONTROL_CONSTANT;
-    realtime_oscillators[oscillator_id].brightness_mode =
-        SEQUENCE_PARAMETER_CONTROL_CONSTANT;
-    frequency_controls[oscillator_id] = (sequence_linear_control_t){0};
-    brightness_controls[oscillator_id] = (sequence_linear_control_t){0};
-  }
+  memset(sequence_steps, 0, sizeof(sequence_steps));
+  sequence_step_count = 0U;
+  sequence_current_step = 0U;
+  sequence_elapsed_ms = 0U;
+  sequence_playing = false;
   taskEXIT_CRITICAL(&sequence_lock);
 
   return ESP_OK;
 }
 
-sequence_operating_mode_t sequence_get_operating_mode(void) {
-  taskENTER_CRITICAL(&sequence_lock);
-  const sequence_operating_mode_t mode = sequence_operating_mode;
-  taskEXIT_CRITICAL(&sequence_lock);
-
-  return mode;
-}
-
-esp_err_t
-sequence_realtime_set_static(uint8_t oscillator_id,
-                             const oscillator_static_config_t *config) {
-  if (oscillator_id >= OSCILLATOR_COUNT || config == NULL) {
+esp_err_t sequence_load(const sequence_step_t *steps, uint32_t step_count) {
+  if (step_count > SEQUENCE_MAX_STEPS || (steps == NULL && step_count > 0U)) {
     return ESP_ERR_INVALID_ARG;
   }
 
-  const esp_err_t error = oscillator_set_static(oscillator_id, config);
-  if (error != ESP_OK) {
-    return error;
+  if (steps != NULL) {
+    for (uint32_t i = 0; i < step_count; i++) {
+      if (!step_is_valid(&steps[i])) {
+        return ESP_ERR_INVALID_ARG;
+      }
+    }
   }
 
   taskENTER_CRITICAL(&sequence_lock);
-  realtime_oscillators[oscillator_id].static_config = *config;
+  if (steps != NULL) {
+    memcpy(sequence_steps, steps, step_count * sizeof(sequence_step_t));
+  }
+  sequence_step_count = step_count;
+  sequence_current_step = 0U;
+  sequence_elapsed_ms = 0U;
+  sequence_playing = false;
   taskEXIT_CRITICAL(&sequence_lock);
 
   return ESP_OK;
 }
 
-esp_err_t sequence_realtime_set_frequency(uint8_t oscillator_id,
-                                          float frequency_hz) {
-  if (oscillator_id >= OSCILLATOR_COUNT) {
-    return ESP_ERR_INVALID_ARG;
-  }
-
-  const esp_err_t error = oscillator_set_frequency(oscillator_id, frequency_hz);
-  if (error != ESP_OK) {
-    return error;
-  }
-
+esp_err_t sequence_play(void) {
   taskENTER_CRITICAL(&sequence_lock);
-  realtime_oscillators[oscillator_id].frequency_hz = frequency_hz;
-  realtime_oscillators[oscillator_id].frequency_mode =
-      SEQUENCE_PARAMETER_CONTROL_CONSTANT;
-  frequency_controls[oscillator_id] = (sequence_linear_control_t){0};
+  if (!sequence_playing && sequence_step_count > 0U) {
+    sequence_playing = true;
+  }
   taskEXIT_CRITICAL(&sequence_lock);
 
   return ESP_OK;
 }
 
-esp_err_t sequence_realtime_set_brightness(uint8_t oscillator_id,
-                                           float brightness) {
-  if (oscillator_id >= OSCILLATOR_COUNT || !brightness_is_valid(brightness)) {
-    return ESP_ERR_INVALID_ARG;
-  }
-
+esp_err_t sequence_pause(void) {
   taskENTER_CRITICAL(&sequence_lock);
-  realtime_oscillators[oscillator_id].brightness = brightness;
-  realtime_oscillators[oscillator_id].brightness_mode =
-      SEQUENCE_PARAMETER_CONTROL_CONSTANT;
-  brightness_controls[oscillator_id] = (sequence_linear_control_t){0};
+  sequence_playing = false;
   taskEXIT_CRITICAL(&sequence_lock);
 
   return ESP_OK;
 }
 
-esp_err_t sequence_realtime_linear_frequency(uint8_t oscillator_id,
-                                             float target_frequency_hz,
-                                             uint32_t duration_ms) {
-  if (oscillator_id >= OSCILLATOR_COUNT || !isfinite(target_frequency_hz) ||
-      target_frequency_hz < 0.0f ||
-      target_frequency_hz > OSCILLATOR_MAX_FREQUENCY_HZ ||
-      !duration_is_valid(duration_ms)) {
+esp_err_t sequence_seek(uint32_t step_index) {
+  taskENTER_CRITICAL(&sequence_lock);
+  if (step_index >= sequence_step_count) {
+    taskEXIT_CRITICAL(&sequence_lock);
     return ESP_ERR_INVALID_ARG;
   }
 
-  taskENTER_CRITICAL(&sequence_lock);
-  configure_linear_control(&frequency_controls[oscillator_id],
-                           realtime_oscillators[oscillator_id].frequency_hz,
-                           target_frequency_hz, duration_ms);
-  realtime_oscillators[oscillator_id].frequency_mode =
-      SEQUENCE_PARAMETER_CONTROL_LINEAR;
+  sequence_current_step = step_index;
+  sequence_elapsed_ms = 0U;
+  const uint32_t target_step = step_index;
   taskEXIT_CRITICAL(&sequence_lock);
 
-  return ESP_OK;
-}
-
-esp_err_t sequence_realtime_linear_brightness(uint8_t oscillator_id,
-                                              float target_brightness,
-                                              uint32_t duration_ms) {
-  if (oscillator_id >= OSCILLATOR_COUNT ||
-      !brightness_is_valid(target_brightness) ||
-      !duration_is_valid(duration_ms)) {
-    return ESP_ERR_INVALID_ARG;
-  }
-
-  taskENTER_CRITICAL(&sequence_lock);
-  configure_linear_control(&brightness_controls[oscillator_id],
-                           realtime_oscillators[oscillator_id].brightness,
-                           target_brightness, duration_ms);
-  realtime_oscillators[oscillator_id].brightness_mode =
-      SEQUENCE_PARAMETER_CONTROL_LINEAR;
-  taskEXIT_CRITICAL(&sequence_lock);
-
-  return ESP_OK;
+  return apply_step(target_step);
 }
 
 esp_err_t sequence_tick(void) {
-  float frequency_updates[OSCILLATOR_COUNT];
-  bool frequency_changed[OSCILLATOR_COUNT] = {false};
+  uint32_t step_to_apply = 0U;
+  bool apply = false;
 
   taskENTER_CRITICAL(&sequence_lock);
-  for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
-       oscillator_id++) {
-    if (realtime_oscillators[oscillator_id].frequency_mode ==
-        SEQUENCE_PARAMETER_CONTROL_LINEAR) {
-      sequence_linear_control_t *control = &frequency_controls[oscillator_id];
-      control->elapsed_ticks++;
-      const float progress =
-          (float)control->elapsed_ticks / (float)control->total_ticks;
-      const float frequency =
-          control->elapsed_ticks >= control->total_ticks
-              ? control->target_value
-              : control->start_value +
-                    (control->target_value - control->start_value) * progress;
-      realtime_oscillators[oscillator_id].frequency_hz = frequency;
-      frequency_updates[oscillator_id] = frequency;
-      frequency_changed[oscillator_id] = true;
-      if (control->elapsed_ticks >= control->total_ticks) {
-        realtime_oscillators[oscillator_id].frequency_mode =
-            SEQUENCE_PARAMETER_CONTROL_CONSTANT;
-      }
-    }
+  if (!sequence_playing || sequence_step_count == 0U) {
+    taskEXIT_CRITICAL(&sequence_lock);
+    return ESP_OK;
+  }
 
-    if (realtime_oscillators[oscillator_id].brightness_mode ==
-        SEQUENCE_PARAMETER_CONTROL_LINEAR) {
-      sequence_linear_control_t *control = &brightness_controls[oscillator_id];
-      control->elapsed_ticks++;
-      const float progress =
-          (float)control->elapsed_ticks / (float)control->total_ticks;
-      realtime_oscillators[oscillator_id].brightness =
-          control->elapsed_ticks >= control->total_ticks
-              ? control->target_value
-              : control->start_value +
-                    (control->target_value - control->start_value) * progress;
-      if (control->elapsed_ticks >= control->total_ticks) {
-        realtime_oscillators[oscillator_id].brightness_mode =
-            SEQUENCE_PARAMETER_CONTROL_CONSTANT;
-      }
+  sequence_elapsed_ms += SEQUENCE_STEP_TICK_PERIOD_MS;
+
+  const sequence_step_t *current = &sequence_steps[sequence_current_step];
+  if (sequence_elapsed_ms >= current->duration_ms) {
+    if (sequence_current_step + 1U < sequence_step_count) {
+      sequence_current_step++;
+      sequence_elapsed_ms = 0U;
+      step_to_apply = sequence_current_step;
+      apply = true;
+    } else {
+      sequence_playing = false;
+      sequence_elapsed_ms = 0U;
     }
   }
   taskEXIT_CRITICAL(&sequence_lock);
 
-  for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
-       oscillator_id++) {
-    if (frequency_changed[oscillator_id]) {
-      const esp_err_t error = oscillator_set_frequency(
-          oscillator_id, frequency_updates[oscillator_id]);
-      if (error != ESP_OK) {
-        return error;
-      }
-    }
+  if (apply) {
+    return apply_step(step_to_apply);
   }
 
   return ESP_OK;
 }
 
-esp_err_t
-sequence_get_realtime_brightness(float brightnesses[OSCILLATOR_COUNT]) {
-  if (brightnesses == NULL) {
-    return ESP_ERR_INVALID_ARG;
-  }
-
+bool sequence_is_playing(void) {
   taskENTER_CRITICAL(&sequence_lock);
-  for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
-       oscillator_id++) {
-    brightnesses[oscillator_id] =
-        realtime_oscillators[oscillator_id].brightness;
-  }
+  const bool playing = sequence_playing;
   taskEXIT_CRITICAL(&sequence_lock);
 
-  return ESP_OK;
+  return playing;
+}
+
+uint32_t sequence_get_current_step(void) {
+  taskENTER_CRITICAL(&sequence_lock);
+  const uint32_t current = sequence_current_step;
+  taskEXIT_CRITICAL(&sequence_lock);
+
+  return current;
 }

@@ -1,165 +1,129 @@
 /**
  * @file sequence.h
- * @brief Realtime parameter ownership for HypnoLight oscillators.
+ * @brief Step-based playback engine for HypnoLight sequences.
  *
- * This initial sequence component implements the realtime mode only. It owns
- * current static settings, frequencies, and brightness values for the five
- * oscillators, while oscillator generates waveforms and led_control drives PWM.
+ * The `sequence` component stores a fixed-size array of steps and advances
+ * playback. Each step defines, for every oscillator, a static waveform
+ * configuration and three independent modulators for frequency, brightness, and
+ * duty cycle. The actual realtime evaluation of those modulators is performed
+ * by the `led_engine` component.
  */
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "esp_err.h"
+#include "modulator.h"
 #include "oscillator.h"
 
-/** @brief Operating modes supported by the future sequence engine. */
-typedef enum {
-  SEQUENCE_OPERATING_MODE_REALTIME,
-  SEQUENCE_OPERATING_MODE_SEQUENCE,
-} sequence_operating_mode_t;
+/** @brief Maximum number of steps stored internally by the sequence engine. */
+#define SEQUENCE_MAX_STEPS 128U
 
-/** @brief Fixed evaluation interval for realtime parameter controls. */
-#define SEQUENCE_TICK_PERIOD_MS 10U
-
-/** @brief Supported realtime parameter control modes. */
-typedef enum {
-  SEQUENCE_PARAMETER_CONTROL_CONSTANT,
-  SEQUENCE_PARAMETER_CONTROL_LINEAR,
-} sequence_parameter_control_mode_t;
+/** @brief Fixed interval at which sequence_tick() must be called. */
+#define SEQUENCE_STEP_TICK_PERIOD_MS 100U
 
 /**
- * @brief Current realtime parameters owned for one oscillator.
+ * @brief Per-oscillator data for one sequence step.
  *
- * The custom_lut pointer is retained only as configuration metadata. The
- * oscillator component copies custom waveform samples into its internal LUT.
+ * The modulator configurations are evaluated by `led_engine` at 1 kHz. The
+ * static configuration is applied once at step entry.
  */
 typedef struct {
   oscillator_static_config_t static_config;
-  float frequency_hz;
-  float brightness;
-  sequence_parameter_control_mode_t frequency_mode;
-  sequence_parameter_control_mode_t brightness_mode;
-} sequence_realtime_oscillator_t;
+  modulator_config_t frequency_modulator;
+  modulator_config_t brightness_modulator;
+  modulator_config_t duty_modulator;
+} sequence_oscillator_step_t;
 
 /**
- * @brief Initialize realtime parameter state and all oscillator generators.
+ * @brief One sequence step.
  *
- * All brightness and frequency values start at zero. The initial mode is
- * SEQUENCE_OPERATING_MODE_REALTIME.
+ * The duration is common to all oscillators. Each oscillator carries its own
+ * static waveform and modulator settings.
+ */
+typedef struct {
+  uint32_t duration_ms;
+  sequence_oscillator_step_t oscillators[OSCILLATOR_COUNT];
+} sequence_step_t;
+
+/**
+ * @brief Initialize the sequence playback state.
  *
- * @return ESP_OK on success; otherwise, an error returned by oscillator_init().
+ * All step data, playback position, and playback state are reset. This function
+ * does not initialize the `led_engine`; it must be initialized before playback
+ * starts.
+ *
+ * @return ESP_OK on success.
  */
 esp_err_t sequence_init(void);
 
 /**
- * @brief Return the current operating mode.
+ * @brief Load a sequence into internal RAM.
  *
- * The initial implementation always returns SEQUENCE_OPERATING_MODE_REALTIME.
- * Sequence playback mode will be added with step loading and timing support.
+ * The steps are copied into an internal buffer limited by
+ * SEQUENCE_MAX_STEPS. All static configurations and modulator configurations
+ * are validated. Playback is reset to the first step and paused.
  *
- * @return Current sequence operating mode.
+ * @param[in] steps Array of sequence steps.
+ * @param[in] step_count Number of steps to copy.
+ *
+ * @return ESP_OK on success, or ESP_ERR_INVALID_ARG for invalid input.
  */
-sequence_operating_mode_t sequence_get_operating_mode(void);
+esp_err_t sequence_load(const sequence_step_t *steps, uint32_t step_count);
 
 /**
- * @brief Apply static waveform configuration in realtime mode.
+ * @brief Start or resume playback from the current step.
  *
- * The selected oscillator rebuilds its LUT and resets its phase according to
- * config->phase_degrees. Other oscillator state remains unchanged.
- *
- * @param[in] oscillator_id Oscillator ID in the range 0 to 4.
- * @param[in] config Static waveform configuration.
- *
- * @return ESP_OK on success or an error returned by oscillator_set_static().
- */
-esp_err_t
-sequence_realtime_set_static(uint8_t oscillator_id,
-                             const oscillator_static_config_t *config);
-
-/**
- * @brief Set one oscillator's realtime frequency.
- *
- * Updating frequency preserves the current DDS phase and does not rebuild the
- * waveform LUT.
- *
- * @param[in] oscillator_id Oscillator ID in the range 0 to 4.
- * @param[in] frequency_hz Frequency in the range accepted by oscillator.
- *
- * @return ESP_OK on success or an error returned by oscillator_set_frequency().
- */
-esp_err_t sequence_realtime_set_frequency(uint8_t oscillator_id,
-                                          float frequency_hz);
-
-/**
- * @brief Set one oscillator's realtime brightness.
- *
- * Brightness is stored as a normalized factor and is consumed by the 1 kHz
- * output callback with the waveform value generated by oscillator.
- *
- * @param[in] oscillator_id Oscillator ID in the range 0 to 4.
- * @param[in] brightness Normalized brightness in the inclusive range
- * [0.0, 1.0].
- *
- * @return ESP_OK on success or ESP_ERR_INVALID_ARG for invalid input.
- */
-esp_err_t sequence_realtime_set_brightness(uint8_t oscillator_id,
-                                           float brightness);
-
-/**
- * @brief Start a linear realtime frequency ramp.
- *
- * The parameter advances once per sequence_tick() from its current value to
- * target_frequency_hz. duration_ms must be a positive multiple of
- * SEQUENCE_TICK_PERIOD_MS.
- *
- * @param[in] oscillator_id Oscillator ID in the range 0 to 4.
- * @param[in] target_frequency_hz Target frequency accepted by oscillator.
- * @param[in] duration_ms Ramp duration in milliseconds.
- *
- * @return ESP_OK on success or ESP_ERR_INVALID_ARG for invalid input.
- */
-esp_err_t sequence_realtime_linear_frequency(uint8_t oscillator_id,
-                                             float target_frequency_hz,
-                                             uint32_t duration_ms);
-
-/**
- * @brief Start a linear realtime brightness ramp.
- *
- * The parameter advances once per sequence_tick() from its current value to
- * target_brightness. duration_ms must be a positive multiple of
- * SEQUENCE_TICK_PERIOD_MS.
- *
- * @param[in] oscillator_id Oscillator ID in the range 0 to 4.
- * @param[in] target_brightness Normalized target brightness in [0.0, 1.0].
- * @param[in] duration_ms Ramp duration in milliseconds.
- *
- * @return ESP_OK on success or ESP_ERR_INVALID_ARG for invalid input.
- */
-esp_err_t sequence_realtime_linear_brightness(uint8_t oscillator_id,
-                                              float target_brightness,
-                                              uint32_t duration_ms);
-
-/**
- * @brief Evaluate all active realtime parameter controls once.
- *
- * Call this function exactly once every SEQUENCE_TICK_PERIOD_MS milliseconds.
- * Each completed linear ramp reaches its target exactly on its final tick and
- * automatically becomes a constant control.
+ * If playback is already running this function has no effect.
  *
  * @return ESP_OK on success.
+ */
+esp_err_t sequence_play(void);
+
+/**
+ * @brief Pause playback without changing the current step or LED state.
+ *
+ * The modulators configured in `led_engine` continue to run while paused, so
+ * the LEDs keep their current dynamic output.
+ *
+ * @return ESP_OK on success.
+ */
+esp_err_t sequence_pause(void);
+
+/**
+ * @brief Jump to a specific step and apply its configuration.
+ *
+ * If the sequence is playing, playback continues from the new position. If it
+ * is paused, the configuration is applied but playback remains paused.
+ *
+ * @param[in] step_index Zero-based step index.
+ *
+ * @return ESP_OK on success, or ESP_ERR_INVALID_ARG for an out-of-range index.
+ */
+esp_err_t sequence_seek(uint32_t step_index);
+
+/**
+ * @brief Advance the sequence timeline by one tick.
+ *
+ * Call this function every SEQUENCE_STEP_TICK_PERIOD_MS milliseconds. It
+ * advances the current step timer and, when the duration expires, moves to the
+ * next step and applies its configuration to `led_engine`.
+ *
+ * @return ESP_OK on success, or an error propagated from `led_engine`.
  */
 esp_err_t sequence_tick(void);
 
 /**
- * @brief Copy the current realtime brightness snapshot.
+ * @brief Return whether the sequence engine is currently playing.
  *
- * The copy is synchronized so the output callback receives a consistent set of
- * five brightness values. The caller must provide OSCILLATOR_COUNT floats.
- *
- * @param[out] brightnesses Destination array for normalized brightness values.
- *
- * @return ESP_OK on success or ESP_ERR_INVALID_ARG when brightnesses is NULL.
+ * @return true when playback is active.
  */
-esp_err_t
-sequence_get_realtime_brightness(float brightnesses[OSCILLATOR_COUNT]);
+bool sequence_is_playing(void);
+
+/**
+ * @brief Return the zero-based index of the current step.
+ *
+ * @return Current step index.
+ */
+uint32_t sequence_get_current_step(void);

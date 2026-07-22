@@ -70,16 +70,21 @@ Converts the normalized oscillator waveform and current brightness into the duty
 
 Step sequencer / playback engine. The realtime parameter evaluation previously implemented here has moved to the `led_engine` component. `sequence` now focuses on storing and advancing steps, then dispatching per-oscillator modulator configurations to `led_engine`.
 
-- **Player mode**: reads a stored sequence and advances from step to step. Each step carries duration, static oscillator configuration, and modulator settings for frequency and brightness.
+- **Player mode**: reads a stored sequence and advances from step to step. Each step carries duration, static oscillator configuration, and modulator settings for frequency, brightness, and duty cycle.
 - **Editor mode**: future commands from `comms` will write step data and playback commands into `sequence`.
 - **Playback control**: play, pause, seek, loop, and tempo will be managed here.
-- **Public API** (to be defined when playback is implemented):
+- **Public data types**:
+  - `sequence_step_t` with `duration_ms` and per-oscillator `sequence_oscillator_step_t`
+  - `sequence_oscillator_step_t` with `oscillator_static_config_t` and `modulator_config_t` for `frequency_modulator`, `brightness_modulator`, and `duty_modulator`
+- **Public API**:
   - `esp_err_t sequence_init(void)`
-  - `esp_err_t sequence_load(...)`
+  - `esp_err_t sequence_load(const sequence_step_t *steps, uint32_t step_count)`
   - `esp_err_t sequence_play(void)`
   - `esp_err_t sequence_pause(void)`
-  - `esp_err_t sequence_seek(uint32_t step)`
+  - `esp_err_t sequence_seek(uint32_t step_index)`
   - `esp_err_t sequence_tick(void)`
+  - `bool sequence_is_playing(void)`
+  - `uint32_t sequence_get_current_step(void)`
 
 ### `modulator`
 

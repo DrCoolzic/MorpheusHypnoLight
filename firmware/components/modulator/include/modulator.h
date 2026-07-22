@@ -1,10 +1,11 @@
 /**
  * @file modulator.h
- * @brief Generic time-varying value generator for frequency and brightness.
+ * @brief Generic time-varying value generator for frequency, brightness, and
+ * duty cycle.
  *
  * The modulator component supports three control modes: static, linear, and
- * LFO. It is used by `led_engine` to produce the current frequency and
- * brightness values for each oscillator.
+ * LFO. It is used by `led_engine` to produce the current frequency, brightness,
+ * and duty cycle values for each oscillator.
  */
 
 #pragma once
