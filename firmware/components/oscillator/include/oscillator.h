@@ -1,6 +1,7 @@
 /**
  * @file oscillator.h
- * @brief LUT and DDS waveform generation for the HypnoLight LED groups.
+ * @brief Waveform generation using LUT or direct phase evaluation for
+ * HypnoLight LED groups.
  *
  * The oscillator module generates five independent normalized waveform values.
  * It has no dependency on LEDC or brightness control.
@@ -58,8 +59,9 @@ esp_err_t oscillator_init(void);
 /**
  * @brief Apply static waveform settings to an oscillator.
  *
- * This rebuilds the oscillator LUT and resets its DDS phase to phase_degrees.
- * Call it at a step boundary, not concurrently with oscillator_tick().
+ * This builds the LUT for sine/custom waveforms and stores parameters for
+ * square/triangle, then resets the DDS phase to phase_degrees. Call it at a
+ * step boundary, not concurrently with oscillator_tick().
  *
  * @param[in] oscillator_id Oscillator ID in the range 0 to 4.
  * @param[in] config Static waveform configuration.

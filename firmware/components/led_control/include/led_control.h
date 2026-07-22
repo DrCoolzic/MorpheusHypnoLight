@@ -21,6 +21,9 @@
 /** @brief Oscillator ID assigned to the central group (CG). */
 #define LED_CONTROL_CG_OSCILLATOR_ID 4
 
+/** @brief Default global brightness multiplier applied to every channel. */
+#define LED_CONTROL_DEFAULT_GLOBAL_BRIGHTNESS 1.0f
+
 /**
  * @brief Configure the LEDC timer and all five fixed LED output channels.
  *
@@ -34,9 +37,10 @@ esp_err_t led_control_init(void);
 /**
  * @brief Update one LED group's duty cycle from normalized signal values.
  *
- * The output duty is calculated as osc_value multiplied by current_brightness.
- * Finite values outside the normalized range are clamped to [0.0, 1.0]. This
- * function uses standard LEDC driver APIs and must not be called from an ISR.
+ * The output duty is calculated as osc_value × current_brightness ×
+ * global_brightness. Finite values outside the normalized range are
+ * clamped to [0.0, 1.0]. This function uses standard LEDC driver APIs and must
+ * not be called from an ISR.
  *
  * @param[in] oscillator_id Fixed channel ID in the range 0 to 4.
  * @param[in] osc_value Instantaneous waveform value.
@@ -48,6 +52,26 @@ esp_err_t led_control_init(void);
  */
 esp_err_t led_control_update(uint8_t oscillator_id, float osc_value,
                              float current_brightness);
+
+/**
+ * @brief Set the global brightness multiplier for all channels.
+ *
+ * The output duty cycle is scaled by this factor, allowing the overall
+ * lamp brightness to be changed with a single setting. The value must be in
+ * the inclusive range [0.0, 1.0]. The default is 1.0 (no attenuation).
+ *
+ * @param[in] brightness Global brightness multiplier.
+ *
+ * @return ESP_OK on success, or ESP_ERR_INVALID_ARG for an invalid value.
+ */
+esp_err_t led_control_set_global_brightness(float brightness);
+
+/**
+ * @brief Return the current global brightness multiplier.
+ *
+ * @return Current global brightness multiplier in [0.0, 1.0].
+ */
+float led_control_get_global_brightness(void);
 
 /**
  * @brief Turn off all five LED groups.

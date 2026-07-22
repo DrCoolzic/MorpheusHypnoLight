@@ -21,6 +21,9 @@ typedef struct {
   float lut[OSCILLATOR_LUT_SIZE];
   float phase;
   float frequency_hz;
+  oscillator_waveform_t waveform;
+  float duty_cycle;
+  bool uses_lut;
 } oscillator_state_t;
 
 /** @brief State indexed by fixed oscillator ID. */
@@ -101,14 +104,11 @@ static void build_lut(oscillator_state_t *state,
                1.0f) /
               2.0f;
       break;
-    case OSCILLATOR_WAVEFORM_SQUARE:
-      value = cycle_position < config->duty_cycle ? 1.0f : 0.0f;
-      break;
-    case OSCILLATOR_WAVEFORM_TRIANGLE:
-      value = triangle_sample(cycle_position, config->duty_cycle);
-      break;
     case OSCILLATOR_WAVEFORM_CUSTOM:
       value = config->custom_lut[sample];
+      break;
+    default:
+      value = 0.0f;
       break;
     }
 
@@ -149,7 +149,6 @@ static bool static_config_is_valid(const oscillator_static_config_t *config) {
   return true;
 }
 
-/** @copydoc oscillator_init */
 esp_err_t oscillator_init(void) {
   const oscillator_static_config_t default_config = {
       .waveform = OSCILLATOR_WAVEFORM_SINE,
@@ -162,6 +161,9 @@ esp_err_t oscillator_init(void) {
   for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
        oscillator_id++) {
     oscillator_state_t *state = &oscillator_states[oscillator_id];
+    state->waveform = default_config.waveform;
+    state->duty_cycle = default_config.duty_cycle;
+    state->uses_lut = true;
     build_lut(state, &default_config);
     state->phase = 0.0f;
     state->frequency_hz = 0.0f;
@@ -171,7 +173,6 @@ esp_err_t oscillator_init(void) {
   return ESP_OK;
 }
 
-/** @copydoc oscillator_set_static */
 esp_err_t oscillator_set_static(uint8_t oscillator_id,
                                 const oscillator_static_config_t *config) {
   if (oscillator_id >= OSCILLATOR_COUNT || !static_config_is_valid(config)) {
@@ -180,14 +181,19 @@ esp_err_t oscillator_set_static(uint8_t oscillator_id,
 
   taskENTER_CRITICAL(&oscillator_lock);
   oscillator_state_t *state = &oscillator_states[oscillator_id];
-  build_lut(state, config);
+  state->waveform = config->waveform;
+  state->duty_cycle = config->duty_cycle;
+  state->uses_lut = (config->waveform == OSCILLATOR_WAVEFORM_SINE) ||
+                    (config->waveform == OSCILLATOR_WAVEFORM_CUSTOM);
+  if (state->uses_lut) {
+    build_lut(state, config);
+  }
   state->phase = phase_degrees_to_lut_position(config->phase_degrees);
   taskEXIT_CRITICAL(&oscillator_lock);
 
   return ESP_OK;
 }
 
-/** @copydoc oscillator_set_frequency */
 esp_err_t oscillator_set_frequency(uint8_t oscillator_id, float frequency_hz) {
   if (oscillator_id >= OSCILLATOR_COUNT || !isfinite(frequency_hz) ||
       frequency_hz < 0.0f || frequency_hz > OSCILLATOR_MAX_FREQUENCY_HZ) {
@@ -201,7 +207,6 @@ esp_err_t oscillator_set_frequency(uint8_t oscillator_id, float frequency_hz) {
   return ESP_OK;
 }
 
-/** @copydoc oscillator_tick */
 esp_err_t oscillator_tick(float osc_values[OSCILLATOR_COUNT]) {
   if (osc_values == NULL) {
     return ESP_ERR_INVALID_ARG;
@@ -216,8 +221,19 @@ esp_err_t oscillator_tick(float osc_values[OSCILLATOR_COUNT]) {
       continue;
     }
 
-    const uint8_t sample_index = (uint8_t)state->phase;
-    osc_values[oscillator_id] = state->lut[sample_index];
+    const float cycle_position = state->phase / OSCILLATOR_LUT_SIZE;
+    float value;
+
+    if (state->uses_lut) {
+      const uint8_t sample_index = (uint8_t)state->phase;
+      value = state->lut[sample_index];
+    } else if (state->waveform == OSCILLATOR_WAVEFORM_SQUARE) {
+      value = cycle_position < state->duty_cycle ? 1.0f : 0.0f;
+    } else {
+      value = triangle_sample(cycle_position, state->duty_cycle);
+    }
+
+    osc_values[oscillator_id] = clamp_unit(value);
 
     state->phase +=
         OSCILLATOR_LUT_SIZE * state->frequency_hz / OSCILLATOR_TICK_HZ;

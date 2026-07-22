@@ -9,6 +9,7 @@ sim/test/
 .VSCodeCounter
 save/
 tools/
+doxygen/
 
 # Thumbnails
 ._*

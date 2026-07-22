@@ -73,7 +73,6 @@ static void configure_linear_control(sequence_linear_control_t *control,
   control->total_ticks = duration_ms / SEQUENCE_TICK_PERIOD_MS;
 }
 
-/** @copydoc sequence_init */
 esp_err_t sequence_init(void) {
   const oscillator_static_config_t default_static_config = {
       .waveform = OSCILLATOR_WAVEFORM_SINE,
@@ -106,7 +105,6 @@ esp_err_t sequence_init(void) {
   return ESP_OK;
 }
 
-/** @copydoc sequence_get_operating_mode */
 sequence_operating_mode_t sequence_get_operating_mode(void) {
   taskENTER_CRITICAL(&sequence_lock);
   const sequence_operating_mode_t mode = sequence_operating_mode;
@@ -115,7 +113,6 @@ sequence_operating_mode_t sequence_get_operating_mode(void) {
   return mode;
 }
 
-/** @copydoc sequence_realtime_set_static */
 esp_err_t
 sequence_realtime_set_static(uint8_t oscillator_id,
                              const oscillator_static_config_t *config) {
@@ -135,7 +132,6 @@ sequence_realtime_set_static(uint8_t oscillator_id,
   return ESP_OK;
 }
 
-/** @copydoc sequence_realtime_set_frequency */
 esp_err_t sequence_realtime_set_frequency(uint8_t oscillator_id,
                                           float frequency_hz) {
   if (oscillator_id >= OSCILLATOR_COUNT) {
@@ -157,7 +153,6 @@ esp_err_t sequence_realtime_set_frequency(uint8_t oscillator_id,
   return ESP_OK;
 }
 
-/** @copydoc sequence_realtime_set_brightness */
 esp_err_t sequence_realtime_set_brightness(uint8_t oscillator_id,
                                            float brightness) {
   if (oscillator_id >= OSCILLATOR_COUNT || !brightness_is_valid(brightness)) {
@@ -174,7 +169,6 @@ esp_err_t sequence_realtime_set_brightness(uint8_t oscillator_id,
   return ESP_OK;
 }
 
-/** @copydoc sequence_realtime_linear_frequency */
 esp_err_t sequence_realtime_linear_frequency(uint8_t oscillator_id,
                                              float target_frequency_hz,
                                              uint32_t duration_ms) {
@@ -196,7 +190,6 @@ esp_err_t sequence_realtime_linear_frequency(uint8_t oscillator_id,
   return ESP_OK;
 }
 
-/** @copydoc sequence_realtime_linear_brightness */
 esp_err_t sequence_realtime_linear_brightness(uint8_t oscillator_id,
                                               float target_brightness,
                                               uint32_t duration_ms) {
@@ -217,7 +210,6 @@ esp_err_t sequence_realtime_linear_brightness(uint8_t oscillator_id,
   return ESP_OK;
 }
 
-/** @copydoc sequence_tick */
 esp_err_t sequence_tick(void) {
   float frequency_updates[OSCILLATOR_COUNT];
   bool frequency_changed[OSCILLATOR_COUNT] = {false};
@@ -278,7 +270,6 @@ esp_err_t sequence_tick(void) {
   return ESP_OK;
 }
 
-/** @copydoc sequence_get_realtime_brightness */
 esp_err_t
 sequence_get_realtime_brightness(float brightnesses[OSCILLATOR_COUNT]) {
   if (brightnesses == NULL) {

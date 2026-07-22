@@ -7,6 +7,15 @@
 #include <math.h>
 
 #include "driver/ledc.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+/** @brief Serialized access to the global brightness multiplier. */
+static portMUX_TYPE led_control_lock = portMUX_INITIALIZER_UNLOCKED;
+
+/** @brief Global brightness multiplier applied to every channel. */
+static float led_control_global_brightness =
+    LED_CONTROL_DEFAULT_GLOBAL_BRIGHTNESS;
 
 /** @brief LEDC timer shared by all five LED output channels. */
 #define LED_CONTROL_TIMER LEDC_TIMER_0
@@ -45,7 +54,6 @@ static float clamp_unit(float value) {
   return value;
 }
 
-/** @copydoc led_control_init */
 esp_err_t led_control_init(void) {
   const ledc_timer_config_t timer_config = {
       .speed_mode = LED_CONTROL_MODE,
@@ -54,6 +62,10 @@ esp_err_t led_control_init(void) {
       .freq_hz = LED_CONTROL_FREQUENCY_HZ,
       .clk_cfg = LEDC_AUTO_CLK,
   };
+
+  taskENTER_CRITICAL(&led_control_lock);
+  led_control_global_brightness = LED_CONTROL_DEFAULT_GLOBAL_BRIGHTNESS;
+  taskEXIT_CRITICAL(&led_control_lock);
 
   esp_err_t error = ledc_timer_config(&timer_config);
   if (error != ESP_OK) {
@@ -80,7 +92,6 @@ esp_err_t led_control_init(void) {
   return ESP_OK;
 }
 
-/** @copydoc led_control_update */
 esp_err_t led_control_update(uint8_t oscillator_id, float osc_value,
                              float current_brightness) {
   if (oscillator_id >= LED_CONTROL_OSCILLATOR_COUNT || !isfinite(osc_value) ||
@@ -88,8 +99,13 @@ esp_err_t led_control_update(uint8_t oscillator_id, float osc_value,
     return ESP_ERR_INVALID_ARG;
   }
 
-  const float final_brightness =
-      clamp_unit(osc_value) * clamp_unit(current_brightness);
+  taskENTER_CRITICAL(&led_control_lock);
+  const float global_brightness = led_control_global_brightness;
+  taskEXIT_CRITICAL(&led_control_lock);
+
+  const float final_brightness = clamp_unit(osc_value) *
+                                 clamp_unit(current_brightness) *
+                                 global_brightness;
   const uint32_t duty =
       (uint32_t)(final_brightness * LED_CONTROL_MAX_DUTY + 0.5f);
 
@@ -102,7 +118,26 @@ esp_err_t led_control_update(uint8_t oscillator_id, float osc_value,
   return ledc_update_duty(LED_CONTROL_MODE, (ledc_channel_t)oscillator_id);
 }
 
-/** @copydoc led_control_all_off */
+esp_err_t led_control_set_global_brightness(float brightness) {
+  if (!isfinite(brightness) || brightness < 0.0f || brightness > 1.0f) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  taskENTER_CRITICAL(&led_control_lock);
+  led_control_global_brightness = brightness;
+  taskEXIT_CRITICAL(&led_control_lock);
+
+  return ESP_OK;
+}
+
+float led_control_get_global_brightness(void) {
+  taskENTER_CRITICAL(&led_control_lock);
+  const float value = led_control_global_brightness;
+  taskEXIT_CRITICAL(&led_control_lock);
+
+  return value;
+}
+
 esp_err_t led_control_all_off(void) {
   for (uint8_t oscillator_id = 0; oscillator_id < LED_CONTROL_OSCILLATOR_COUNT;
        oscillator_id++) {

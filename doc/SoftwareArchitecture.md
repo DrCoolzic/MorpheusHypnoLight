@@ -56,32 +56,29 @@ Converts the normalized oscillator waveform and current brightness into the duty
 - **PB1–PB4**: LEDC channels 0–3 at a common carrier frequency and 10-bit resolution. Each channel controls the two LED sub-groups in its peripheral bank.
 - **CG**: LEDC channel 4, using the same configuration as the peripheral banks.
 - **Fixed mapping**: API oscillator IDs 0–3 map to PB1–PB4 / LEDC channels 0–3; ID 4 maps to CG / LEDC channel 4.
-- **Duty calculation**: `final_duty = osc_value × current_brightness`, with both inputs normalized to `[0.0, 1.0]`. Out-of-range values are clamped; invalid oscillator IDs and non-finite input values return an error.
+- **Duty calculation**: `final_duty = osc_value × current_brightness × global_brightness`, with all inputs normalized to `[0.0, 1.0]`. Out-of-range values are clamped; invalid oscillator IDs and non-finite input values return an error.
+- **Global brightness multiplier**: configurable at runtime through `led_control_set_global_brightness()`. The default is 1.0 (no attenuation). A single setting scales the overall lamp brightness; the test application sets it to 0.5 to limit eye strain.
 - **Public API**:
   - `esp_err_t led_control_init(void)`
   - `esp_err_t led_control_update(uint8_t oscillator_id, float osc_value, float current_brightness)`
+  - `esp_err_t led_control_set_global_brightness(float brightness)`
+  - `float led_control_get_global_brightness(void)`
   - `esp_err_t led_control_all_off(void)`
 
 ### `sequence`
 
-Owns the current parameters for all oscillators. The initial implementation supports realtime mode only; sequence playback and LFOs will be added later.
+Step sequencer / playback engine. The realtime parameter evaluation previously implemented here has moved to the `led_engine` component. `sequence` now focuses on storing and advancing steps, then dispatching per-oscillator modulator configurations to `led_engine`.
 
-- **Realtime mode**: a single indefinite live step. UI or communication commands apply parameter changes immediately.
-- **Static parameters**: waveform, duty cycle, and phase are forwarded to `oscillator_set_static()` for the affected oscillator only.
-- **Parameter controls**: frequency and brightness each use either `CONSTANT` or `LINEAR` control. The existing `sequence_realtime_set_frequency()` and `sequence_realtime_set_brightness()` setters apply a value immediately and select `CONSTANT`. The linear APIs capture the current value and interpolate to the requested target.
-- **Deterministic evaluation**: `sequence_tick()` runs every 10 ms. Linear durations must be positive multiples of 10 ms. On the final tick, the target is assigned exactly and the control automatically returns to `CONSTANT`.
-- **Dynamic parameters**: each frequency value is forwarded to `oscillator_set_frequency()` without resetting DDS phase; brightness is published as a synchronized five-value snapshot for the 1 kHz output timer.
-- **Sequence mode**: reserved for the later step engine. It will add playback, pause, seek, looping, stored steps, and LFOs.
-- **Public API**:
+- **Player mode**: reads a stored sequence and advances from step to step. Each step carries duration, static oscillator configuration, and modulator settings for frequency and brightness.
+- **Editor mode**: future commands from `comms` will write step data and playback commands into `sequence`.
+- **Playback control**: play, pause, seek, loop, and tempo will be managed here.
+- **Public API** (to be defined when playback is implemented):
   - `esp_err_t sequence_init(void)`
-  - `sequence_operating_mode_t sequence_get_operating_mode(void)`
-  - `esp_err_t sequence_realtime_set_static(uint8_t oscillator_id, const oscillator_static_config_t *config)`
-  - `esp_err_t sequence_realtime_set_frequency(uint8_t oscillator_id, float frequency_hz)`
-  - `esp_err_t sequence_realtime_set_brightness(uint8_t oscillator_id, float brightness)`
-  - `esp_err_t sequence_realtime_linear_frequency(uint8_t oscillator_id, float target_frequency_hz, uint32_t duration_ms)`
-  - `esp_err_t sequence_realtime_linear_brightness(uint8_t oscillator_id, float target_brightness, uint32_t duration_ms)`
+  - `esp_err_t sequence_load(...)`
+  - `esp_err_t sequence_play(void)`
+  - `esp_err_t sequence_pause(void)`
+  - `esp_err_t sequence_seek(uint32_t step)`
   - `esp_err_t sequence_tick(void)`
-  - `esp_err_t sequence_get_realtime_brightness(float brightnesses[OSCILLATOR_COUNT])`
 
 ### `modulator`
 
@@ -157,6 +154,17 @@ Encapsulates the per-oscillator signal chain: a frequency modulator, a brightnes
   - `brightness_modulator`: instance of the `modulator` component. Output is normalized `[0.0, 1.0]` and forwarded to `led_control_update()` as `current_brightness`.
   - `oscillator`: generates the waveform from `oscillator_static_config_t` and the current frequency.
 - **Evaluation**: at each 1 kHz tick the engine evaluates the frequency and brightness modulators, calls `oscillator_tick()`, and passes `osc_value` and `brightness` to `led_control_update()`.
+- **Public API**:
+  - `esp_err_t led_engine_init(void)`
+  - `esp_err_t led_engine_set_static(uint8_t oscillator_id, const oscillator_static_config_t *config)`
+  - `esp_err_t led_engine_set_frequency(uint8_t oscillator_id, float frequency_hz)`
+  - `esp_err_t led_engine_set_brightness(uint8_t oscillator_id, float brightness)`
+  - `esp_err_t led_engine_linear_frequency(uint8_t oscillator_id, float end_value, uint32_t duration_ms)`
+  - `esp_err_t led_engine_linear_brightness(uint8_t oscillator_id, float end_value, uint32_t duration_ms)`
+  - `esp_err_t led_engine_set_frequency_modulator(uint8_t oscillator_id, const modulator_config_t *config)`
+  - `esp_err_t led_engine_set_brightness_modulator(uint8_t oscillator_id, const modulator_config_t *config)`
+  - `esp_err_t led_engine_tick(void)`
+  - `esp_err_t led_engine_all_off(void)`
 
 ### `comms`
 
@@ -212,9 +220,8 @@ Proposed FreeRTOS tasks and timers:
 
 |Task / Timer|Period|Responsibility|
 |------------|------|--------------|
-|`oscillator_timer`|1 ms (1 kHz)|Read current parameters, call `oscillator_tick()`, then pass each waveform value and effective brightness to `led_control`.|
-|`sequence_timer`|10 ms|Call `sequence_tick()` to evaluate realtime linear frequency and brightness controls.|
-|`sequencer_task`|10–50 ms|Future sequence playback: advance stored steps, apply static settings, and apply LFOs.|
+|`led_engine_timer`|1 ms (1 kHz)|Call `led_engine_tick()` to evaluate all modulators, advance the oscillator, and pass each waveform value and effective brightness to `led_control`.|
+|`sequencer_task`|10–50 ms|Future sequence playback: advance stored steps and dispatch modulator configurations to `led_engine`.|
 |`input_task`|50–100 ms|Poll I2C rotary encoders and update parameters or sequence.|
 |`display_task`|100–250 ms|Refresh the OLED display with current status.|
 |`comms_task`|event-driven|Handle BLE/Wi-Fi events and dispatch commands.|
@@ -223,8 +230,8 @@ Proposed FreeRTOS tasks and timers:
 
 **Inter-task communication:**
 
-- `sequence` protects realtime state with a critical section. It calculates a linear frequency update while protected, releases the sequence lock, then publishes it to `oscillator`; this avoids inverse lock acquisition with the 1 kHz output path.
-- The oscillator timer calls `oscillator_tick()`, obtains a synchronized brightness snapshot from `sequence`, and passes each `osc_value` with its current brightness to `led_control`.
+- `led_engine` protects its per-oscillator modulator configuration with a critical section. Modulator evaluation, frequency publication to `oscillator`, oscillator ticking, and LED output updates happen sequentially in the 1 kHz timer callback.
+- `led_control` protects the global brightness multiplier with a critical section; the final output is scaled in `led_control_update()`.
 - `comms` posts commands to a FreeRTOS queue consumed by `sequence` or `input_task`.
 
 ## Build, Flash and Monitor
@@ -259,9 +266,9 @@ The following ESP-IDF configuration options will be required or important for th
 
 ### Visual Hardware Test
 
-The current `main` application includes a visual oscillator test using task-dispatched `esp_timer` callbacks: one at 1 kHz calls `oscillator_tick()` and updates `led_control`, and a second at 10 ms calls `sequence_tick()` to evaluate realtime parameter ramps.
+The current `main` application includes a visual oscillator test using a single task-dispatched `esp_timer` callback at 1 kHz. The callback calls `led_engine_tick()`, which evaluates the frequency and brightness modulators, advances the oscillator, and updates `led_control`. Linear ramps are therefore evaluated each millisecond inside the modulators.
 
-The test stages are:
+The test stages use full per-channel brightness values; the global brightness multiplier is set to 0.5 in `app_main()` (`led_control_set_global_brightness(0.5f)`), scaling the effective output to 50% to reduce eye strain:
 
 - PB1: 2 Hz square waveform with 50% duty cycle.
 - PB2: 2 Hz square waveform with 25% duty cycle.
@@ -270,7 +277,7 @@ The test stages are:
 - CG: 0 Hz fixed output, independent of waveform and phase.
 - PB1 and PB2: 2 Hz square waveforms with a 180-degree phase offset.
 - PB1: linear brightness ramp from 0% to 100% over 4 seconds at 0 Hz.
-- PB2: linear frequency ramp from 0 Hz to 2 Hz over 4 seconds at 50% brightness.
+- PB2: linear frequency ramp from 0 Hz to 2 Hz over 4 seconds at full per-channel brightness.
 
 This validates the oscillator-to-LEDC pipeline on hardware, including waveforms, duty cycle, frequency, zero-frequency behavior, relative phase, and visible realtime linear ramps. It does not replace deterministic unit tests of individual LUT samples, DDS phase increments, or sequence tick interpolation.
 
