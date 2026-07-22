@@ -68,30 +68,32 @@ esp_err_t led_engine_set_frequency(uint8_t oscillator_id, float frequency_hz);
 esp_err_t led_engine_set_brightness(uint8_t oscillator_id, float brightness);
 
 /**
- * @brief Start a linear frequency ramp from the current value.
+ * @brief Start a linear frequency ramp from an explicit start value.
  *
  * The ramp duration is expressed in milliseconds and must be non-zero.
  *
  * @param[in] oscillator_id Oscillator ID in the range 0 to 4.
+ * @param[in] start_value Starting frequency.
  * @param[in] end_value Target frequency.
  * @param[in] duration_ms Ramp duration in milliseconds.
  *
  * @return ESP_OK on success, or ESP_ERR_INVALID_ARG for invalid input.
  */
-esp_err_t led_engine_linear_frequency(uint8_t oscillator_id, float end_value,
-                                      uint32_t duration_ms);
+esp_err_t led_engine_linear_frequency(uint8_t oscillator_id, float start_value,
+                                      float end_value, uint32_t duration_ms);
 
 /**
- * @brief Start a linear brightness ramp from the current value.
+ * @brief Start a linear brightness ramp from an explicit start value.
  *
  * @param[in] oscillator_id Oscillator ID in the range 0 to 4.
+ * @param[in] start_value Starting normalized brightness in [0.0, 1.0].
  * @param[in] end_value Target normalized brightness in [0.0, 1.0].
  * @param[in] duration_ms Ramp duration in milliseconds.
  *
  * @return ESP_OK on success, or ESP_ERR_INVALID_ARG for invalid input.
  */
-esp_err_t led_engine_linear_brightness(uint8_t oscillator_id, float end_value,
-                                       uint32_t duration_ms);
+esp_err_t led_engine_linear_brightness(uint8_t oscillator_id, float start_value,
+                                       float end_value, uint32_t duration_ms);
 
 /**
  * @brief Configure the frequency modulator for one oscillator.

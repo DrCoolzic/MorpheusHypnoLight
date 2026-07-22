@@ -153,7 +153,7 @@ static void run_oscillator_visual_test(esp_timer_handle_t oscillator_timer) {
   configure_oscillator_visual_test(0, OSCILLATOR_WAVEFORM_SINE, 0.5f, 0.0f,
                                    0.0f, 0.0f);
   ESP_ERROR_CHECK(
-      led_engine_linear_brightness(0, 1.0f, LINEAR_TEST_DURATION_MS));
+      led_engine_linear_brightness(0, 0.0f, 1.0f, LINEAR_TEST_DURATION_MS));
   run_oscillator_visual_stage(oscillator_timer, LINEAR_TEST_DURATION_MS);
 
   ESP_LOGI(TAG, "Sequence test: PB2 linear frequency 0 Hz to 2 Hz over 4 s");
@@ -161,7 +161,7 @@ static void run_oscillator_visual_test(esp_timer_handle_t oscillator_timer) {
   configure_oscillator_visual_test(1, OSCILLATOR_WAVEFORM_SINE, 0.5f, 0.0f,
                                    0.0f, OSCILLATOR_TEST_BRIGHTNESS);
   ESP_ERROR_CHECK(
-      led_engine_linear_frequency(1, 2.0f, LINEAR_TEST_DURATION_MS));
+      led_engine_linear_frequency(1, 0.0f, 2.0f, LINEAR_TEST_DURATION_MS));
   run_oscillator_visual_stage(oscillator_timer, LINEAR_TEST_DURATION_MS);
 }
 

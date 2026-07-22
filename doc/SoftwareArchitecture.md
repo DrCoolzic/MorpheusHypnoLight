@@ -159,8 +159,8 @@ Encapsulates the per-oscillator signal chain: a frequency modulator, a brightnes
   - `esp_err_t led_engine_set_static(uint8_t oscillator_id, const oscillator_static_config_t *config)`
   - `esp_err_t led_engine_set_frequency(uint8_t oscillator_id, float frequency_hz)`
   - `esp_err_t led_engine_set_brightness(uint8_t oscillator_id, float brightness)`
-  - `esp_err_t led_engine_linear_frequency(uint8_t oscillator_id, float end_value, uint32_t duration_ms)`
-  - `esp_err_t led_engine_linear_brightness(uint8_t oscillator_id, float end_value, uint32_t duration_ms)`
+  - `esp_err_t led_engine_linear_frequency(uint8_t oscillator_id, float start_value, float end_value, uint32_t duration_ms)`
+  - `esp_err_t led_engine_linear_brightness(uint8_t oscillator_id, float start_value, float end_value, uint32_t duration_ms)`
   - `esp_err_t led_engine_set_frequency_modulator(uint8_t oscillator_id, const modulator_config_t *config)`
   - `esp_err_t led_engine_set_brightness_modulator(uint8_t oscillator_id, const modulator_config_t *config)`
   - `esp_err_t led_engine_tick(void)`

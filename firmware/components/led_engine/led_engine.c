@@ -115,19 +115,14 @@ esp_err_t led_engine_set_brightness(uint8_t oscillator_id, float brightness) {
   return led_engine_set_brightness_modulator(oscillator_id, &config);
 }
 
-esp_err_t led_engine_linear_frequency(uint8_t oscillator_id, float end_value,
-                                      uint32_t duration_ms) {
-  if (oscillator_id >= OSCILLATOR_COUNT || !isfinite(end_value) ||
-      end_value < 0.0f || end_value > OSCILLATOR_MAX_FREQUENCY_HZ ||
-      duration_ms == 0U) {
+esp_err_t led_engine_linear_frequency(uint8_t oscillator_id, float start_value,
+                                      float end_value, uint32_t duration_ms) {
+  if (oscillator_id >= OSCILLATOR_COUNT || !isfinite(start_value) ||
+      !isfinite(end_value) || start_value < 0.0f ||
+      start_value > OSCILLATOR_MAX_FREQUENCY_HZ || end_value < 0.0f ||
+      end_value > OSCILLATOR_MAX_FREQUENCY_HZ || duration_ms == 0U) {
     return ESP_ERR_INVALID_ARG;
   }
-
-  float start_value = 0.0f;
-
-  taskENTER_CRITICAL(&led_engine_lock);
-  start_value = led_engine_oscillators[oscillator_id].current_frequency;
-  taskEXIT_CRITICAL(&led_engine_lock);
 
   const modulator_config_t config = {
       .mode = MODULATOR_MODE_LINEAR,
@@ -142,18 +137,13 @@ esp_err_t led_engine_linear_frequency(uint8_t oscillator_id, float end_value,
   return led_engine_set_frequency_modulator(oscillator_id, &config);
 }
 
-esp_err_t led_engine_linear_brightness(uint8_t oscillator_id, float end_value,
-                                       uint32_t duration_ms) {
-  if (oscillator_id >= OSCILLATOR_COUNT || !isfinite(end_value) ||
+esp_err_t led_engine_linear_brightness(uint8_t oscillator_id, float start_value,
+                                       float end_value, uint32_t duration_ms) {
+  if (oscillator_id >= OSCILLATOR_COUNT || !isfinite(start_value) ||
+      !isfinite(end_value) || start_value < 0.0f || start_value > 1.0f ||
       end_value < 0.0f || end_value > 1.0f || duration_ms == 0U) {
     return ESP_ERR_INVALID_ARG;
   }
-
-  float start_value = 0.0f;
-
-  taskENTER_CRITICAL(&led_engine_lock);
-  start_value = led_engine_oscillators[oscillator_id].current_brightness;
-  taskEXIT_CRITICAL(&led_engine_lock);
 
   const modulator_config_t config = {
       .mode = MODULATOR_MODE_LINEAR,
