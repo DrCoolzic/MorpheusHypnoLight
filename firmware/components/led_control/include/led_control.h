@@ -37,10 +37,10 @@ esp_err_t led_control_init(void);
 /**
  * @brief Update one LED group's duty cycle from normalized signal values.
  *
- * The output duty is calculated as osc_value × current_brightness ×
- * global_brightness. Finite values outside the normalized range are
- * clamped to [0.0, 1.0]. This function uses standard LEDC driver APIs and must
- * not be called from an ISR.
+ * The output duty is calculated as osc_value × gamma(current_brightness ×
+ * global_brightness), where gamma applies a perceptual correction. Finite
+ * values outside the normalized range are clamped to [0.0, 1.0]. This function
+ * uses standard LEDC driver APIs and must not be called from an ISR.
  *
  * @param[in] oscillator_id Fixed channel ID in the range 0 to 4.
  * @param[in] osc_value Instantaneous waveform value.

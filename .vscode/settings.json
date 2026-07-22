@@ -39,7 +39,7 @@
   "cmake.configureOnOpen": false,
   "idf.monitorPort": "COM8",
   "idf.flashType": "UART",
-  "idf.portWin": "COM8",
+  "idf.portWin": "COM3",
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
   ],

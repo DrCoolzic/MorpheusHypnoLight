@@ -32,6 +32,9 @@ static float led_control_global_brightness =
 /** @brief Maximum duty value represented by LED_CONTROL_RESOLUTION. */
 #define LED_CONTROL_MAX_DUTY ((1U << LED_CONTROL_RESOLUTION) - 1U)
 
+/** @brief Gamma correction exponent to linearize perceived brightness. */
+#define LED_CONTROL_GAMMA 2.2f
+
 /** @brief GPIO mapping indexed by fixed oscillator ID. */
 static const int led_control_gpios[LED_CONTROL_OSCILLATOR_COUNT] = {
     4, 5, 6, 7, 15,
@@ -103,9 +106,11 @@ esp_err_t led_control_update(uint8_t oscillator_id, float osc_value,
   const float global_brightness = led_control_global_brightness;
   taskEXIT_CRITICAL(&led_control_lock);
 
-  const float final_brightness = clamp_unit(osc_value) *
-                                 clamp_unit(current_brightness) *
-                                 global_brightness;
+  const float combined_brightness =
+      clamp_unit(current_brightness) * global_brightness;
+  const float corrected_brightness =
+      powf(combined_brightness, LED_CONTROL_GAMMA);
+  const float final_brightness = clamp_unit(osc_value) * corrected_brightness;
   const uint32_t duty =
       (uint32_t)(final_brightness * LED_CONTROL_MAX_DUTY + 0.5f);
 

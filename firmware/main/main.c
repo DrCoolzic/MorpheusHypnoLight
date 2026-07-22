@@ -7,6 +7,7 @@
  * the serial terminal.
  */
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -125,6 +126,30 @@ static int cmd_sequence_status(int argc, char **argv) {
   return 0;
 }
 
+static int cmd_brightness(int argc, char **argv) {
+  if (argc < 2) {
+    printf("Usage: bright <value>\n");
+    printf("Current global brightness: %.2f\n",
+           (double)led_control_get_global_brightness());
+    return 1;
+  }
+
+  const float brightness = strtof(argv[1], NULL);
+  if (!isfinite(brightness) || brightness < 0.0f || brightness > 1.0f) {
+    printf("Brightness must be between 0.0 and 1.0\n");
+    return 1;
+  }
+
+  const esp_err_t error = led_control_set_global_brightness(brightness);
+  if (error != ESP_OK) {
+    printf("led_control_set_global_brightness failed: %d\n", error);
+    return 1;
+  }
+
+  printf("Global brightness set to %.2f\n", (double)brightness);
+  return 0;
+}
+
 static int cmd_run_tests(int argc, char **argv) {
   (void)argc;
   (void)argv;
@@ -175,6 +200,12 @@ static void register_sequence_commands(void) {
           .func = &cmd_sequence_status,
       },
       {
+          .command = "bright",
+          .help = "Set global brightness multiplier (0.0 to 1.0)",
+          .hint = "<brightness>",
+          .func = &cmd_brightness,
+      },
+      {
           .command = "tests",
           .help = "Run the hardware tests stored in test.c",
           .hint = NULL,
@@ -194,7 +225,7 @@ void app_main(void) {
   ESP_LOGI(TAG, "Initializing LED hardware");
   ESP_ERROR_CHECK(led_control_init());
   ESP_ERROR_CHECK(
-      led_control_set_global_brightness(0.3f)); /* limit eye strain */
+      led_control_set_global_brightness(1.0f)); /* limit eye strain */
   ESP_ERROR_CHECK(led_engine_init());
   ESP_ERROR_CHECK(led_control_all_off());
 

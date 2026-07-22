@@ -320,13 +320,29 @@ esp_err_t sequence_play(void) {
     led_engine_resume_modulators(oscillator_id);
   }
 
+  /* Re-apply the current step so that the outputs match the cursor position
+   * even after a stop or after the sequence has reached its end. */
+  taskENTER_CRITICAL(&sequence_lock);
+  const uint32_t restart_step = sequence_current_step;
+  const uint32_t restart_offset = sequence_elapsed_ms;
+  taskEXIT_CRITICAL(&sequence_lock);
+
+  esp_err_t error = apply_step(restart_step);
+  if (error != ESP_OK) {
+    return error;
+  }
+  error = apply_step_offset(restart_step, restart_offset);
+  if (error != ESP_OK) {
+    return error;
+  }
+
   if (sequence_timer == NULL) {
     return ESP_ERR_INVALID_STATE;
   }
 
   (void)esp_timer_stop(sequence_timer);
 
-  const esp_err_t error = esp_timer_start_periodic(
+  error = esp_timer_start_periodic(
       sequence_timer, (uint64_t)SEQUENCE_STEP_TICK_PERIOD_MS * 1000ULL);
   if (error != ESP_OK) {
     return error;
@@ -433,6 +449,15 @@ static void sequence_tick(void) {
 
   if (stop_timer && sequence_timer != NULL) {
     esp_timer_stop(sequence_timer);
+  }
+
+  if (stop_timer) {
+    for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
+         oscillator_id++) {
+      (void)led_engine_set_frequency(oscillator_id, 0.0f);
+      (void)led_engine_set_brightness(oscillator_id, 0.0f);
+    }
+    (void)led_engine_all_off();
   }
 }
 

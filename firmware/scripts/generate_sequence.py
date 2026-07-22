@@ -100,11 +100,17 @@ def generate_c(source_name: str, data: dict) -> str:
         '#include "sequence.h"',
         "",
         "#include <stdint.h>",
+        "#include <string.h>",
         "",
         "void build_demo_sequence(sequence_step_t *steps) {",
         "  (void)steps;",
         "",
     ]
+
+    lines.append(
+        "  memset(steps, 0, sizeof(sequence_step_t) * SEQUENCE_DEMO_STEP_COUNT);"
+    )
+    lines.append("")
 
     steps = data["steps"]
     for step_index, step in enumerate(steps):
@@ -121,29 +127,39 @@ def generate_c(source_name: str, data: dict) -> str:
         lines.append(f"    steps[step].duration_ms = {int(step['duration_ms'])}U;")
 
         for osc_index, osc in enumerate(oscillators):
+            waveform = WAVEFORM_MAP[osc.get("waveform", "sine")]
+            phase_degrees = float(osc.get("phase_degrees", 0.0))
+            frequency = osc["frequency"]
+            brightness = osc["brightness"]
+            duty = osc.get("duty", {"mode": "static", "value": 0.5})
+
             lines.append("    {")
             lines.append(f"      const uint8_t osc = {osc_index}U;")
 
-            waveform = WAVEFORM_MAP[osc["waveform"]]
             lines.append(
                 f"      steps[step].oscillators[osc].static_config.waveform = {waveform};"
             )
             lines.append(
                 f"      steps[step].oscillators[osc].static_config.phase_degrees = "
-                f"{float(osc['phase_degrees'])}f;"
+                f"{phase_degrees}f;"
             )
             lines.append(
                 "      steps[step].oscillators[osc].static_config.custom_lut = NULL;"
             )
 
-            for target in ("frequency", "brightness", "duty"):
-                mod = osc[target]
+            for target, mod in (
+                ("frequency", frequency),
+                ("brightness", brightness),
+                ("duty", duty),
+            ):
                 mode = mod["mode"]
                 if mode not in MODULATOR_DISPATCH:
                     raise ValueError(
                         f"Step {step_index}, oscillator {osc_index}: "
                         f"unknown modulator mode '{mode}'"
                     )
+                if mode == "linear" and "duration_ms" not in mod:
+                    mod["duration_ms"] = step["duration_ms"]
                 MODULATOR_DISPATCH[mode](mod, f"{target}_modulator", lines)
 
             lines.append("    }")
