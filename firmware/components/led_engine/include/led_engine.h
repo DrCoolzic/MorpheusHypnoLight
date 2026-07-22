@@ -160,6 +160,44 @@ esp_err_t led_engine_set_duty_cycle_modulator(uint8_t oscillator_id,
                                               const modulator_config_t *config);
 
 /**
+ * @brief Freeze all linear modulators for one oscillator.
+ *
+ * Static and LFO modulators continue unchanged. This is intended for pausing
+ * sequence playback while keeping LEDs at their current state.
+ *
+ * @param[in] oscillator_id Oscillator ID in the range 0 to 4.
+ *
+ * @return ESP_OK on success, or ESP_ERR_INVALID_ARG for an invalid ID.
+ */
+esp_err_t led_engine_pause_modulators(uint8_t oscillator_id);
+
+/**
+ * @brief Resume previously paused linear modulators for one oscillator.
+ *
+ * Linear ramps continue from the paused value with the remaining duration.
+ *
+ * @param[in] oscillator_id Oscillator ID in the range 0 to 4.
+ *
+ * @return ESP_OK on success, or ESP_ERR_INVALID_ARG for an invalid ID.
+ */
+esp_err_t led_engine_resume_modulators(uint8_t oscillator_id);
+
+/**
+ * @brief Seek all modulators for one oscillator to a position in milliseconds.
+ *
+ * Updates frequency, brightness, and duty modulators so that subsequent
+ * evaluations continue from the requested offset inside the current step.
+ *
+ * @param[in] oscillator_id Oscillator ID in the range 0 to 4.
+ * @param[in] elapsed_ms Offset inside the current modulator configuration, in
+ * milliseconds.
+ *
+ * @return ESP_OK on success, or an error for invalid input.
+ */
+esp_err_t led_engine_seek_modulators(uint8_t oscillator_id,
+                                     uint32_t elapsed_ms);
+
+/**
  * @brief Evaluate all modulators and update the LED outputs.
  *
  * Call this function from the 1 kHz timer callback. It evaluates the

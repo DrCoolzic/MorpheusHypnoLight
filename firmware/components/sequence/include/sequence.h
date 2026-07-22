@@ -82,37 +82,28 @@ esp_err_t sequence_load(const sequence_step_t *steps, uint32_t step_count);
 esp_err_t sequence_play(void);
 
 /**
- * @brief Pause playback without changing the current step or LED state.
+ * @brief Pause playback without changing the current step.
  *
- * The modulators configured in `led_engine` continue to run while paused, so
- * the LEDs keep their current dynamic output.
+ * Linear ramps are frozen at their current value. Static and LFO modulators
+ * keep running, so the LEDs retain their current dynamic output.
  *
  * @return ESP_OK on success.
  */
 esp_err_t sequence_pause(void);
 
 /**
- * @brief Jump to a specific step and apply its configuration.
+ * @brief Jump to a position in the sequence and apply the corresponding step.
  *
- * If the sequence is playing, playback continues from the new position. If it
- * is paused, the configuration is applied but playback remains paused.
+ * The position is resolved to a step and an offset inside that step. The
+ * modulators in `led_engine` are seeked to the exact value at the requested
+ * position.
  *
- * @param[in] step_index Zero-based step index.
+ * @param[in] position_ms Absolute position in the sequence, in milliseconds.
  *
- * @return ESP_OK on success, or ESP_ERR_INVALID_ARG for an out-of-range index.
+ * @return ESP_OK on success, or ESP_ERR_INVALID_ARG for an out-of-range
+ * position.
  */
-esp_err_t sequence_seek(uint32_t step_index);
-
-/**
- * @brief Advance the sequence timeline by one tick.
- *
- * Call this function every SEQUENCE_STEP_TICK_PERIOD_MS milliseconds. It
- * advances the current step timer and, when the duration expires, moves to the
- * next step and applies its configuration to `led_engine`.
- *
- * @return ESP_OK on success, or an error propagated from `led_engine`.
- */
-esp_err_t sequence_tick(void);
+esp_err_t sequence_seek(uint32_t position_ms);
 
 /**
  * @brief Return whether the sequence engine is currently playing.

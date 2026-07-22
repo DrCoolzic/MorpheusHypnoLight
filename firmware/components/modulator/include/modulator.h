@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "esp_err.h"
@@ -62,6 +63,9 @@ typedef struct {
   float start_value;
   uint32_t elapsed_ms;
   float lfo_phase;
+  bool paused;
+  modulator_config_t paused_config;
+  uint32_t paused_elapsed_ms;
 } modulator_state_t;
 
 /**
@@ -103,3 +107,41 @@ esp_err_t modulator_set_config(modulator_state_t *state,
  */
 esp_err_t modulator_evaluate(modulator_state_t *state, float delta_time_ms,
                              float *value);
+
+/**
+ * @brief Freeze a linear modulator at its current value.
+ *
+ * Only linear ramps are frozen. Static and LFO modulators are left unchanged
+ * so that they continue to produce their configured output.
+ *
+ * @param[in,out] state Modulator state to pause.
+ *
+ * @return ESP_OK on success, or ESP_ERR_INVALID_ARG if state is NULL.
+ */
+esp_err_t modulator_pause(modulator_state_t *state);
+
+/**
+ * @brief Resume a previously paused linear modulator.
+ *
+ * The ramp continues from the paused value toward the original target with the
+ * remaining duration.
+ *
+ * @param[in,out] state Modulator state to resume.
+ *
+ * @return ESP_OK on success, or ESP_ERR_INVALID_ARG if state is NULL.
+ */
+esp_err_t modulator_resume(modulator_state_t *state);
+
+/**
+ * @brief Move the modulator to the value it would have at elapsed_ms.
+ *
+ * The internal elapsed time and LFO phase are updated so that subsequent
+ * evaluations continue from the new position. If the modulator is paused, the
+ * paused position is updated instead.
+ *
+ * @param[in,out] state Modulator state to seek.
+ * @param[in] elapsed_ms Time inside the current configuration, in milliseconds.
+ *
+ * @return ESP_OK on success, or ESP_ERR_INVALID_ARG for invalid arguments.
+ */
+esp_err_t modulator_seek(modulator_state_t *state, uint32_t elapsed_ms);

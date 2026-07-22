@@ -81,8 +81,8 @@ Step sequencer / playback engine. The realtime parameter evaluation previously i
   - `esp_err_t sequence_load(const sequence_step_t *steps, uint32_t step_count)`
   - `esp_err_t sequence_play(void)`
   - `esp_err_t sequence_pause(void)`
-  - `esp_err_t sequence_seek(uint32_t step_index)`
-  - `esp_err_t sequence_tick(void)`
+  - `esp_err_t sequence_seek(uint32_t position_ms)`
+  - internal timer drives `sequence_tick()` every `SEQUENCE_STEP_TICK_PERIOD_MS`
   - `bool sequence_is_playing(void)`
   - `uint32_t sequence_get_current_step(void)`
 

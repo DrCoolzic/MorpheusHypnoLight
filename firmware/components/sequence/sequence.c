@@ -9,11 +9,16 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
 #include "led_engine.h"
 #include "modulator.h"
+
+/** @brief Tag used for component log messages. */
+static const char *TAG = "sequence";
 
 /** @brief Serialized access to sequence playback state. */
 static portMUX_TYPE sequence_lock = portMUX_INITIALIZER_UNLOCKED;
@@ -32,6 +37,19 @@ static uint32_t sequence_elapsed_ms = 0U;
 
 /** @brief Whether playback is currently active. */
 static bool sequence_playing = false;
+
+/** @brief Internal periodic timer that drives playback. */
+static esp_timer_handle_t sequence_timer = NULL;
+
+static void sequence_tick(void);
+
+/**
+ * @brief Timer callback that advances the sequence timeline.
+ */
+static void IRAM_ATTR sequence_timer_callback(void *arg) {
+  (void)arg;
+  sequence_tick();
+}
 
 /**
  * @brief Validate a static oscillator configuration without modifying hardware.
@@ -173,7 +191,66 @@ static esp_err_t apply_step(uint32_t step_index) {
   return ESP_OK;
 }
 
+/**
+ * @brief Seek the loaded modulators to an offset inside the current step.
+ *
+ * @param[in] step_index Step whose modulators must be seeked.
+ * @param[in] offset_ms  Offset inside the step, in milliseconds.
+ *
+ * @return ESP_OK on success, or an error propagated from led_engine.
+ */
+static esp_err_t apply_step_offset(uint32_t step_index, uint32_t offset_ms) {
+  if (step_index >= sequence_step_count) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
+       oscillator_id++) {
+    const esp_err_t error =
+        led_engine_seek_modulators(oscillator_id, offset_ms);
+    if (error != ESP_OK) {
+      return error;
+    }
+  }
+
+  return ESP_OK;
+}
+
+/**
+ * @brief Locate the step and offset matching an absolute position.
+ *
+ * @param[in]  position_ms Absolute position in the loaded sequence.
+ * @param[out] step_index  Zero-based step index containing the position.
+ * @param[out] offset_ms   Offset inside that step.
+ *
+ * @return true when the position is inside the sequence duration.
+ */
+static bool find_step_for_position(uint32_t position_ms, uint32_t *step_index,
+                                   uint32_t *offset_ms) {
+  if (step_index == NULL || offset_ms == NULL || sequence_step_count == 0U) {
+    return false;
+  }
+
+  uint32_t accumulated_ms = 0U;
+  for (uint32_t i = 0; i < sequence_step_count; i++) {
+    const uint32_t step_duration = sequence_steps[i].duration_ms;
+    if (position_ms >= accumulated_ms &&
+        position_ms < accumulated_ms + step_duration) {
+      *step_index = i;
+      *offset_ms = position_ms - accumulated_ms;
+      return true;
+    }
+    accumulated_ms += step_duration;
+  }
+
+  return false;
+}
+
 esp_err_t sequence_init(void) {
+  if (sequence_timer != NULL) {
+    esp_timer_stop(sequence_timer);
+  }
+
   taskENTER_CRITICAL(&sequence_lock);
   memset(sequence_steps, 0, sizeof(sequence_steps));
   sequence_step_count = 0U;
@@ -181,6 +258,14 @@ esp_err_t sequence_init(void) {
   sequence_elapsed_ms = 0U;
   sequence_playing = false;
   taskEXIT_CRITICAL(&sequence_lock);
+
+  if (sequence_timer == NULL) {
+    const esp_timer_create_args_t timer_args = {
+        .callback = &sequence_timer_callback,
+        .name = "sequence_tick",
+    };
+    return esp_timer_create(&timer_args, &sequence_timer);
+  }
 
   return ESP_OK;
 }
@@ -198,6 +283,10 @@ esp_err_t sequence_load(const sequence_step_t *steps, uint32_t step_count) {
     }
   }
 
+  if (sequence_timer != NULL) {
+    esp_timer_stop(sequence_timer);
+  }
+
   taskENTER_CRITICAL(&sequence_lock);
   if (steps != NULL) {
     memcpy(sequence_steps, steps, step_count * sizeof(sequence_step_t));
@@ -208,50 +297,110 @@ esp_err_t sequence_load(const sequence_step_t *steps, uint32_t step_count) {
   sequence_playing = false;
   taskEXIT_CRITICAL(&sequence_lock);
 
+  if (step_count > 0U) {
+    const esp_err_t error = apply_step(0U);
+    if (error != ESP_OK) {
+      return error;
+    }
+  }
+
   return ESP_OK;
 }
 
 esp_err_t sequence_play(void) {
   taskENTER_CRITICAL(&sequence_lock);
-  if (!sequence_playing && sequence_step_count > 0U) {
-    sequence_playing = true;
+  if (sequence_step_count == 0U || sequence_playing) {
+    taskEXIT_CRITICAL(&sequence_lock);
+    return ESP_OK;
   }
+  taskEXIT_CRITICAL(&sequence_lock);
+
+  for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
+       oscillator_id++) {
+    led_engine_resume_modulators(oscillator_id);
+  }
+
+  if (sequence_timer == NULL) {
+    return ESP_ERR_INVALID_STATE;
+  }
+
+  const esp_err_t error = esp_timer_start_periodic(
+      sequence_timer, (uint64_t)SEQUENCE_STEP_TICK_PERIOD_MS * 1000ULL);
+  if (error != ESP_OK) {
+    return error;
+  }
+
+  taskENTER_CRITICAL(&sequence_lock);
+  sequence_playing = true;
   taskEXIT_CRITICAL(&sequence_lock);
 
   return ESP_OK;
 }
 
 esp_err_t sequence_pause(void) {
+  if (sequence_timer != NULL) {
+    esp_timer_stop(sequence_timer);
+  }
+
   taskENTER_CRITICAL(&sequence_lock);
+  const bool was_playing = sequence_playing;
   sequence_playing = false;
   taskEXIT_CRITICAL(&sequence_lock);
+
+  if (was_playing) {
+    for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
+         oscillator_id++) {
+      led_engine_pause_modulators(oscillator_id);
+    }
+  }
 
   return ESP_OK;
 }
 
-esp_err_t sequence_seek(uint32_t step_index) {
+esp_err_t sequence_seek(uint32_t position_ms) {
+  if (sequence_timer != NULL) {
+    esp_timer_stop(sequence_timer);
+  }
+
   taskENTER_CRITICAL(&sequence_lock);
-  if (step_index >= sequence_step_count) {
+  uint32_t step_index = 0U;
+  uint32_t offset_ms = 0U;
+  if (!find_step_for_position(position_ms, &step_index, &offset_ms)) {
     taskEXIT_CRITICAL(&sequence_lock);
     return ESP_ERR_INVALID_ARG;
   }
 
   sequence_current_step = step_index;
-  sequence_elapsed_ms = 0U;
-  const uint32_t target_step = step_index;
+  sequence_elapsed_ms = offset_ms;
+  const bool continue_playing = sequence_playing;
   taskEXIT_CRITICAL(&sequence_lock);
 
-  return apply_step(target_step);
+  esp_err_t error = apply_step(step_index);
+  if (error != ESP_OK) {
+    return error;
+  }
+
+  error = apply_step_offset(step_index, offset_ms);
+  if (error != ESP_OK) {
+    return error;
+  }
+
+  if (continue_playing && sequence_timer != NULL) {
+    return esp_timer_start_periodic(
+        sequence_timer, (uint64_t)SEQUENCE_STEP_TICK_PERIOD_MS * 1000ULL);
+  }
+
+  return ESP_OK;
 }
 
-esp_err_t sequence_tick(void) {
+static void sequence_tick(void) {
   uint32_t step_to_apply = 0U;
   bool apply = false;
 
   taskENTER_CRITICAL(&sequence_lock);
   if (!sequence_playing || sequence_step_count == 0U) {
     taskEXIT_CRITICAL(&sequence_lock);
-    return ESP_OK;
+    return;
   }
 
   sequence_elapsed_ms += SEQUENCE_STEP_TICK_PERIOD_MS;
@@ -271,10 +420,11 @@ esp_err_t sequence_tick(void) {
   taskEXIT_CRITICAL(&sequence_lock);
 
   if (apply) {
-    return apply_step(step_to_apply);
+    const esp_err_t error = apply_step(step_to_apply);
+    if (error != ESP_OK) {
+      ESP_LOGE(TAG, "apply_step failed: %d", error);
+    }
   }
-
-  return ESP_OK;
 }
 
 bool sequence_is_playing(void) {

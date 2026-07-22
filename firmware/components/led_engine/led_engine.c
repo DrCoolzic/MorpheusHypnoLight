@@ -303,6 +303,52 @@ led_engine_set_duty_cycle_modulator(uint8_t oscillator_id,
   return ESP_OK;
 }
 
+esp_err_t led_engine_pause_modulators(uint8_t oscillator_id) {
+  if (oscillator_id >= OSCILLATOR_COUNT) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  taskENTER_CRITICAL(&led_engine_lock);
+  led_engine_oscillator_t *osc = &led_engine_oscillators[oscillator_id];
+  modulator_pause(&osc->frequency_modulator);
+  modulator_pause(&osc->brightness_modulator);
+  modulator_pause(&osc->duty_modulator);
+  taskEXIT_CRITICAL(&led_engine_lock);
+
+  return ESP_OK;
+}
+
+esp_err_t led_engine_resume_modulators(uint8_t oscillator_id) {
+  if (oscillator_id >= OSCILLATOR_COUNT) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  taskENTER_CRITICAL(&led_engine_lock);
+  led_engine_oscillator_t *osc = &led_engine_oscillators[oscillator_id];
+  modulator_resume(&osc->frequency_modulator);
+  modulator_resume(&osc->brightness_modulator);
+  modulator_resume(&osc->duty_modulator);
+  taskEXIT_CRITICAL(&led_engine_lock);
+
+  return ESP_OK;
+}
+
+esp_err_t led_engine_seek_modulators(uint8_t oscillator_id,
+                                     uint32_t elapsed_ms) {
+  if (oscillator_id >= OSCILLATOR_COUNT) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  taskENTER_CRITICAL(&led_engine_lock);
+  led_engine_oscillator_t *osc = &led_engine_oscillators[oscillator_id];
+  modulator_seek(&osc->frequency_modulator, elapsed_ms);
+  modulator_seek(&osc->brightness_modulator, elapsed_ms);
+  modulator_seek(&osc->duty_modulator, elapsed_ms);
+  taskEXIT_CRITICAL(&led_engine_lock);
+
+  return ESP_OK;
+}
+
 esp_err_t led_engine_tick(void) {
   float frequencies[OSCILLATOR_COUNT];
   float brightnesses[OSCILLATOR_COUNT];
