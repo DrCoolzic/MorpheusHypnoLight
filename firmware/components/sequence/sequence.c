@@ -324,6 +324,8 @@ esp_err_t sequence_play(void) {
     return ESP_ERR_INVALID_STATE;
   }
 
+  (void)esp_timer_stop(sequence_timer);
+
   const esp_err_t error = esp_timer_start_periodic(
       sequence_timer, (uint64_t)SEQUENCE_STEP_TICK_PERIOD_MS * 1000ULL);
   if (error != ESP_OK) {
@@ -396,6 +398,7 @@ esp_err_t sequence_seek(uint32_t position_ms) {
 static void sequence_tick(void) {
   uint32_t step_to_apply = 0U;
   bool apply = false;
+  bool stop_timer = false;
 
   taskENTER_CRITICAL(&sequence_lock);
   if (!sequence_playing || sequence_step_count == 0U) {
@@ -414,7 +417,9 @@ static void sequence_tick(void) {
       apply = true;
     } else {
       sequence_playing = false;
+      sequence_current_step = 0U;
       sequence_elapsed_ms = 0U;
+      stop_timer = true;
     }
   }
   taskEXIT_CRITICAL(&sequence_lock);
@@ -424,6 +429,10 @@ static void sequence_tick(void) {
     if (error != ESP_OK) {
       ESP_LOGE(TAG, "apply_step failed: %d", error);
     }
+  }
+
+  if (stop_timer && sequence_timer != NULL) {
+    esp_timer_stop(sequence_timer);
   }
 }
 
@@ -441,4 +450,12 @@ uint32_t sequence_get_current_step(void) {
   taskEXIT_CRITICAL(&sequence_lock);
 
   return current;
+}
+
+uint32_t sequence_get_elapsed_ms(void) {
+  taskENTER_CRITICAL(&sequence_lock);
+  const uint32_t elapsed = sequence_elapsed_ms;
+  taskEXIT_CRITICAL(&sequence_lock);
+
+  return elapsed;
 }

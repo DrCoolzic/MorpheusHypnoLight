@@ -118,3 +118,10 @@ bool sequence_is_playing(void);
  * @return Current step index.
  */
 uint32_t sequence_get_current_step(void);
+
+/**
+ * @brief Return the elapsed time inside the current step.
+ *
+ * @return Elapsed time in milliseconds.
+ */
+uint32_t sequence_get_elapsed_ms(void);
