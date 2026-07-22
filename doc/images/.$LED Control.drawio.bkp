@@ -1,6 +1,6 @@
 <mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.6 Chrome/144.0.7559.236 Electron/40.8.4 Safari/537.36" version="29.6.6">
   <diagram name="Page-1" id="rqYmWfkOwu1BIdSAzBMK">
-    <mxGraphModel dx="2253" dy="841" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="1087" dy="688" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -12,10 +12,10 @@
         <mxCell id="dq2J3Z3bt3iIbfI0_ZAk-3" parent="1" style="whiteSpace=wrap;html=1;aspect=fixed;" value="LED DRIVER" vertex="1">
           <mxGeometry height="160" width="160" x="440" y="200" as="geometry" />
         </mxCell>
-        <mxCell id="dq2J3Z3bt3iIbfI0_ZAk-8" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;shape=flexArrow;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" target="dq2J3Z3bt3iIbfI0_ZAk-4" value="FREQUENCY">
+        <mxCell id="dq2J3Z3bt3iIbfI0_ZAk-8" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;shape=flexArrow;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" target="dq2J3Z3bt3iIbfI0_ZAk-4" value="FREQUENCY">
           <mxGeometry relative="1" x="0.0125" y="16" as="geometry">
             <mxPoint as="offset" />
-            <mxPoint x="-80" y="240" as="sourcePoint" />
+            <mxPoint x="40" y="240" as="sourcePoint" />
           </mxGeometry>
         </mxCell>
         <mxCell id="dq2J3Z3bt3iIbfI0_ZAk-11" edge="1" parent="1" source="dq2J3Z3bt3iIbfI0_ZAk-4" style="edgeStyle=orthogonalEdgeStyle;shape=flexArrow;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="dq2J3Z3bt3iIbfI0_ZAk-3">
@@ -24,17 +24,17 @@
         <mxCell id="dq2J3Z3bt3iIbfI0_ZAk-4" parent="1" style="whiteSpace=wrap;html=1;aspect=fixed;" value="OSCILLATOR" vertex="1">
           <mxGeometry height="160" width="160" x="200" y="200" as="geometry" />
         </mxCell>
-        <mxCell id="dq2J3Z3bt3iIbfI0_ZAk-17" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;shape=flexArrow;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" value="BRIGHTNESS">
+        <mxCell id="dq2J3Z3bt3iIbfI0_ZAk-17" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;shape=flexArrow;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" value="BRIGHTNESS">
           <mxGeometry relative="1" x="0.0125" y="16" as="geometry">
             <mxPoint as="offset" />
-            <mxPoint x="-80" y="280" as="sourcePoint" />
+            <mxPoint x="40" y="279.86" as="sourcePoint" />
             <mxPoint x="200" y="279.86" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="dq2J3Z3bt3iIbfI0_ZAk-18" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;shape=flexArrow;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" value="WAVEFORM, DUTY CYCLE, PHASE">
+        <mxCell id="dq2J3Z3bt3iIbfI0_ZAk-18" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;shape=flexArrow;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" value="DUTY CYCLE">
           <mxGeometry relative="1" x="0.0125" y="16" as="geometry">
             <mxPoint as="offset" />
-            <mxPoint x="-80" y="320" as="sourcePoint" />
+            <mxPoint x="40" y="320" as="sourcePoint" />
             <mxPoint x="200" y="320" as="targetPoint" />
           </mxGeometry>
         </mxCell>

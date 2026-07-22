@@ -2,33 +2,46 @@
 
 ## Objective
 
-The objective of this project is to create a device for visual and auditory stimulation. This type of device is often referred to as AVS (Audio-Visual Stimulation) or FLS (Flicker Light Stimulation). Flicker Light Stimulation is a non-invasive technique that uses rhythmic light variation to influence brain activity and the state of consciousness. It involves emitting rhythmic light pulses at specific frequencies, typically ranging from 3 Hz to 50 Hz. These light pulses stimulate the visual system, leading to a phenomenon called "visual entrainment," in which brain activity synchronizes with the frequency of the light. This synchronization can induce altered states of consciousness, like those experienced during deep meditation or under the influence of psychedelics, often accompanied by striking visual patterns and sensations beyond conscious control.
+The Morpheus HypnoLight Project is an ecosystem consisting of three main components: the Morpheus Player, the Morpheus Editor, and the Morpheus HypnoLight Device.
+The objective of this project is to create an environment for visual and auditory stimulation often referred to as AVS (Audio-Visual Stimulation) or FLS (Flicker Light Stimulation).
+Flicker Light Stimulation is a non-invasive technique that uses rhythmic light variation to influence brain activity and the state of consciousness.
+It involves emitting rhythmic light pulses at specific frequencies, typically ranging from 3 Hz to 50 Hz.
+These light pulses stimulate the visual system, leading to a phenomenon called "visual entrainment," in which brain activity synchronizes with the frequency of the light.
+This synchronization can induce altered states of consciousness, like those experienced during deep meditation or under the influence of psychedelics, often accompanied by striking visual patterns and sensations beyond conscious control.
+
+A stimulation session consists of both an acoustic component and a visual component.
+The audio component is handled by the Morpheus Player / Editor, and the visual component is handled by the Morpheus HypnoLight device.
+
+This specification describes the Morpheus HypnoLight Device, which generates light flashes controlled by the Morpheus Player or the Morpheus Editor.
+
+## Operating Modes
+
+The Morpheus HypnoLight Device can be controlled by two host applications, each corresponding to a distinct operating mode:
+
+**Player Mode**
+
+When controlled by the Morpheus Player, the device behaves like a video player: it loads and plays a sequence made of steps. Playback follows the timing defined in the sequence, and the Player handles the audio locally while sending the necessary timing and parameter data to the HypnoLight device. When playback is paused, the LEDs turn off. This mode is intended for end users who are not concerned with the internal content of the sequence.
+
+**Editor Mode**
+
+When controlled by the Morpheus Editor, the device supports both sequence playback and realtime editing. While a sequence is playing, the behavior is similar to Player mode. When the Editor is paused, playback stops and the current LED state is frozen (the LEDs remain on). The user then enters a realtime editing state in which any parameter — such as oscillator frequency, waveform, duty cycle, phase, or brightness — can be modified directly, for example through potentiometers or on-screen controls. Changes are applied immediately and are reflected on the LEDs in real time. This mode is intended for users who create and edit sequences and therefore need a detailed understanding of how the Morpheus HypnoLight device works.
 
 ---
 
 ## Main Features
 
-### Must have
-
-- Two modes of operation
-  - **Remote Sequence Mode of Operation**: The sequences to play are selected and controlled remotely from an application that communicates using BLE or Wi-Fi. This application can control multiple machines simultaneously.
-  - **Remote Real-time Mode of Operation**: Developers use this mode to control all machine parameters in real time without using sequences.
-
+- Two modes of operation as described above
 - Bluetooth Low Energy connectivity, used to connect to the control application and potentially to a sound system
 - 4 peripheral LED banks (PB1..PB4, cold white), each containing 2 sub-groups of 4 LEDs and driven by one of 4 LEDC hardware channels
 - 1 central LED group (CG, warm white) driven by a dedicated LEDC hardware channel
 - 5 oscillators with sine, triangle, square, and custom waveforms, each with controllable frequency, duty cycle, brightness, and phase; oscillators 1-4 drive banks PB1-PB4 and oscillator 5 drives the central group CG
-- Low Frequency Oscillator (LFO) modulation of oscillator parameters, including frequency modulation for rich FLS effects
-- Step-based sequence engine with linear interpolation or LFO modulation modes
+- Generic modulator for frequency and brightness with static, linear, and simple LFO modes
+- Step-based sequence engine with modulator-based frequency and brightness control
 - Capability to pause and seek loaded sequences
 - Low-cost hardware (target: under $100)
 - Low-noise cooling using a large PWM temperature controlled fan
 - Compact and easy to carry with [tripod mounting threads](https://www.amazon.fr/ruthex-Lot-pannes-%C3%A0-souder/dp/B0F1B8GC7Z?th=1) - [Hexagonal Insert for Tripod Mounting](https://www.amazon.fr/QUARKZMAN-Entra%C3%AEnement-Hexagonal-Connecteur-Fixation/dp/B0G138HB36/ref=sr_1_49_sspa)
 - WiFi web server interface
-
-### Could have
-
-- **Local Real-Time Mode of Operation**: This mode allows developers to control all machine parameters in real time without using sequences by connecting through a QWIIC connector some input devices
 
 ---
 
@@ -58,19 +71,13 @@ The device drives 9 physical LED driver channels (eight peripheral sub-groups an
 
 The mapping between oscillators and LEDC channels is fixed: oscillator *i* always writes to LEDC channel *i*. There is no dispatch table.
 
+For each oscillator the **frequency** and **brightness** are generated by independent modulators (static, linear, or LFO). The modulator outputs are combined with the oscillator waveform to produce the final LEDC duty cycle.
+
 ---
 
 ### LED Driver
 
-After examining several LED drivers, the AL8860 was chosen as it perfectly suits the project's needs. With the AL8860, the brightness of the connected LEDs can be controlled either with an analog or a PWM signal.
-
-Using the analog control input of the AL8860 has serious limitations:
-
-- **Limited range**: only 0.5 V to 2.5 V
-- **Potential nonlinearity**
-- **Additional complexity** requiring D/A converters
-
-Therefore, brightness is controlled by pulse width modulation (PWM) applied to the CTRL pin of the AL8860. The same AL8860 circuit is used for all 9 groups, all driven by PWM signals generated by the ESP32 LEDC peripheral.
+After examining several LED drivers, the AL8860 was chosen as it perfectly suits the project's needs. The brightness of the connected LEDs is controlled with a PWM signal applied to the CTRL pin of the AL8860. The same AL8860 circuit is used for all 9 groups, all driven by PWM signals generated by the ESP32 LEDC peripheral.
 
 The schematic for one LED group is as follows:
 
@@ -88,6 +95,8 @@ The CTRL pin of the AL8860 operates in digital mode:
 - **CTRL < 0.4 V**: driver shut down, LED off
 
 This makes the CTRL pin ideal for direct connection to a PWM signal generated by the ESP32, through a 1 kΩ series resistor (R2) for protection.
+
+**PWM dimming.** A digital PWM signal applied to the CTRL pin produces an average LED current proportional to its duty cycle. The datasheet recommends a PWM frequency **below 500 Hz** for best resolution and accuracy (better than 1% from 1% to 100% duty at 500 Hz); higher PWM frequencies reduce dimming dynamic range and accuracy. The 1 kHz LEDC carrier chosen for this project is therefore a practical compromise: it is high enough to be invisible, while still maintaining acceptable accuracy for the visible brightness range.
 
 > Note: In the prototype we will use PicoBuck LED driver modules from SparkFun. They use the AL8805 LED driver instead of the AL8860, but the two drivers are functionally equivalent even though the AL8860 is recommended for new designs.
 
@@ -115,7 +124,7 @@ Oscillators 1-4 drive the four outer banks and are normally used in the 1-100 Hz
 
 #### Two-Level PWM Modulation
 
-The oscillator parameters are: frequency (0-100 Hz), duty cycle (0-100%), brightness (0-100%), and phase (0-360 degrees).
+The oscillator parameters are: **waveform**, **duty cycle**, and **phase** (0-360 degrees). The **frequency** and **brightness** are produced by independent modulators (static, linear, or LFO) and passed to the oscillator and LEDC path.
 
 Since the signal driving the AL8860 CTRL pin must be a digital PWM signal, a two-level **PWM modulation** technique is used to independently control both brightness and the visible flicker frequency and duty cycle:
 
@@ -133,7 +142,7 @@ When `osc_value` is at its peak, the LEDC runs at full brightness duty cycle. Wh
 
 ![](images/oscillator.png)
 
-#### Brightness Modulator: ESP32 LEDC Peripheral
+#### Brightness Control: ESP32 LEDC Peripheral
 
 The ESP32-S3 LEDC peripheral provides 8 hardware PWM channels; 5 are used in this design. Each LEDC channel is initialized at a fixed carrier frequency (1 kHz) with 10-bit resolution (0-1023 duty range).
 
@@ -147,32 +156,38 @@ The low-frequency modulating signal is generated entirely in ESP32 software usin
 
 All waveforms are normalized to the range 0.0-1.0. Each waveform has a **frequency** and a **duty cycle** parameter. The meaning of duty cycle depends on the waveform type:
 
-|Waveform|Duty Cycle Meaning|FLS Effect|
-|----------|------------------|----------|
-|Square|Fraction of period at HIGH level (classic PWM)|Sharp, stroboscopic pulses|
-|Triangle|Fraction of period in ascending phase (0% or 100% gives a sawtooth variant)|Linear fade in/out, asymmetry controllable|
-|Sine|Not applicable (fixed shape)|Gentle, organic stimulation|
-|Custom|Encoded in the LUT (user-defined shape)|Any specific FLS therapeutic profile|
+|Waveform|Duty Cycle Meaning|Generation|FLS Effect|
+|----------|------------------|----------|----------|
+|Square|Fraction of period at HIGH level (classic PWM)|Computed directly from phase and duty|Sharp, stroboscopic pulses|
+|Triangle|Fraction of period in ascending phase (0% or 100% gives a sawtooth variant)|Computed directly from phase and duty|Linear fade in/out, asymmetry controllable|
+|Sine|Not applicable (fixed shape)|64-sample LUT|Gentle, organic stimulation|
+|Custom|Encoded in the LUT (user-defined shape)|User-supplied LUT|Any specific FLS therapeutic profile|
 
 Note: sawtooth is not a separate waveform type. It is a degenerate case of the triangle waveform obtained by setting duty cycle to 0% (instant rise then full fall ramp) or 100% (full rise ramp then instant fall).
 
-**Implementation: LUT + Phase Accumulator (DDS)**
+**Implementation: DDS Phase Accumulator with LUT or Direct Generation**
 
-Waveform shapes are pre-computed at step startup into a **Look-Up Table (LUT)** of N samples (e.g., N = 64). This avoids expensive floating-point trigonometric calculations inside the time-critical timer callback. The duty cycle parameter is applied during LUT generation, so changing the duty cycle triggers a LUT rebuild for that oscillator.
+A **Direct Digital Synthesis (DDS)** phase accumulator runs in the 1 kHz timer callback. At each tick the phase advances by an amount proportional to the current frequency; the phase is then converted to a waveform value.
 
-To handle continuously changing frequencies smoothly, a **Direct Digital Synthesis (DDS)** phase accumulator is used. Rather than stepping through the LUT at a fixed integer rate, a fractional phase value advances by an amount proportional to the current frequency on every timer tick:
+- **Sine** and **custom** use a 64-sample LUT. The sine LUT is pre-computed at step startup to avoid trigonometric calls in the timer callback. The custom LUT is supplied by the user. Changing waveform, duty cycle, or phase rebuilds or reloads the LUT.
+- **Square** and **triangle** are computed directly from the phase accumulator and the duty cycle parameter each tick. They do not use a LUT, so they do not suffer from LUT under-sampling at higher frequencies and do not require a LUT rebuild when the duty cycle changes.
 
 ```c
-// Timer callback - runs at CALLBACK_RATE Hz (e.g. 1000 Hz)
+// Timer callback - runs at 1 kHz
 void osc_callback(void* arg) {
-    // 1. Compute all 5 oscillator values
     for (int i = 0; i < NUM_OSC; i++) {
+        // Advance DDS phase
         osc_phase[i] += (LUT_SIZE * current_freq[i]) / CALLBACK_RATE_HZ;
         if (osc_phase[i] >= LUT_SIZE) osc_phase[i] -= LUT_SIZE;
-        osc_value[i] = lut[i][(int)osc_phase[i]];
+
+        if (oscillator_uses_lut(i)) {
+            osc_value[i] = lut[i][(int)osc_phase[i]];
+        } else {
+            osc_value[i] = compute_waveform(osc_waveform[i], osc_phase[i], osc_duty[i]);
+        }
     }
 
-    // 2. Write each oscillator directly to its fixed LEDC channel
+    // Write each oscillator directly to its fixed LEDC channel
     for (int ch = 0; ch < 5; ch++) {
         ledcWrite(ch, (int)(osc_value[ch] * current_brightness[ch] * MAX_DUTY));
     }
@@ -182,8 +197,8 @@ void osc_callback(void* arg) {
 This approach ensures:
 
 - Frequency changes are **instantaneous and glitch-free** for all 5 oscillators
-- Any waveform shape is supported by simply loading a different LUT
-- The LEDC update is a direct array write per channel per tick
+- Sine is fast (one LUT lookup) and accurate at all supported frequencies
+- Square and triangle are always generated with full tick-level timing resolution
 - Custom therapeutic waveform profiles can be loaded as arbitrary LUTs
 
 **Parameter update constraints:**
@@ -192,18 +207,22 @@ This approach ensures:
 |---------|--------------------|---------|
 |Frequency|Yes|DDS phase increment updated each parameter tick|
 |Brightness|Yes|Multiplied at callback time, no LUT rebuild|
-|Duty cycle|No (fixed per step)|LUT rebuilt once at step start|
+|Duty cycle|No (fixed per step)|LUT rebuilt for sine/custom; parameters captured for square/triangle|
 |Phase|Set once at step start|Initializes the phase accumulator|
 
-Duty cycle is kept fixed per step because changing it requires rebuilding the LUT. For FLS purposes this is not a limitation: the perceptual difference between smoothly swept duty cycle and step-wise updated duty cycle is negligible.
+Duty cycle is kept fixed per step for consistency and to avoid unnecessary LUT rebuilds for sine and custom. Square and triangle are computed directly each tick, but changing duty mid-step would still alter the shape within the step, which is reserved for future extensions.
 
 The **phase** parameter is useful when multiple oscillators are used, as it allows you to adjust the relative positions of the waveforms.
 
-**Note on timing constraints:** The LEDC peripheral applies a new duty cycle at the start of each carrier period. At a 1 kHz carrier, updates more frequent than every 1 ms provide no additional benefit. In practice, with a 64-sample LUT, the maximum meaningful flicker frequency is approximately 1000 / 64 = 15 Hz at full waveform resolution. At higher flicker frequencies, a smaller LUT (e.g., 32 or 16 samples) should be used to stay within this constraint.
+**Note on timing constraints:** The LEDC peripheral applies a new duty cycle at the start of each carrier period. At a 1 kHz carrier, updates more frequent than every 1 ms provide no additional benefit.
+
+With the 64-sample LUT used for sine and custom, the phase increment per tick reaches one sample per tick at 1000 / 64 ≈ 15.6 Hz. Above this frequency the oscillator still produces the correct fundamental period, but the LUT is under-sampled: not every sample is output, so waveform edges and harmonics become coarser. For example at 40 Hz with a 64-sample LUT, only 25 of the 64 samples are used each period. To keep full sine fidelity above ~15 Hz, reduce the LUT size (e.g., 32 or 16 samples) so that the phase increment per tick stays close to one sample.
+
+Square and triangle are generated directly from the phase accumulator each tick and are therefore not affected by LUT under-sampling. Their timing accuracy is limited only by the 1 ms LEDC update rate.
 
 ---
 
-## Sequence Mode of Operation
+## Player Mode of Operation
 
 ### Overview
 
@@ -223,19 +242,19 @@ A step has one global parameter and a set of per-oscillator parameters for oscil
 
 |Parameter|Description|
 |---------|-----------|
-|`waveform`|Waveform shape: sine, square, triangle, or custom|
-|`duty`|Duty cycle: fixed value for the duration of the step (triggers LUT rebuild at step start)|
-|`phase`|Starting position in the LUT at the beginning of this step (0-360 degrees)|
-|`freq`|Frequency control: linear(start_hz, end_hz) or lfo(form, freq_hz, min_hz, max_hz)|
-|`brightness`|Brightness control: linear(start_%, end_%) or lfo(form, freq_hz, min_%, max_%)|
+|`waveform`|Oscillator waveform shape: sine, square, triangle, or custom|
+|`duty`|Oscillator duty cycle: fixed value for the duration of the step (triggers LUT rebuild at step start)|
+|`phase`|Starting position in the oscillator LUT at the beginning of this step (0-360 degrees)|
+|`freq`|Frequency modulator: `static(hz)`, `linear(start_hz, end_hz)`, or `lfo(waveform, freq_hz, low_hz, high_hz)`|
+|`brightness`|Brightness modulator: `static(%)`, `linear(start_%, end_%)`, or `lfo(waveform, freq_hz, low_%, high_%)`|
 
 ### Parameter Control Modes
 
-The two dynamic parameters for each oscillator (freq and brightness) can independently use one of two control modes during a step:
+Each oscillator has two modulated parameters, `freq` and `brightness`. Both can independently use one of three control modes: `static`, `linear`, or `lfo`.
 
-#### Linear Mode
+#### Static Mode
 
-The parameter interpolates smoothly and linearly from a start value to an end value over the duration of the step. Setting start and end to the same value keeps the parameter constant.
+The parameter stays at a fixed value for the duration of the step.
 
 ```text
 Example step - oscillator 1 (drives PB1):
@@ -243,16 +262,30 @@ Example step - oscillator 1 (drives PB1):
   waveform:   sine
   duty:       50%
   phase:      0 degrees
-  freq:       linear  10 Hz -> 12 Hz
-  brightness: linear  80%   -> 50%
+  freq:       static 10 Hz
+  brightness: static 80%
 
 Example step - oscillator 5 (drives CG):
   duration:   20 s
   waveform:   sine
   duty:       50%
   phase:      0 degrees
-  freq:       0 Hz  (fixed brightness)
-  brightness: linear  40% -> 40%   (constant)
+  freq:       static 0 Hz
+  brightness: static 40%
+```
+
+#### Linear Mode
+
+The parameter interpolates smoothly and linearly from the start_value at the start of the ramp to the end_value over the step duration.
+
+```text
+Example step - oscillator 1 (drives PB1):
+  duration:   20 s
+  waveform:   sine
+  duty:       50%
+  phase:      0 degrees
+  freq:       linear 10 - 12 Hz
+  brightness: linear 50% - 80%
 ```
 
 At each parameter update tick, the current value is:
@@ -263,7 +296,7 @@ current_value = start + (end - start) * (elapsed / duration)
 
 #### LFO Mode (Low Frequency Oscillator Modulation)
 
-Inspired by classic analog synthesizers (e.g., Korg MS-20/MS-50), a dedicated **Low Frequency Oscillator (LFO)** modulates the parameter rhythmically between a minimum and maximum value at a given LFO frequency and waveform shape. This creates organic, evolving parameter motion within a step.
+A simple **Low Frequency Oscillator (LFO)** modulates the parameter rhythmically between a low and a high value. The LFO has no LUT and supports sine (or a triangle approximation) and square with a fixed 50% duty cycle.
 
 ```text
 Example step - oscillator 2 (drives PB2):
@@ -271,23 +304,23 @@ Example step - oscillator 2 (drives PB2):
   waveform:   sine
   duty:       50%
   phase:      90 degrees
-  freq:       lfo  sine  2 Hz  10 Hz - 20 Hz
-  brightness: lfo  triangle  0.5 Hz  60% - 90%
+  freq:       lfo sine   2 Hz  10 Hz - 20 Hz
+  brightness: lfo square 0.5 Hz  60% - 90%
 
 Example step - oscillator 5 (drives CG):
   duration:   10 s
   waveform:   sine
   duty:       50%
   phase:      0 degrees
-  freq:       lfo  sine  0.2 Hz  (breathing)
-  brightness: lfo  sine  0.2 Hz  30% - 50%
+  freq:       lfo sine 0.2 Hz  (breathing)
+  brightness: lfo sine 0.2 Hz  30% - 50%
 ```
 
 At each parameter update tick, the LFO value is evaluated and mapped to the parameter range:
 
 ```text
 lfo_value     = evaluate_lfo(lfo_waveform, lfo_freq, t)   // 0.0 to 1.0
-current_value = param_min + (param_max - param_min) * lfo_value
+current_value = low + (high - low) * lfo_value
 ```
 
 **Frequency Modulation and its FLS effect:**
@@ -299,97 +332,46 @@ When the LFO is applied to the frequency parameter, the result is a **frequency-
 The full signal flow from the sequence engine down to all LED groups is:
 
 ```mermaid
-flowchart TD
-    SEQ["**SEQUENCER**\nStep 1 -> Step 2 -> ..."]
+flowchart LR
+    subgraph Control sources
+        ED([Editor])
+        PL([Player])
+    end
 
-    SEQ --> P1["**Param Layer - Osc 1**\nfreq / brightness\nlinear or LFO"]
-    SEQ --> P2["**Param Layer - Osc 2**\nfreq / brightness\nlinear or LFO"]
-    SEQ --> P3["**Param Layer - Osc 3**\nfreq / brightness\nlinear or LFO"]
-    SEQ --> P4["**Param Layer - Osc 4**\nfreq / brightness\nlinear or LFO"]
-    SEQ --> P5["**Param Layer - Osc 5**\nfreq / brightness / CG\nlinear or LFO"]
+    ED -->|realtime parameters| CTRL
+    PL -->|step parameters| CTRL
 
-    P1 --> O1["**OSC 1**\nLUT + DDS\nphase accumulator"]
-    P2 --> O2["**OSC 2**\nLUT + DDS\nphase accumulator"]
-    P3 --> O3["**OSC 3**\nLUT + DDS\nphase accumulator"]
-    P4 --> O4["**OSC 4**\nLUT + DDS\nphase accumulator"]
-    P5 --> O5["**OSC 5**\nLUT + DDS\nphase accumulator\n CG ambient"]
+    subgraph CTRL[led_engine per oscillator]
+        direction TB
+        FM[frequency_modulator<br/>static / linear / lfo]
+        BM[brightness_modulator<br/>static / linear / lfo]
+        OSC[oscillator<br/>waveform, duty_cycle, phase]
+    end
 
-    O1 --> LEDC["**LEDC - 5 channels**\n1 kHz carrier / 10-bit"]
-    O2 --> LEDC
-    O3 --> LEDC
-    O4 --> LEDC
-    O5 --> LEDC
+    FM -- frequency_hz --> OSC
+    OSC -- osc_value --> LED
+    BM -- brightness --> LED
 
-    LEDC --> AL18["**AL8860 x8**\n333 mA each\n2 per bank"]
-    LEDC --> AL9["**AL8860**\n333 mA - CG"]
+    subgraph LED[led_control]
+        direction TB
+        PWM[LEDC PWM 1 kHz]
+        DRV[AL8860 driver]
+    end
 
-    AL18 --> G18["**LED banks PB1..PB4**\ncold white / flickering"]
-    AL9  --> G9["**LED group CG**\nwarm white / ambient"]
-
-    style SEQ      fill:#4A90D9,color:#fff,stroke:#2c6fad
-    style LEDC     fill:#7B68EE,color:#fff,stroke:#5040cc
-    style AL18     fill:#5BAD6F,color:#fff,stroke:#3a8050
-    style AL9      fill:#5BAD6F,color:#fff,stroke:#3a8050
-    style G18      fill:#2E7D32,color:#fff,stroke:#1a5c1e
-    style G9       fill:#E65100,color:#fff,stroke:#bf360c
+    LED -->|PWM| LEDS[LED banks PB1..PB4 / CG]
 ```
 
 ### Timing Layers Summary
 
 |Layer|Update Rate|Responsibility|
 |-----|-----------|--------------|
-|Sequencer|Every few seconds|Advance to next step, rebuild LUTs|
-|Parameter layer|Every 10-50 ms|Linear interp or LFO update for all 5 oscillators|
-|Phase accumulator|Every 1 ms (timer callback)|Drive all 5 oscillators, write to 5 LEDC channels|
+|Sequencer|100 ms|Advance to next step, apply static oscillator settings|
+|led_engine|1 ms|Evaluate modulators, call `oscillator_tick()`, write `led_control`|
 |LEDC peripheral|Every 1 ms (carrier period)|Output PWM to AL8860 banks PB1..PB4 and central group CG|
 
-## Real-Time Mode of Operation
+## Editor Mode of Operation
 
-In real-time mode, the notion of steps does not exist as it does in sequence mode. Therefore, the linear mode of the oscillator is replaced by a fixed-value mode.
-
-### Parameter Control Modes
-
-The two dynamic parameters for each oscillator (freq and brightness) can independently use one of two control modes:
-
-#### Fixed Value Mode
-
-The parameters stay constant.
-
-```text
-Example - oscillator 1 (drives PB1):
-  waveform:   sine
-  duty:       50%
-  phase:      0 degrees
-  freq:       10 Hz
-  brightness: 80%
-
-Example - oscillator 5 (drives CG):
-  waveform:   sine
-  duty:       50%
-  phase:      0 degrees
-  freq:       0 Hz
-  brightness: 40%
-```
-
-#### LFO Mode (Low Frequency Oscillator Modulation)
-
-Works as described in the `Sequence mode`
-
-```text
-Example - oscillator 2 (drives PB2):
-  waveform:   sine
-  duty:       50%
-  phase:      90 degrees
-  freq:       lfo  sine  2 Hz  10 Hz - 20 Hz
-  brightness: lfo  triangle  0.5 Hz  60% - 90%
-
-Example - oscillator 5 (drives CG):
-  waveform:   sine
-  duty:       50%
-  phase:      0 degrees
-  freq:       lfo  sine  0.2 Hz  (breathing)
-  brightness: lfo  sine  0.2 Hz  30% - 50%
-```
+In Editor mode the device is controlled live, without a fixed sequence timeline. The same modulator modes (`static`, `linear`, `lfo`) are available for frequency and brightness. When the Editor is paused, the current LED state is frozen and any parameter can be adjusted directly, for example with potentiometers or on-screen controls. When a sequence is playing inside the Editor, the behavior is identical to Player mode.
 
 ## Hardware Prototype
 

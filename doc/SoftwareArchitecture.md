@@ -6,10 +6,10 @@ The Morpheus HypnoLight firmware is an [ESP-IDF](https://docs.espressif.com/proj
 
 The firmware implements two main operating modes described in the product specification:
 
-- **Sequence Mode**: the device plays ordered steps stored in memory.
-- **Real-Time Mode**: parameters are controlled live without a sequence.
+- **Player Mode**: the `sequence` component advances stored steps and sends parameters to the `led_engine`.
+- **Editor Mode**: commands from the `comms` layer or local controls write parameters directly into the `led_engine`.
 
-Both modes share the same low-level signal generation pipeline.
+Both modes share the same `led_engine` signal generation pipeline, which contains per oscillator a frequency modulator, a brightness modulator, and an oscillator.
 
 ## Repository Layout
 
@@ -24,7 +24,9 @@ firmware/
 └── components/             # Application components
     ├── oscillator/         # Software oscillator engine (LUT + DDS)
     ├── led_control/        # Fixed LEDC channel output
-    ├── sequence/           # Sequence engine (steps, interpolation, LFO)
+    ├── modulator/          # Generic static/linear/LFO value generator
+    ├── led_engine/         # Per-oscillator control chain
+    ├── sequence/           # Sequence engine (steps, playback)
     └── comms/              # BLE / Wi-Fi communication layer
 ```
 
@@ -34,11 +36,13 @@ firmware/
 
 Responsible for generating the five low-frequency signals that drive the four peripheral banks (PB1..PB4) and the central group (CG).
 
-- **Waveforms**: sine, square, triangle, custom (via LUT).
-- **Static parameters per oscillator**: waveform, duty cycle, and phase. They are applied at a sequence-step boundary through `oscillator_set_static()`; this rebuilds the LUT and initializes the phase accumulator.
-- **Dynamic parameter per oscillator**: frequency. The parameter layer updates it with `oscillator_set_frequency()` without rebuilding the LUT.
+- **Waveforms**: sine, square, triangle, custom.
+  - **Sine** and **custom** are pre-computed into a 64-sample LUT when static parameters change.
+  - **Square** and **triangle** are generated directly from the phase accumulator and duty cycle each tick.
+- **Static parameters per oscillator**: waveform, duty cycle, and phase. They are applied at a sequence-step boundary through `oscillator_set_static()`; sine and custom rebuild the LUT, while square and triangle only store the new parameters.
+- **Dynamic parameter per oscillator**: frequency. The parameter layer updates it with `oscillator_set_frequency()` without rebuilding any LUT.
 - **Output**: normalized instantaneous waveform values `osc_values[5]` in the range `[0.0, 1.0]`. At 0 Hz, an oscillator returns a constant `1.0` independently of its static waveform configuration.
-- **Implementation**: 64-sample Look-Up Table (LUT) per oscillator and Direct Digital Synthesis (DDS) phase accumulator updated by `oscillator_tick()` at 1 kHz. The component is independent of LEDC and brightness control.
+- **Implementation**: Direct Digital Synthesis (DDS) phase accumulator updated by `oscillator_tick()` at 1 kHz. Sine and custom use a 64-sample LUT; square and triangle are computed from phase and duty. The component is independent of LEDC and brightness control.
 - **Public API**:
   - `esp_err_t oscillator_init(void)`
   - `esp_err_t oscillator_set_static(uint8_t oscillator_id, const oscillator_static_config_t *config)`
@@ -79,6 +83,81 @@ Owns the current parameters for all oscillators. The initial implementation supp
   - `esp_err_t sequence_tick(void)`
   - `esp_err_t sequence_get_realtime_brightness(float brightnesses[OSCILLATOR_COUNT])`
 
+### `modulator`
+
+Generic time-varying value generator used by `led_engine` for frequency and brightness. It supports three modes: `static`, `linear`, and `lfo`. The LFO has no LUT and supports sine (or a triangle approximation) and square with a fixed 50% duty cycle.
+
+```c
+/** @brief Modulator operating modes. */
+typedef enum {
+  MODULATOR_MODE_STATIC,
+  MODULATOR_MODE_LINEAR,
+  MODULATOR_MODE_LFO,
+} modulator_mode_t;
+
+/** @brief LFO waveforms supported by the modulator. */
+typedef enum {
+  MODULATOR_LFO_WAVEFORM_SINE,
+  MODULATOR_LFO_WAVEFORM_SQUARE,
+} modulator_lfo_waveform_t;
+
+/** @brief Static mode configuration: a constant value. */
+typedef struct {
+  float value;
+} modulator_static_config_t;
+
+/** @brief Linear mode configuration: ramp from start to end over a duration. */
+typedef struct {
+  float start_value;
+  float end_value;
+  uint32_t duration_ms;
+} modulator_linear_config_t;
+
+/** @brief LFO mode configuration. */
+typedef struct {
+  modulator_lfo_waveform_t waveform;
+  float frequency_hz;
+  float low;
+  float high;
+} modulator_lfo_config_t;
+
+/** @brief Complete modulator configuration. */
+typedef struct {
+  modulator_mode_t mode;
+  modulator_static_config_t static_config;
+  modulator_linear_config_t linear_config;
+  modulator_lfo_config_t lfo_config;
+} modulator_config_t;
+
+/** @brief Modulator runtime state. */
+typedef struct {
+  modulator_config_t config;
+  float current_value;
+  float start_value;
+  uint32_t elapsed_ms;
+  float lfo_phase;
+} modulator_state_t;
+
+/** @brief Initialize a modulator to static zero. */
+esp_err_t modulator_init(modulator_state_t *state);
+
+/** @brief Apply a new configuration and capture internal start state. */
+esp_err_t modulator_set_config(modulator_state_t *state, const modulator_config_t *config);
+
+/** @brief Compute the next value after delta_time_ms. */
+esp_err_t modulator_evaluate(modulator_state_t *state, float delta_time_ms, float *value);
+```
+
+### `led_engine`
+
+Encapsulates the per-oscillator signal chain: a frequency modulator, a brightness modulator, and an oscillator. It receives parameter updates from `sequence` in Player mode or directly from `comms` / local controls in Editor mode, then drives `led_control`.
+
+- **Per oscillator**:
+  - `frequency_modulator`: instance of the `modulator` component. Output is in Hz and forwarded to `oscillator_set_frequency()`.
+  - `brightness_modulator`: instance of the `modulator` component. Output is normalized `[0.0, 1.0]` and forwarded to `led_control_update()` as `current_brightness`.
+  - `oscillator`: generates the waveform from `oscillator_static_config_t` and the current frequency.
+- **Evaluation**: at each 1 kHz tick the engine evaluates the frequency and brightness modulators, calls `oscillator_tick()`, and passes `osc_value` and `brightness` to `led_control_update()`.
+
 ### `comms`
 
 Communication layer for remote control and configuration.
@@ -93,25 +172,36 @@ Communication layer for remote control and configuration.
 
 ## Data Flow
 
-The full signal flow is shown in the product specification; at firmware level it can be summarized as:
+The `led_engine` pipeline is shared by both Player and Editor modes. `sequence` (Player mode) and direct commands (Editor mode) both feed the same engine; the engine evaluates the frequency and brightness modulators, drives the oscillator, and writes the final duty cycle through `led_control`.
 
-```text
-Sequencer (step advance every few seconds)
-    ↓
-Parameter layer (linear / LFO update every 10–50 ms)
-    └── publishes current_frequency and current_brightness
-    ↓
-Oscillator timer callback (1 kHz)
-    └── computes osc_value from the waveform and current_frequency
-    ↓
-led_control: final_duty = osc_value × current_brightness
-    ↓
-LEDC peripheral (5 fixed channels)
-    ├── channel 0 → PB1
-    ├── channel 1 → PB2
-    ├── channel 2 → PB3
-    ├── channel 3 → PB4
-    └── channel 4 → CG
+```mermaid
+flowchart LR
+    subgraph Sources
+        RT([Realtime / Editor])
+        SEQ([Sequence / Player])
+    end
+
+    RT -->|set parameters| CTRL
+    SEQ -->|step parameters| CTRL
+
+    subgraph CTRL[led_engine per oscillator]
+        direction TB
+        FM[frequency_modulator<br/>static / linear / lfo]
+        BM[brightness_modulator<br/>static / linear / lfo]
+        OSC[oscillator<br/>waveform, duty_cycle, phase]
+    end
+
+    FM -- frequency_hz --> OSC
+    OSC -- osc_value --> LED
+    BM -- brightness --> LED
+
+    subgraph LED[led_control]
+        direction TB
+        PWM[LEDC PWM 1 kHz]
+        DRV[AL8860 driver]
+    end
+
+    LED -->|PWM| LEDS[LED banks PB1..PB4 / CG]
 ```
 
 ## Runtime Architecture (FreeRTOS)
