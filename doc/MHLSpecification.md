@@ -31,13 +31,14 @@ When controlled by the Morpheus Editor, the device supports both sequence playba
 ## Main Features
 
 - Two modes of operation as described above
-- Bluetooth Low Energy connectivity, used to connect to the control application and potentially to a sound system
+- Bluetooth Low Energy connectivity, used to connect to the control applications and potentially to a sound system
 - 4 peripheral LED banks (PB1..PB4, cold white), each containing 2 sub-groups of 4 LEDs and driven by one of 4 LEDC hardware channels
 - 1 central LED group (CG, warm white) driven by a dedicated LEDC hardware channel
 - 5 oscillators with sine, triangle, square, and custom waveforms, each with controllable frequency, duty cycle, brightness, and phase; oscillators 1-4 drive banks PB1-PB4 and oscillator 5 drives the central group CG
 - Generic modulator for frequency, brightness, and duty cycle with static, linear, and simple LFO modes
 - Step-based sequence engine with modulator-based frequency, brightness, and duty cycle control
-- Capability to pause and seek loaded sequences
+- Capability to freely pause and seek loaded sequences
+- A gamma correction is applied to compensate for the fact that the brightness perceived by the human eye follows the Weber–Fechner law, making variations in brightness appear linear.
 - Low-cost hardware (target: under $100)
 - Low-noise cooling using a large PWM temperature controlled fan
 - Compact and easy to carry with [tripod mounting threads](https://www.amazon.fr/ruthex-Lot-pannes-%C3%A0-souder/dp/B0F1B8GC7Z?th=1) - [Hexagonal Insert for Tripod Mounting](https://www.amazon.fr/QUARKZMAN-Entra%C3%AEnement-Hexagonal-Connecteur-Fixation/dp/B0G138HB36/ref=sr_1_49_sspa)

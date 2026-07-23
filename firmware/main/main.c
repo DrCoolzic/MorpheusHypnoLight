@@ -225,7 +225,7 @@ void app_main(void) {
   ESP_LOGI(TAG, "Initializing LED hardware");
   ESP_ERROR_CHECK(led_control_init());
   ESP_ERROR_CHECK(
-      led_control_set_global_brightness(1.0f)); /* limit eye strain */
+      led_control_set_global_brightness(0.8f)); /* limit eye strain */
   ESP_ERROR_CHECK(led_engine_init());
   ESP_ERROR_CHECK(led_control_all_off());
 
@@ -237,9 +237,9 @@ void app_main(void) {
   ESP_ERROR_CHECK(
       esp_timer_create(&oscillator_timer_args, &g_oscillator_timer));
 
-  ESP_LOGI(TAG, "Starting 1 kHz led_engine tick");
-  ESP_ERROR_CHECK(
-      esp_timer_start_periodic(g_oscillator_timer, OSCILLATOR_TICK_PERIOD_US));
+  /* Load and start the demo sequence. */
+  sequence_step_t demo_sequence[SEQUENCE_DEMO_STEP_COUNT];
+  build_demo_sequence(demo_sequence);
 
   /* Optional: run the legacy hardware tests once before the demo starts.
    * If enabled, test_run_all() stops the oscillator timer, so restart it
@@ -249,13 +249,14 @@ void app_main(void) {
   //     esp_timer_start_periodic(g_oscillator_timer,
   //     OSCILLATOR_TICK_PERIOD_US));
 
-  /* Load and start the demo sequence. */
-  sequence_step_t demo_sequence[SEQUENCE_DEMO_STEP_COUNT];
-  build_demo_sequence(demo_sequence);
-
   ESP_LOGI(TAG, "Loading demo sequence");
   ESP_ERROR_CHECK(sequence_init());
   ESP_ERROR_CHECK(sequence_load(demo_sequence, SEQUENCE_DEMO_STEP_COUNT));
+
+  ESP_LOGI(TAG, "Starting 1 kHz led_engine tick");
+  ESP_ERROR_CHECK(
+      esp_timer_start_periodic(g_oscillator_timer, OSCILLATOR_TICK_PERIOD_US));
+
   ESP_ERROR_CHECK(sequence_play());
   ESP_LOGI(TAG, "Sequence started. Open the serial console and type help for "
                 "commands (play, pause, stop, seek, status, tests).");

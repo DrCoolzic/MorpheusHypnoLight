@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 /** @brief Number of steps in the generated demo sequence. */
-#define SEQUENCE_DEMO_STEP_COUNT 1U
+#define SEQUENCE_DEMO_STEP_COUNT 3U
 
 /** @brief Populate the provided array with the demo sequence steps. */
 void build_demo_sequence(sequence_step_t *steps);

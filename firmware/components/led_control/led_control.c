@@ -90,6 +90,17 @@ esp_err_t led_control_init(void) {
     if (error != ESP_OK) {
       return error;
     }
+
+    /* Explicitly latch a zero duty cycle so the channel is off before the
+     * oscillator tick begins. */
+    error = ledc_set_duty(LED_CONTROL_MODE, (ledc_channel_t)oscillator_id, 0);
+    if (error != ESP_OK) {
+      return error;
+    }
+    error = ledc_update_duty(LED_CONTROL_MODE, (ledc_channel_t)oscillator_id);
+    if (error != ESP_OK) {
+      return error;
+    }
   }
 
   return ESP_OK;

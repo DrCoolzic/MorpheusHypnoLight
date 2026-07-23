@@ -41,7 +41,7 @@ Responsible for generating the five low-frequency signals that drive the four pe
   - **Square** and **triangle** are generated directly from the phase accumulator and duty cycle each tick.
 - **Static parameters per oscillator**: waveform and phase. They are applied at a sequence-step boundary through `oscillator_set_static()`; sine and custom rebuild the LUT, while square and triangle only store the new waveform and phase.
 - **Dynamic parameters per oscillator**: frequency and duty cycle. Both are updated on the fly through `oscillator_set_frequency()` and `oscillator_set_duty_cycle()` without rebuilding any LUT.
-- **Output**: normalized instantaneous waveform values `osc_values[5]` in the range `[0.0, 1.0]`. At 0 Hz, an oscillator returns a constant `1.0` independently of its static waveform configuration.
+- **Output**: normalized instantaneous waveform values `osc_values[5]` in the range `[0.0, 1.0]`. At 0 Hz, an oscillator returns a constant `1.0` regardless of waveform, phase, or duty cycle.
 - **Implementation**: Direct Digital Synthesis (DDS) phase accumulator updated by `oscillator_tick()` at 1 kHz. Sine and custom use a 64-sample LUT; square and triangle are computed from phase and duty. The component is independent of LEDC and brightness control.
 - **Public API**:
   - `esp_err_t oscillator_init(void)`
@@ -52,12 +52,13 @@ Responsible for generating the five low-frequency signals that drive the four pe
 
 ### `led_control`
 
-Converts the normalized oscillator waveform and current brightness into the duty cycle written to the five fixed LEDC hardware channels. It does not evaluate step timing, interpolation, or LFOs.
+Converts the normalized oscillator waveform and current brightness into the duty cycle written to the five fixed LEDC hardware channels, applying a gamma correction so that brightness ramps appear perceptually linear. It does not evaluate step timing, interpolation, or LFOs.
 
 - **PB1–PB4**: LEDC channels 0–3 at a common carrier frequency and 10-bit resolution. Each channel controls the two LED sub-groups in its peripheral bank.
 - **CG**: LEDC channel 4, using the same configuration as the peripheral banks.
 - **Fixed mapping**: API oscillator IDs 0–3 map to PB1–PB4 / LEDC channels 0–3; ID 4 maps to CG / LEDC channel 4.
-- **Duty calculation**: `final_duty = osc_value × current_brightness × global_brightness`, with all inputs normalized to `[0.0, 1.0]`. Out-of-range values are clamped; invalid oscillator IDs and non-finite input values return an error.
+- **Duty calculation**: `final_duty = osc_value × gamma(current_brightness × global_brightness)`, where `gamma(x) = x^2.2` approximates the human eye response so that linear brightness ramps look perceptually smooth. All inputs are normalized to `[0.0, 1.0]`, and out-of-range values are clamped; invalid oscillator IDs and non-finite input values return an error.
+- **LED off condition**: a `current_brightness` of `0.0` turns the oscillator off regardless of waveform, frequency, phase, or duty cycle.
 - **Global brightness multiplier**: configurable at runtime through `led_control_set_global_brightness()`. The default is 1.0 (no attenuation). A single setting scales the overall lamp brightness; the test application sets it to 0.5 to limit eye strain.
 - **Public API**:
   - `esp_err_t led_control_init(void)`
@@ -157,7 +158,7 @@ Encapsulates the per-oscillator signal chain: a frequency modulator, a brightnes
 
 - **Per oscillator**:
   - `frequency_modulator`: instance of the `modulator` component. Output is in Hz and forwarded to `oscillator_set_frequency()`.
-  - `brightness_modulator`: instance of the `modulator` component. Output is normalized `[0.0, 1.0]` and forwarded to `led_control_update()` as `current_brightness`.
+  - `brightness_modulator`: instance of the `modulator` component. Output is normalized `[0.0, 1.0]` and forwarded to `led_control_update()` as `current_brightness`; `led_control` treats it as a perceptual brightness value and applies a gamma correction.
   - `duty_modulator`: instance of the `modulator` component. Output is normalized `[0.0, 1.0]` and forwarded to `oscillator_set_duty_cycle()`.
   - `oscillator`: generates the waveform from `oscillator_static_config_t`, the current frequency, and the current duty cycle.
 - **Evaluation**: at each 1 kHz tick the engine evaluates the frequency, brightness, and duty modulators, applies them through `oscillator_set_frequency()` and `oscillator_set_duty_cycle()`, then calls `oscillator_tick()`, and passes `osc_value` and `brightness` to `led_control_update()`.
