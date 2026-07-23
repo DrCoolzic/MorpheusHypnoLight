@@ -71,7 +71,7 @@ def emit_lfo_modulator(mod: dict, target: str, lines: list[str]) -> None:
     )
     lines.append(
         f"      steps[step].oscillators[osc].{target}.lfo_config.frequency_hz = "
-        f"{float(mod['frequency_hz'])}f;"
+        f"{float(mod['lfo_frequency'])}f;"
     )
     lines.append(
         f"      steps[step].oscillators[osc].{target}.lfo_config.low = "
@@ -127,7 +127,7 @@ def generate_c(source_name: str, data: dict) -> str:
         lines.append(f"    steps[step].duration_ms = {int(step['duration_ms'])}U;")
 
         for osc_index, osc in enumerate(oscillators):
-            waveform = WAVEFORM_MAP[osc.get("waveform", "sine")]
+            waveform = WAVEFORM_MAP[osc.get("waveform", "square")]
             phase_degrees = float(osc.get("phase_degrees", 0.0))
             frequency = osc["frequency"]
             brightness = osc["brightness"]
