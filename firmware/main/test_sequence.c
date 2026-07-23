@@ -92,8 +92,8 @@ void build_demo_sequence(sequence_step_t *steps) {
       steps[step].oscillators[osc].frequency_modulator.mode = MODULATOR_MODE_STATIC;
       steps[step].oscillators[osc].frequency_modulator.static_config.value = 15.0f;
       steps[step].oscillators[osc].brightness_modulator.mode = MODULATOR_MODE_LINEAR;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.start_value = 1.0f;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.end_value = 0.5f;
+      steps[step].oscillators[osc].brightness_modulator.linear_config.start_value = 0.6f;
+      steps[step].oscillators[osc].brightness_modulator.linear_config.end_value = 0.3f;
       steps[step].oscillators[osc].brightness_modulator.linear_config.duration_ms = 5000U;
       steps[step].oscillators[osc].duty_modulator.mode = MODULATOR_MODE_STATIC;
       steps[step].oscillators[osc].duty_modulator.static_config.value = 0.5f;
@@ -106,8 +106,8 @@ void build_demo_sequence(sequence_step_t *steps) {
       steps[step].oscillators[osc].frequency_modulator.mode = MODULATOR_MODE_STATIC;
       steps[step].oscillators[osc].frequency_modulator.static_config.value = 14.0f;
       steps[step].oscillators[osc].brightness_modulator.mode = MODULATOR_MODE_LINEAR;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.start_value = 1.0f;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.end_value = 0.5f;
+      steps[step].oscillators[osc].brightness_modulator.linear_config.start_value = 0.6f;
+      steps[step].oscillators[osc].brightness_modulator.linear_config.end_value = 0.3f;
       steps[step].oscillators[osc].brightness_modulator.linear_config.duration_ms = 5000U;
       steps[step].oscillators[osc].duty_modulator.mode = MODULATOR_MODE_STATIC;
       steps[step].oscillators[osc].duty_modulator.static_config.value = 0.5f;
@@ -120,8 +120,8 @@ void build_demo_sequence(sequence_step_t *steps) {
       steps[step].oscillators[osc].frequency_modulator.mode = MODULATOR_MODE_STATIC;
       steps[step].oscillators[osc].frequency_modulator.static_config.value = 13.0f;
       steps[step].oscillators[osc].brightness_modulator.mode = MODULATOR_MODE_LINEAR;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.start_value = 1.0f;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.end_value = 0.5f;
+      steps[step].oscillators[osc].brightness_modulator.linear_config.start_value = 0.6f;
+      steps[step].oscillators[osc].brightness_modulator.linear_config.end_value = 0.3f;
       steps[step].oscillators[osc].brightness_modulator.linear_config.duration_ms = 5000U;
       steps[step].oscillators[osc].duty_modulator.mode = MODULATOR_MODE_STATIC;
       steps[step].oscillators[osc].duty_modulator.static_config.value = 0.5f;
@@ -134,8 +134,8 @@ void build_demo_sequence(sequence_step_t *steps) {
       steps[step].oscillators[osc].frequency_modulator.mode = MODULATOR_MODE_STATIC;
       steps[step].oscillators[osc].frequency_modulator.static_config.value = 12.0f;
       steps[step].oscillators[osc].brightness_modulator.mode = MODULATOR_MODE_LINEAR;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.start_value = 1.0f;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.end_value = 0.5f;
+      steps[step].oscillators[osc].brightness_modulator.linear_config.start_value = 0.6f;
+      steps[step].oscillators[osc].brightness_modulator.linear_config.end_value = 0.3f;
       steps[step].oscillators[osc].brightness_modulator.linear_config.duration_ms = 5000U;
       steps[step].oscillators[osc].duty_modulator.mode = MODULATOR_MODE_STATIC;
       steps[step].oscillators[osc].duty_modulator.static_config.value = 0.5f;
@@ -164,54 +164,138 @@ void build_demo_sequence(sequence_step_t *steps) {
       steps[step].oscillators[osc].static_config.waveform = OSCILLATOR_WAVEFORM_TRIANGLE;
       steps[step].oscillators[osc].static_config.phase_degrees = 0.0f;
       steps[step].oscillators[osc].static_config.custom_lut = NULL;
+      steps[step].oscillators[osc].frequency_modulator.mode = MODULATOR_MODE_LFO;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.waveform = MODULATOR_LFO_WAVEFORM_SINE;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.frequency_hz = 0.5f;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.low = 6.0f;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.high = 9.0f;
+      steps[step].oscillators[osc].brightness_modulator.mode = MODULATOR_MODE_STATIC;
+      steps[step].oscillators[osc].brightness_modulator.static_config.value = 0.5f;
+      steps[step].oscillators[osc].duty_modulator.mode = MODULATOR_MODE_STATIC;
+      steps[step].oscillators[osc].duty_modulator.static_config.value = 0.0f;
+    }
+    {
+      const uint8_t osc = 1U;
+      steps[step].oscillators[osc].static_config.waveform = OSCILLATOR_WAVEFORM_TRIANGLE;
+      steps[step].oscillators[osc].static_config.phase_degrees = 90.0f;
+      steps[step].oscillators[osc].static_config.custom_lut = NULL;
+      steps[step].oscillators[osc].frequency_modulator.mode = MODULATOR_MODE_LFO;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.waveform = MODULATOR_LFO_WAVEFORM_SINE;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.frequency_hz = 0.6f;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.low = 6.5f;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.high = 9.5f;
+      steps[step].oscillators[osc].brightness_modulator.mode = MODULATOR_MODE_STATIC;
+      steps[step].oscillators[osc].brightness_modulator.static_config.value = 0.5f;
+      steps[step].oscillators[osc].duty_modulator.mode = MODULATOR_MODE_STATIC;
+      steps[step].oscillators[osc].duty_modulator.static_config.value = 0.0f;
+    }
+    {
+      const uint8_t osc = 2U;
+      steps[step].oscillators[osc].static_config.waveform = OSCILLATOR_WAVEFORM_TRIANGLE;
+      steps[step].oscillators[osc].static_config.phase_degrees = 180.0f;
+      steps[step].oscillators[osc].static_config.custom_lut = NULL;
+      steps[step].oscillators[osc].frequency_modulator.mode = MODULATOR_MODE_LFO;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.waveform = MODULATOR_LFO_WAVEFORM_SINE;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.frequency_hz = 0.7f;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.low = 7.0f;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.high = 10.0f;
+      steps[step].oscillators[osc].brightness_modulator.mode = MODULATOR_MODE_STATIC;
+      steps[step].oscillators[osc].brightness_modulator.static_config.value = 0.5f;
+      steps[step].oscillators[osc].duty_modulator.mode = MODULATOR_MODE_STATIC;
+      steps[step].oscillators[osc].duty_modulator.static_config.value = 0.0f;
+    }
+    {
+      const uint8_t osc = 3U;
+      steps[step].oscillators[osc].static_config.waveform = OSCILLATOR_WAVEFORM_TRIANGLE;
+      steps[step].oscillators[osc].static_config.phase_degrees = 270.0f;
+      steps[step].oscillators[osc].static_config.custom_lut = NULL;
+      steps[step].oscillators[osc].frequency_modulator.mode = MODULATOR_MODE_LFO;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.waveform = MODULATOR_LFO_WAVEFORM_SINE;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.frequency_hz = 0.8f;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.low = 7.5f;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.high = 10.5f;
+      steps[step].oscillators[osc].brightness_modulator.mode = MODULATOR_MODE_STATIC;
+      steps[step].oscillators[osc].brightness_modulator.static_config.value = 0.5f;
+      steps[step].oscillators[osc].duty_modulator.mode = MODULATOR_MODE_STATIC;
+      steps[step].oscillators[osc].duty_modulator.static_config.value = 0.0f;
+    }
+    {
+      const uint8_t osc = 4U;
+      steps[step].oscillators[osc].static_config.waveform = OSCILLATOR_WAVEFORM_SINE;
+      steps[step].oscillators[osc].static_config.phase_degrees = 0.0f;
+      steps[step].oscillators[osc].static_config.custom_lut = NULL;
       steps[step].oscillators[osc].frequency_modulator.mode = MODULATOR_MODE_STATIC;
-      steps[step].oscillators[osc].frequency_modulator.static_config.value = 12.0f;
-      steps[step].oscillators[osc].brightness_modulator.mode = MODULATOR_MODE_LINEAR;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.start_value = 0.5f;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.end_value = 0.0f;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.duration_ms = 5000U;
+      steps[step].oscillators[osc].frequency_modulator.static_config.value = 0.5f;
+      steps[step].oscillators[osc].brightness_modulator.mode = MODULATOR_MODE_LFO;
+      steps[step].oscillators[osc].brightness_modulator.lfo_config.waveform = MODULATOR_LFO_WAVEFORM_SINE;
+      steps[step].oscillators[osc].brightness_modulator.lfo_config.frequency_hz = 0.5f;
+      steps[step].oscillators[osc].brightness_modulator.lfo_config.low = 0.3f;
+      steps[step].oscillators[osc].brightness_modulator.lfo_config.high = 0.8f;
+      steps[step].oscillators[osc].duty_modulator.mode = MODULATOR_MODE_STATIC;
+      steps[step].oscillators[osc].duty_modulator.static_config.value = 0.5f;
+    }
+  }
+  /* Step 3 */
+  {
+    const uint32_t step = 3U;
+    steps[step].duration_ms = 5000U;
+    {
+      const uint8_t osc = 0U;
+      steps[step].oscillators[osc].static_config.waveform = OSCILLATOR_WAVEFORM_SQUARE;
+      steps[step].oscillators[osc].static_config.phase_degrees = 0.0f;
+      steps[step].oscillators[osc].static_config.custom_lut = NULL;
+      steps[step].oscillators[osc].frequency_modulator.mode = MODULATOR_MODE_LFO;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.waveform = MODULATOR_LFO_WAVEFORM_SQUARE;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.frequency_hz = 0.1f;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.low = 6.0f;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.high = 9.0f;
+      steps[step].oscillators[osc].brightness_modulator.mode = MODULATOR_MODE_STATIC;
+      steps[step].oscillators[osc].brightness_modulator.static_config.value = 0.5f;
       steps[step].oscillators[osc].duty_modulator.mode = MODULATOR_MODE_STATIC;
       steps[step].oscillators[osc].duty_modulator.static_config.value = 0.5f;
     }
     {
       const uint8_t osc = 1U;
-      steps[step].oscillators[osc].static_config.waveform = OSCILLATOR_WAVEFORM_TRIANGLE;
+      steps[step].oscillators[osc].static_config.waveform = OSCILLATOR_WAVEFORM_SQUARE;
       steps[step].oscillators[osc].static_config.phase_degrees = 0.0f;
       steps[step].oscillators[osc].static_config.custom_lut = NULL;
-      steps[step].oscillators[osc].frequency_modulator.mode = MODULATOR_MODE_STATIC;
-      steps[step].oscillators[osc].frequency_modulator.static_config.value = 13.0f;
-      steps[step].oscillators[osc].brightness_modulator.mode = MODULATOR_MODE_LINEAR;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.start_value = 0.5f;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.end_value = 0.0f;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.duration_ms = 5000U;
+      steps[step].oscillators[osc].frequency_modulator.mode = MODULATOR_MODE_LFO;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.waveform = MODULATOR_LFO_WAVEFORM_SQUARE;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.frequency_hz = 0.1f;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.low = 6.5f;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.high = 9.5f;
+      steps[step].oscillators[osc].brightness_modulator.mode = MODULATOR_MODE_STATIC;
+      steps[step].oscillators[osc].brightness_modulator.static_config.value = 0.5f;
       steps[step].oscillators[osc].duty_modulator.mode = MODULATOR_MODE_STATIC;
       steps[step].oscillators[osc].duty_modulator.static_config.value = 0.5f;
     }
     {
       const uint8_t osc = 2U;
-      steps[step].oscillators[osc].static_config.waveform = OSCILLATOR_WAVEFORM_TRIANGLE;
-      steps[step].oscillators[osc].static_config.phase_degrees = 0.0f;
+      steps[step].oscillators[osc].static_config.waveform = OSCILLATOR_WAVEFORM_SQUARE;
+      steps[step].oscillators[osc].static_config.phase_degrees = 180.0f;
       steps[step].oscillators[osc].static_config.custom_lut = NULL;
-      steps[step].oscillators[osc].frequency_modulator.mode = MODULATOR_MODE_STATIC;
-      steps[step].oscillators[osc].frequency_modulator.static_config.value = 14.0f;
-      steps[step].oscillators[osc].brightness_modulator.mode = MODULATOR_MODE_LINEAR;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.start_value = 0.5f;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.end_value = 0.0f;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.duration_ms = 5000U;
+      steps[step].oscillators[osc].frequency_modulator.mode = MODULATOR_MODE_LFO;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.waveform = MODULATOR_LFO_WAVEFORM_SQUARE;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.frequency_hz = 0.1f;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.low = 7.0f;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.high = 10.0f;
+      steps[step].oscillators[osc].brightness_modulator.mode = MODULATOR_MODE_STATIC;
+      steps[step].oscillators[osc].brightness_modulator.static_config.value = 0.5f;
       steps[step].oscillators[osc].duty_modulator.mode = MODULATOR_MODE_STATIC;
       steps[step].oscillators[osc].duty_modulator.static_config.value = 0.5f;
     }
     {
       const uint8_t osc = 3U;
-      steps[step].oscillators[osc].static_config.waveform = OSCILLATOR_WAVEFORM_TRIANGLE;
-      steps[step].oscillators[osc].static_config.phase_degrees = 0.0f;
+      steps[step].oscillators[osc].static_config.waveform = OSCILLATOR_WAVEFORM_SQUARE;
+      steps[step].oscillators[osc].static_config.phase_degrees = 180.0f;
       steps[step].oscillators[osc].static_config.custom_lut = NULL;
-      steps[step].oscillators[osc].frequency_modulator.mode = MODULATOR_MODE_STATIC;
-      steps[step].oscillators[osc].frequency_modulator.static_config.value = 15.0f;
-      steps[step].oscillators[osc].brightness_modulator.mode = MODULATOR_MODE_LINEAR;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.start_value = 0.5f;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.end_value = 0.0f;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.duration_ms = 5000U;
+      steps[step].oscillators[osc].frequency_modulator.mode = MODULATOR_MODE_LFO;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.waveform = MODULATOR_LFO_WAVEFORM_SQUARE;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.frequency_hz = 0.1f;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.low = 7.5f;
+      steps[step].oscillators[osc].frequency_modulator.lfo_config.high = 10.5f;
+      steps[step].oscillators[osc].brightness_modulator.mode = MODULATOR_MODE_STATIC;
+      steps[step].oscillators[osc].brightness_modulator.static_config.value = 0.5f;
       steps[step].oscillators[osc].duty_modulator.mode = MODULATOR_MODE_STATIC;
       steps[step].oscillators[osc].duty_modulator.static_config.value = 0.5f;
     }
@@ -222,10 +306,11 @@ void build_demo_sequence(sequence_step_t *steps) {
       steps[step].oscillators[osc].static_config.custom_lut = NULL;
       steps[step].oscillators[osc].frequency_modulator.mode = MODULATOR_MODE_STATIC;
       steps[step].oscillators[osc].frequency_modulator.static_config.value = 0.5f;
-      steps[step].oscillators[osc].brightness_modulator.mode = MODULATOR_MODE_LINEAR;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.start_value = 0.5f;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.end_value = 0.0f;
-      steps[step].oscillators[osc].brightness_modulator.linear_config.duration_ms = 5000U;
+      steps[step].oscillators[osc].brightness_modulator.mode = MODULATOR_MODE_LFO;
+      steps[step].oscillators[osc].brightness_modulator.lfo_config.waveform = MODULATOR_LFO_WAVEFORM_SINE;
+      steps[step].oscillators[osc].brightness_modulator.lfo_config.frequency_hz = 0.5f;
+      steps[step].oscillators[osc].brightness_modulator.lfo_config.low = 0.3f;
+      steps[step].oscillators[osc].brightness_modulator.lfo_config.high = 0.8f;
       steps[step].oscillators[osc].duty_modulator.mode = MODULATOR_MODE_STATIC;
       steps[step].oscillators[osc].duty_modulator.static_config.value = 0.5f;
     }

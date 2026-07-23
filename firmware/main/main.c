@@ -119,10 +119,15 @@ static int cmd_sequence_status(int argc, char **argv) {
   (void)argc;
   (void)argv;
 
-  printf("playing: %s, step: %lu, position: %lu ms\n",
-         sequence_is_playing() ? "yes" : "no",
-         (unsigned long)sequence_get_current_step(),
-         (unsigned long)sequence_get_elapsed_ms());
+  const uint32_t current_step = sequence_get_current_step();
+  const uint32_t step_count = sequence_get_step_count();
+  const uint32_t elapsed_in_step = sequence_get_elapsed_ms();
+  const uint32_t total_elapsed = sequence_get_total_elapsed_ms();
+
+  printf("playing: %s, step: %lu/%lu, elapsed in step: %lu ms, total: %lu ms\n",
+         sequence_is_playing() ? "yes" : "no", (unsigned long)current_step + 1U,
+         (unsigned long)step_count, (unsigned long)elapsed_in_step,
+         (unsigned long)total_elapsed);
   return 0;
 }
 
@@ -225,7 +230,7 @@ void app_main(void) {
   ESP_LOGI(TAG, "Initializing LED hardware");
   ESP_ERROR_CHECK(led_control_init());
   ESP_ERROR_CHECK(
-      led_control_set_global_brightness(0.8f)); /* limit eye strain */
+      led_control_set_global_brightness(0.6f)); /* limit eye strain */
   ESP_ERROR_CHECK(led_engine_init());
   ESP_ERROR_CHECK(led_control_all_off());
 

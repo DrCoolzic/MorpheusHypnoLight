@@ -125,3 +125,20 @@ uint32_t sequence_get_current_step(void);
  * @return Elapsed time in milliseconds.
  */
 uint32_t sequence_get_elapsed_ms(void);
+
+/**
+ * @brief Return the number of steps currently loaded.
+ *
+ * @return Step count.
+ */
+uint32_t sequence_get_step_count(void);
+
+/**
+ * @brief Return the absolute elapsed time since the start of the sequence.
+ *
+ * This is the sum of the durations of all previous steps plus the elapsed time
+ * inside the current step.
+ *
+ * @return Total elapsed time in milliseconds.
+ */
+uint32_t sequence_get_total_elapsed_ms(void);

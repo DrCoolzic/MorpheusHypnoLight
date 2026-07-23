@@ -484,3 +484,26 @@ uint32_t sequence_get_elapsed_ms(void) {
 
   return elapsed;
 }
+
+uint32_t sequence_get_step_count(void) {
+  taskENTER_CRITICAL(&sequence_lock);
+  const uint32_t count = sequence_step_count;
+  taskEXIT_CRITICAL(&sequence_lock);
+
+  return count;
+}
+
+uint32_t sequence_get_total_elapsed_ms(void) {
+  taskENTER_CRITICAL(&sequence_lock);
+  const uint32_t current = sequence_current_step;
+  const uint32_t elapsed = sequence_elapsed_ms;
+  const uint32_t count = sequence_step_count;
+
+  uint32_t total = elapsed;
+  for (uint32_t i = 0U; i < current && i < count; i++) {
+    total += sequence_steps[i].duration_ms;
+  }
+  taskEXIT_CRITICAL(&sequence_lock);
+
+  return total;
+}

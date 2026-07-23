@@ -43,28 +43,28 @@
           "waveform": "square",
           "phase_degrees": 0,
           "frequency": { "mode": "static", "value": 15 },
-          "brightness": { "mode": "linear", "start": 1.0, "end": 0.5 },
+          "brightness": { "mode": "linear", "start": 0.6, "end": 0.3 },
           "duty": { "mode": "static", "value": 0.5 }
         },
         {
           "waveform": "square",
           "phase_degrees": 0,
           "frequency": { "mode": "static", "value": 14 },
-          "brightness": { "mode": "linear", "start": 1.0, "end": 0.5 },
+          "brightness": { "mode": "linear", "start": 0.6, "end": 0.3 },
           "duty": { "mode": "static", "value": 0.5 }
         },
         {
           "waveform": "square",
           "phase_degrees": 0,
           "frequency": { "mode": "static", "value": 13 },
-          "brightness": { "mode": "linear", "start": 1.0, "end": 0.5 },
+          "brightness": { "mode": "linear", "start": 0.6, "end": 0.3 },
           "duty": { "mode": "static", "value": 0.5 }
         },
         {
           "waveform": "square",
           "phase_degrees": 0,
           "frequency": { "mode": "static", "value": 12 },
-          "brightness": { "mode": "linear", "start": 1.0, "end": 0.5 },
+          "brightness": { "mode": "linear", "start": 0.6, "end": 0.3 },
           "duty": { "mode": "static", "value": 0.5 }
         },
         {
@@ -82,36 +82,76 @@
         {
           "waveform": "triangle",
           "phase_degrees": 0,
-          "frequency": { "mode": "static", "value": 12 },
-          "brightness": { "mode": "linear", "start": 0.5, "end": 0.0 },
-          "duty": { "mode": "static", "value": 0.5 }
+          "frequency": { "mode": "lfo", "waveform": "sine", "frequency_hz": 0.5, "low": 6.0, "high": 9 },
+          "brightness": { "mode": "static", "value": 0.5 },
+          "duty": { "mode": "static", "value": 0.0 }
         },
         {
           "waveform": "triangle",
-          "phase_degrees": 0,
-          "frequency": { "mode": "static", "value": 13 },
-          "brightness": { "mode": "linear", "start": 0.5, "end": 0.0 },
-          "duty": { "mode": "static", "value": 0.5 }
+          "phase_degrees": 90,
+          "frequency": { "mode": "lfo", "waveform": "sine", "frequency_hz": 0.6, "low": 6.5, "high": 9.5 },
+          "brightness": { "mode": "static", "value": 0.5 },
+          "duty": { "mode": "static", "value": 0.0 }
         },
         {
           "waveform": "triangle",
-          "phase_degrees": 0,
-          "frequency": { "mode": "static", "value": 14 },
-          "brightness": { "mode": "linear", "start": 0.5, "end": 0.0 },
-          "duty": { "mode": "static", "value": 0.5 }
+          "phase_degrees": 180,
+          "frequency": { "mode": "lfo", "waveform": "sine", "frequency_hz": 0.7, "low": 7.0, "high": 10 },
+          "brightness": { "mode": "static", "value": 0.5 },
+          "duty": { "mode": "static", "value": 0.0 }
         },
         {
           "waveform": "triangle",
+          "phase_degrees": 270,
+          "frequency": { "mode": "lfo", "waveform": "sine", "frequency_hz": 0.8, "low": 7.5, "high": 10.5 },
+          "brightness": { "mode": "static", "value": 0.5 },
+          "duty": { "mode": "static", "value": 0.0 }
+        },
+        {
+          "waveform": "sine",
           "phase_degrees": 0,
-          "frequency": { "mode": "static", "value": 15 },
-          "brightness": { "mode": "linear", "start": 0.5, "end": 0.0 },
+          "frequency": { "mode": "static", "value": 0.5 },
+          "brightness": { "mode": "lfo", "waveform": "sine", "frequency_hz": 0.5, "low": 0.3, "high": 0.8 },
+          "duty": { "mode": "static", "value": 0.5 }
+        }
+      ]
+    },
+    {
+      "duration_ms": 5000,
+      "oscillators": [
+        {
+          "waveform": "square",
+          "phase_degrees": 0,
+          "frequency": { "mode": "lfo", "waveform": "square", "frequency_hz": 0.1, "low": 6.0, "high": 9 },
+          "brightness": { "mode": "static", "value": 0.5 },
+          "duty": { "mode": "static", "value": 0.5 }
+        },
+        {
+          "waveform": "square",
+          "phase_degrees": 0,
+          "frequency": { "mode": "lfo", "waveform": "square", "frequency_hz": 0.1, "low": 6.5, "high": 9.5 },
+          "brightness": { "mode": "static", "value": 0.5 },
+          "duty": { "mode": "static", "value": 0.5 }
+        },
+        {
+          "waveform": "square",
+          "phase_degrees": 180,
+          "frequency": { "mode": "lfo", "waveform": "square", "frequency_hz": 0.1, "low": 7.0, "high": 10 },
+          "brightness": { "mode": "static", "value": 0.5 },
+          "duty": { "mode": "static", "value": 0.5 }
+        },
+        {
+          "waveform": "square",
+          "phase_degrees": 180,
+          "frequency": { "mode": "lfo", "waveform": "square", "frequency_hz": 0.1, "low": 7.5, "high": 10.5 },
+          "brightness": { "mode": "static", "value": 0.5 },
           "duty": { "mode": "static", "value": 0.5 }
         },
         {
           "waveform": "sine",
           "phase_degrees": 0,
           "frequency": { "mode": "static", "value": 0.5 },
-          "brightness": { "mode": "linear", "start": 0.5, "end": 0.0 },
+          "brightness": { "mode": "lfo", "waveform": "sine", "frequency_hz": 0.5, "low": 0.3, "high": 0.8 },
           "duty": { "mode": "static", "value": 0.5 }
         }
       ]
