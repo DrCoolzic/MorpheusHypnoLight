@@ -2,52 +2,122 @@
 
 Analyze the current footprint of a step (≈ 604 bytes), define a compact wire format using fixed-point integers with one decimal place and optional fields, add a dedicated loader/parser, then expose the control commands (play/pause/stop/brightness) and sequence transfer over BLE.
 
-## Planned Steps
+## Implementation Roadmap
 
-1. **Measure the Current Footprint**
-   - `sequence_step_t` = `uint32_t duration_ms` + 5× `sequence_oscillator_step_t`
-   - Each `sequence_oscillator_step_t` = `oscillator_static_config_t` (12 bytes) + 3× `modulator_config_t` (3×36 bytes)
-   - Estimated total: **604 bytes/step**, i.e. ~77 KB for 128 steps.
-   - Verify with `idf.py size` or a small test program once the structs are frozen.
+### Phase 1: Finalize the Application JSON Format
 
-2. **Define the Compact Format**
-   - Encode duration in deciseconds as `uint16_t`: seconds ×10, 100 ms resolution, maximum 6 553.5 s (≈109 min).
-   - Encode every frequency value, including LFO frequency, as `uint16_t`: Hz ×10, 0.1 Hz resolution, maximum 6 553.5 Hz.
-   - Encode phase as radians ×10 in `uint8_t`: values 0–63 represent 0–2π with a resolution of approximately 0.1 rad (5.7°).
-   - Encode normalized brightness and duty-cycle values as integer percentages in `uint8_t`: firmware float ×100, range 0–100, 1% resolution.
-   - Encode modes and waveforms as `uint8_t` enums.
-   - Let each modulator mode determine its payload length so only parameters used by that mode are transmitted; no presence mask is required for these fields.
-   - Replace the `custom_lut` pointer with a predefined LUT index on the firmware side (or a separate transmission if needed).
-   - Resulting size: 47–112 bytes/step for five oscillators, excluding any sequence-level header or checksum.
+**Status: mostly complete**
 
-3. **Add a Compact Parser/Loader**
-   - Create `sequence_load_compact(const uint8_t *data, uint32_t len)` to decode the wire format and fill the engine.
-   - Keep the existing `sequence_load()` C-array loader if embedded code generation is still desired.
-   - Validate ranges before applying.
+- Use `sequence_format.md` as the authoritative format shared by Morpheus Player, Morpheus Editor, and firmware tools.
+- Require `version`, `name`, and `steps`; keep `author` and `createdAt` optional.
+- Store relative step `duration` in seconds and derive total sequence duration from all steps.
+- Require exactly five oscillators per step.
+- Use `lfo_frequency` as the JSON field name and `square` as the default main waveform.
+- Migrate `demo.json` and `generate_sequence.py` from `duration_ms` to the application JSON format.
+- Add strict JSON validation before any output is generated.
 
-4. **Prepare the Bluetooth Protocol**
-   - Control commands: `play`, `pause`, `stop`, `brightness <x10>`.
-   - Full sequence transfer command: packet-based send with acknowledgements.
-   - Single-step update command for real-time editing: transmit only the step index and its compact payload instead of retransmitting the complete sequence.
-   - Apply a received step atomically. Prefer immediate application when updating the currently playing step, provided this can be done safely without exposing a partially decoded configuration.
-   - Coalesce rapid editor changes before transmission to avoid flooding the BLE link.
-   - Decide whether the format is raw binary or encapsulated in typed messages (id + len + payload).
+**Acceptance criteria:** the demo sequence conforms to `sequence_format.md`, invalid fields and ranges are rejected, and the existing C output still produces equivalent playback.
 
-5. **Update the Python Tool**
-   - Adapt `generate_sequence.py` to emit the compact binary format in addition to the C source.
-   - Add a “BLE preview” mode that reports the total sequence size.
+### Phase 2: Finalize the Compact Binary Layout
 
-6. **Tests and Validation**
-   - Compare generated sequences before/after compacting.
-   - Verify playback on the device.
-   - Measure actual BLE throughput/transfer time.
+**Status: partially defined**
 
-## Open Decisions
+- Define a sequence header containing at least the format version and step count.
+- Define the exact byte order and payload layout for sequences, steps, oscillators, and all modulator modes.
+- Use little-endian encoding for every `uint16_t` value unless portability requirements dictate otherwise.
+- Encode only fields used by the selected modulator mode.
+- Reserve no custom LUT support in format version 1.
+- Decide whether the format includes total payload length and CRC.
+- Publish at least one annotated binary example and golden byte vector.
 
-- Priority order: compacting steps or BLE commands first?
-- Custom LUT handling: predefined index, separate transmission, or no custom LUT for now?
-- Desired resolution: ×10 (1 decimal place) or finer?
-- BLE packet format: raw binary, lightweight JSON, or structured messages like Nordic UART?
+**Acceptance criteria:** every byte has a documented meaning, message length can be validated without reading beyond the buffer, and independent encoders produce the same golden vector.
+
+### Phase 3: Add Compact Encoding to the Python Tool
+
+**Status: pending**
+
+- Keep the current C source output as a temporary reference path.
+- Add compact binary output, for example `demo.seq`.
+- Add C byte-array output for firmware tests without BLE.
+- Report encoded sizes per step and for the complete sequence.
+- Quantize duration, frequency, phase, brightness, and duty according to the compact format rules.
+
+**Acceptance criteria:** the same validated JSON input can generate C structures, a binary file, and an identical embedded C byte array.
+
+### Phase 4: Implement the Firmware Decoder
+
+**Status: pending**
+
+- Add a pure `sequence_decode_compact()` function that decodes into a caller-provided `sequence_step_t` array.
+- Check version, lengths, step count, modes, waveforms, numeric ranges, and truncation before accepting the sequence.
+- Avoid dynamic allocation and out-of-bounds reads.
+- Decode into temporary storage so invalid input cannot partially modify the active sequence.
+- Add `sequence_load_compact()` as the validated bridge to the existing sequence engine.
+
+**Acceptance criteria:** valid golden vectors decode successfully, malformed inputs return explicit errors, and the active sequence remains unchanged after a decoding failure.
+
+### Phase 5: Validate the Compact Round Trip
+
+**Status: pending**
+
+- Generate reference `sequence_step_t` values directly from JSON.
+- Encode the same JSON to compact bytes and decode it back to `sequence_step_t`.
+- Compare fields semantically instead of using `memcmp()`.
+- Account for quantization tolerances: 100 ms duration, 0.1 Hz frequency, 1% brightness/duty, and approximately 5.7° phase.
+- Test every mode and waveform, minimum and maximum values, one-step and 128-step sequences, truncated buffers, unknown values, and invalid ranges.
+
+**Acceptance criteria:** all decoded values equal their quantized reference values and all malformed test vectors are rejected.
+
+### Phase 6: Validate Playback without BLE
+
+**Status: pending**
+
+- Embed the generated compact demo byte array in the firmware.
+- Load it through `sequence_load_compact()`.
+- Verify playback behavior against the existing directly generated C sequence.
+- Measure the actual current and compact memory footprints.
+
+**Acceptance criteria:** both loading paths produce equivalent visible playback and the measured compact size matches the encoder report.
+
+### Phase 7: Add the BLE Transport
+
+**Status: pending**
+
+- Transfer the exact compact bytes already validated without BLE.
+- Define typed control and transfer messages with identifier, length, payload, and integrity information.
+- Support full-sequence transfer and an atomic single-step update command.
+- Prefer immediate application when updating the currently playing step.
+- Coalesce rapid editor updates and avoid a blocking acknowledgement after every BLE fragment.
+- Add sequence numbering, final acknowledgement, and selective retry or complete retry behavior.
+
+**Acceptance criteria:** full sequences and individual steps transfer reliably, corrupted or incomplete transfers are rejected, and a typical 1 600-byte sequence transfers in roughly 200 ms under normal conditions.
+
+### Phase 8: Integrate Morpheus Player and Morpheus Editor
+
+**Status: pending**
+
+- Read and validate the application JSON format.
+- Reuse an encoder that produces bytes identical to the Python golden vectors.
+- Send complete sequences when loading and only modified steps during real-time editing.
+- Surface validation, connection, transfer, and firmware rejection errors to the user.
+
+**Acceptance criteria:** application-generated bytes pass the firmware golden-vector tests and real-time step updates do not require retransmitting the complete sequence.
+
+## Decisions Recorded
+
+- Compact format implementation comes before BLE transport.
+- JSON is the persistent application format; compact binary is the BLE and firmware-loading format.
+- Duration and every frequency-related value use `uint16_t` ×10.
+- Brightness and duty use normalized values encoded as `uint8_t` ×100.
+- Phase uses radians ×10 in `uint8_t`.
+- Custom LUT support is deferred beyond format version 1.
+- A currently playing step should be updated immediately when this can be done atomically.
+
+## Remaining Decisions
+
+- Final sequence header fields and numeric enum values.
+- CRC algorithm and whether a payload-length field is included.
+- Exact BLE message envelope, fragmentation, acknowledgement, and retry rules.
 
 ## Compact Format Size
 
