@@ -11,6 +11,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "esp_err.h"
@@ -71,6 +72,13 @@ esp_err_t sequence_init(void);
  * @return ESP_OK on success, or ESP_ERR_INVALID_ARG for invalid input.
  */
 esp_err_t sequence_load(const sequence_step_t *steps, uint32_t step_count);
+
+esp_err_t sequence_decode_compact(const uint8_t *data, size_t data_length,
+                                  sequence_step_t *steps,
+                                  uint32_t steps_capacity,
+                                  uint32_t *step_count);
+
+esp_err_t sequence_load_compact(const uint8_t *data, size_t data_length);
 
 /**
  * @brief Start or resume playback from the current step.

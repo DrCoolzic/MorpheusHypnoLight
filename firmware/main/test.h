@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "esp_err.h"
 #include "esp_timer.h"
 
 /**
@@ -13,6 +14,10 @@
  * Lights up each peripheral bank and the central group in sequence without
  * using the oscillator engine.
  */
+esp_err_t test_validate_compact_sequence(void);
+
+esp_err_t test_load_compact_demo_sequence(void);
+
 void test_run_static_led_test(void);
 
 /**

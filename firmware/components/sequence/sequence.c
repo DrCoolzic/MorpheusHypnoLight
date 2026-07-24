@@ -307,6 +307,37 @@ esp_err_t sequence_load(const sequence_step_t *steps, uint32_t step_count) {
   return ESP_OK;
 }
 
+esp_err_t sequence_load_compact(const uint8_t *data, size_t data_length) {
+  uint32_t step_count = 0U;
+  esp_err_t error =
+      sequence_decode_compact(data, data_length, NULL, 0U, &step_count);
+  if (error != ESP_OK) {
+    return error;
+  }
+
+  if (sequence_timer != NULL) {
+    esp_timer_stop(sequence_timer);
+  }
+
+  taskENTER_CRITICAL(&sequence_lock);
+  sequence_playing = false;
+  taskEXIT_CRITICAL(&sequence_lock);
+
+  error = sequence_decode_compact(data, data_length, sequence_steps,
+                                  SEQUENCE_MAX_STEPS, &step_count);
+  if (error != ESP_OK) {
+    return error;
+  }
+
+  taskENTER_CRITICAL(&sequence_lock);
+  sequence_step_count = step_count;
+  sequence_current_step = 0U;
+  sequence_elapsed_ms = 0U;
+  taskEXIT_CRITICAL(&sequence_lock);
+
+  return apply_step(0U);
+}
+
 esp_err_t sequence_play(void) {
   taskENTER_CRITICAL(&sequence_lock);
   if (sequence_step_count == 0U || sequence_playing) {

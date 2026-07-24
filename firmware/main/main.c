@@ -21,7 +21,7 @@
 #include "oscillator.h"
 #include "sequence.h"
 #include "test.h"
-#include "test_sequence.h"
+#include "test_sequence_compact_data.h"
 
 static const char *TAG = "sequence_demo";
 
@@ -172,6 +172,27 @@ static int cmd_run_tests(int argc, char **argv) {
   return 0;
 }
 
+static int cmd_sequence_size(int argc, char **argv) {
+  (void)argc;
+  (void)argv;
+
+  const uint32_t step_count = sequence_get_step_count();
+  const size_t one_step = sizeof(sequence_step_t);
+  const size_t one_oscillator = sizeof(sequence_oscillator_step_t);
+  const size_t one_modulator = sizeof(modulator_config_t);
+  const size_t all_steps = one_step * step_count;
+  const size_t max_sequence = one_step * SEQUENCE_MAX_STEPS;
+
+  printf("sequence_step_t:         %zu bytes\n", one_step);
+  printf("sequence_oscillator_step_t: %zu bytes\n", one_oscillator);
+  printf("modulator_config_t:      %zu bytes\n", one_modulator);
+  printf("loaded steps:            %lu\n", (unsigned long)step_count);
+  printf("loaded sequence RAM:     %zu bytes\n", all_steps);
+  printf("max sequence RAM:      %zu bytes\n", max_sequence);
+  printf("compact demo bytes:      %zu bytes\n", sizeof(demo_sequence_compact));
+  return 0;
+}
+
 static void register_sequence_commands(void) {
   const esp_console_cmd_t commands[] = {
       {
@@ -216,6 +237,12 @@ static void register_sequence_commands(void) {
           .hint = NULL,
           .func = &cmd_run_tests,
       },
+      {
+          .command = "size",
+          .help = "Show structure sizes and memory footprint",
+          .hint = NULL,
+          .func = &cmd_sequence_size,
+      },
   };
 
   for (size_t i = 0; i < sizeof(commands) / sizeof(commands[0]); i++) {
@@ -242,9 +269,7 @@ void app_main(void) {
   ESP_ERROR_CHECK(
       esp_timer_create(&oscillator_timer_args, &g_oscillator_timer));
 
-  /* Load and start the demo sequence. */
-  sequence_step_t demo_sequence[SEQUENCE_DEMO_STEP_COUNT];
-  build_demo_sequence(demo_sequence);
+  ESP_ERROR_CHECK(test_validate_compact_sequence());
 
   /* Optional: run the legacy hardware tests once before the demo starts.
    * If enabled, test_run_all() stops the oscillator timer, so restart it
@@ -254,9 +279,9 @@ void app_main(void) {
   //     esp_timer_start_periodic(g_oscillator_timer,
   //     OSCILLATOR_TICK_PERIOD_US));
 
-  ESP_LOGI(TAG, "Loading demo sequence");
+  ESP_LOGI(TAG, "Loading compact demo sequence");
   ESP_ERROR_CHECK(sequence_init());
-  ESP_ERROR_CHECK(sequence_load(demo_sequence, SEQUENCE_DEMO_STEP_COUNT));
+  ESP_ERROR_CHECK(test_load_compact_demo_sequence());
 
   ESP_LOGI(TAG, "Starting 1 kHz led_engine tick");
   ESP_ERROR_CHECK(

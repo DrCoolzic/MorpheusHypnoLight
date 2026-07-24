@@ -203,11 +203,11 @@ For an LFO modulating frequency, `low` and `high` use the main frequency range. 
 
 The JSON file is the authoritative application-level sequence representation. It should be saved and exchanged by Morpheus Player and Morpheus Editor.
 
-The compact binary format is a transport and firmware-loading representation derived from the JSON file. It is not intended to replace the JSON file in user storage.
+The compact binary format is a transport and firmware-loading representation derived from the JSON file. It is not intended to replace the JSON file in user storage. Its exact wire layout is defined in `compact_sequence_format.md`.
 
 `generate_sequence.py` must validate the complete JSON document before producing output. It will support two output paths:
 
 - C source generation for built-in firmware tests.
 - Compact binary generation for BLE transfer and compact loader validation.
 
-The current generator and `demo.json` still use `duration_ms` and omit the root metadata. They must be migrated to this specification before the JSON document can be used unchanged for both output paths.
+The generator and `demo.json` use this application format. The generator validates the complete document and converts each step `duration` from seconds to firmware milliseconds when producing C source.

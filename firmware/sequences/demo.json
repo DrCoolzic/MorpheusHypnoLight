@@ -1,7 +1,9 @@
 {
+  "version": "1.0.0",
+  "name": "Morpheus Demo",
   "steps": [
     {
-      "duration_ms": 5000,
+      "duration": 5.0,
       "oscillators": [
         {
           "waveform": "sine",
@@ -37,7 +39,7 @@
       ]
     },
     {
-      "duration_ms": 5000,
+      "duration": 5.0,
       "oscillators": [
         {
           "waveform": "square",
@@ -77,7 +79,7 @@
       ]
     },
     {
-      "duration_ms": 5000,
+      "duration": 5.0,
       "oscillators": [
         {
           "waveform": "triangle",
@@ -117,7 +119,7 @@
       ]
     },
     {
-      "duration_ms": 5000,
+      "duration": 5.0,
       "oscillators": [
         {
           "waveform": "square",
