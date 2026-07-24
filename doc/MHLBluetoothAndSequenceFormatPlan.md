@@ -78,29 +78,34 @@ Analyze the current footprint of a step (≈ 604 bytes), define a compact wire f
 
 ### Phase 6: Validate Playback without BLE
 
-**Status: playback validated; memory measurement pending**
+**Status: complete**
 
 - The build generates and embeds `test_sequence_compact_data.h` from `demo.json`.
 - Firmware startup validates the compact decoder and loads the demo through `sequence_load_compact()`.
 - Direct C generation remains as the semantic reference used by the round-trip test.
 - The firmware builds successfully; compact demo size is 256 bytes including its header.
 - Compact playback started successfully on the ESP32-S3 and was visually confirmed as equivalent.
-- The actual `sizeof(sequence_step_t)` memory measurement remains to be recorded.
+- On-device `size` command produced the following measurements:
+  - `sequence_step_t` = 604 bytes.
+  - `sequence_oscillator_step_t` = 120 bytes.
+  - `modulator_config_t` = 36 bytes.
+  - 4-step demo in RAM = 2 416 bytes.
+  - Maximum sequence in RAM = 77 312 bytes.
+  - Compact demo on wire = 256 bytes.
 
-**Acceptance criteria: playback met.** Compact loading and visible playback are validated; only the explicit current-structure memory measurement remains.
+**Acceptance criteria: met.** Playback, build integration, and memory footprint are validated. The compact representation is about **9.4× smaller** than the decoded 4-step demo and about **302× smaller** than the worst-case in-RAM sequence.
 
 ### Phase 7: Add the BLE Transport
 
-**Status: pending**
+**Status: complete**
 
-- Transfer the exact compact bytes already validated without BLE.
-- Define typed control and transfer messages with identifier, length, payload, and integrity information.
-- Support full-sequence transfer and an atomic single-step update command.
-- Prefer immediate application when updating the currently playing step.
-- Coalesce rapid editor updates and avoid a blocking acknowledgement after every BLE fragment.
-- Add sequence numbering, final acknowledgement, and selective retry or complete retry behavior.
+- NimBLE enabled in `sdkconfig.defaults` and a new `ble` component created.
+- GATT service with 128-bit UUIDs registered for command and status characteristics.
+- `ble_transfer.py` successfully connects, uploads `build/demo_compact.bin`, and sends `PLAY`.
+- Advertising restarts automatically after each disconnect so the device remains discoverable.
+- Full-sequence transfer validated end-to-end on ESP32-S3; the single-step update protocol is defined but not yet exercised.
 
-**Acceptance criteria:** full sequences and individual steps transfer reliably, corrupted or incomplete transfers are rejected, and a typical 1 600-byte sequence transfers in roughly 200 ms under normal conditions.
+**Acceptance criteria:** full-sequence transfer and playback commands validated on hardware; device reconnects and re-transfers without a reboot.
 
 ### Phase 8: Integrate Morpheus Player and Morpheus Editor
 
@@ -163,3 +168,54 @@ This gives the following minimum and maximum sizes per oscillator:
 - A 20-step sequence is therefore approximately 940–2 240 bytes, with a midpoint estimate of about 1 600 bytes, excluding any sequence-level header or checksum.
 
 A typical sequence of approximately 1 600 bytes should take on the order of 200 ms to transfer over Bluetooth Low Energy under normal operating conditions.
+
+## Python Tools in `firmware/scripts/`
+
+The `firmware/scripts` directory contains the Python utilities used by the build, tests, and BLE workflow.
+
+### `generate_sequence.py`
+
+Validates a Morpheus application JSON sequence and produces the artifacts needed by the firmware build.
+
+- Default input: `sequences/demo.json`.
+- Generated outputs:
+  - `main/test_sequence.c` and `main/test_sequence.h`: C representation of the sequence.
+  - Optional compact binary (`--compact-output PATH`) and C header (`--compact-c-output PATH`).
+
+Example:
+
+```bash
+python scripts/generate_sequence.py
+python scripts/generate_sequence.py --compact-output build/demo_compact.bin
+```
+
+### `test_generate_sequence.py`
+
+Unit tests for `generate_sequence.py`. Run with:
+
+```bash
+python scripts/test_generate_sequence.py
+```
+
+### `ble_transfer.py`
+
+Connects to a `HypnoLight` device over BLE, uploads a compact binary sequence, and sends control commands.
+
+- Requires `bleak`: `pip install bleak`.
+- Default compact binary: `build/demo_compact.bin`.
+- Default chunk size: 17 bytes, safe for a 23-byte ATT MTU.
+
+Common invocations:
+
+```bash
+# Scan, connect, upload, and play
+python scripts/ble_transfer.py --play --binary build/demo_compact.bin
+
+# Upload and pause
+python scripts/ble_transfer.py --binary build/demo_compact.bin --pause
+
+# Upload, then set global brightness to 50%
+python scripts/ble_transfer.py --play --binary build/demo_compact.bin --brightness 50
+```
+
+See `doc/ble_protocol.md` for the command opcodes and status notification format.

@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ble.h"
 #include "esp_console.h"
 #include "esp_err.h"
 #include "esp_log.h"
@@ -288,6 +289,10 @@ void app_main(void) {
       esp_timer_start_periodic(g_oscillator_timer, OSCILLATOR_TICK_PERIOD_US));
 
   ESP_ERROR_CHECK(sequence_play());
+
+  ESP_LOGI(TAG, "Starting BLE peripheral");
+  ESP_ERROR_CHECK(ble_init());
+
   ESP_LOGI(TAG, "Sequence started. Open the serial console and type help for "
                 "commands (play, pause, stop, seek, status, tests).");
 

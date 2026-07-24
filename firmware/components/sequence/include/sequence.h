@@ -81,6 +81,23 @@ esp_err_t sequence_decode_compact(const uint8_t *data, size_t data_length,
 esp_err_t sequence_load_compact(const uint8_t *data, size_t data_length);
 
 /**
+ * @brief Replace a single step in the loaded sequence.
+ *
+ * The replacement is atomic: the step is validated, the current playback is
+ * paused if needed, and the step is copied into internal storage. If the
+ * replaced step is the one currently playing, its modulators are re-applied
+ * before playback resumes.
+ *
+ * @param[in] step_index Zero-based index of the step to replace.
+ * @param[in] step Pointer to the new step data.
+ *
+ * @return ESP_OK on success, or ESP_ERR_INVALID_ARG for an invalid index or
+ * step.
+ */
+esp_err_t sequence_replace_step(uint32_t step_index,
+                                const sequence_step_t *step);
+
+/**
  * @brief Start or resume playback from the current step.
  *
  * If playback is already running this function has no effect.

@@ -338,6 +338,49 @@ esp_err_t sequence_load_compact(const uint8_t *data, size_t data_length) {
   return apply_step(0U);
 }
 
+esp_err_t sequence_replace_step(uint32_t step_index,
+                                const sequence_step_t *step) {
+  if (step == NULL || !step_is_valid(step) ||
+      step_index >= SEQUENCE_MAX_STEPS) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  if (sequence_timer != NULL) {
+    esp_timer_stop(sequence_timer);
+  }
+
+  taskENTER_CRITICAL(&sequence_lock);
+  const bool was_playing = sequence_playing;
+  sequence_playing = false;
+  if (step_index >= sequence_step_count) {
+    taskEXIT_CRITICAL(&sequence_lock);
+    return ESP_ERR_INVALID_ARG;
+  }
+  memcpy(&sequence_steps[step_index], step, sizeof(*step));
+  const bool is_current = (step_index == sequence_current_step);
+  taskEXIT_CRITICAL(&sequence_lock);
+
+  if (is_current) {
+    const esp_err_t error = apply_step(step_index);
+    if (error != ESP_OK) {
+      return error;
+    }
+  }
+
+  if (was_playing && sequence_timer != NULL) {
+    const esp_err_t error = esp_timer_start_periodic(
+        sequence_timer, (uint64_t)SEQUENCE_STEP_TICK_PERIOD_MS * 1000ULL);
+    if (error != ESP_OK) {
+      return error;
+    }
+    taskENTER_CRITICAL(&sequence_lock);
+    sequence_playing = true;
+    taskEXIT_CRITICAL(&sequence_lock);
+  }
+
+  return ESP_OK;
+}
+
 esp_err_t sequence_play(void) {
   taskENTER_CRITICAL(&sequence_lock);
   if (sequence_step_count == 0U || sequence_playing) {
