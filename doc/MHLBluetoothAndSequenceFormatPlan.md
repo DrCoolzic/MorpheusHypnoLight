@@ -216,6 +216,24 @@ python scripts/ble_transfer.py --binary build/demo_compact.bin --pause
 
 # Upload, then set global brightness to 50%
 python scripts/ble_transfer.py --play --binary build/demo_compact.bin --brightness 50
+
+# upload with 200 bytes chunk
+python scripts/ble_transfer.py --play --binary build/demo_compact.bin --chunk 200
 ```
 
+#### Arguments
+
+
+| Argument       | Default                  | Description                                                 |
+| ---------------- | -------------------------- | ------------------------------------------------------------- |
+| `--name`       | `HypnoLight`             | Advertised BLE device name.                                 |
+| `--address`    | —                       | BLE address; if omitted, scan by name.                      |
+| `--binary`     | `build/demo_compact.bin` | Compact binary sequence file to upload.                     |
+| `--chunk`      | `17`                     | Sequence bytes per`LOAD_CHUNK`; safe for a 23-byte ATT MTU. |
+| `--play`       | flag                     | Send`PLAY` after the transfer.                              |
+| `--pause`      | flag                     | Send`PAUSE` after the transfer.                             |
+| `--stop`       | flag                     | Send`STOP` after the transfer.                              |
+| `--brightness` | —                       | Set global brightness (0–100).                             |
+
 See `doc/ble_protocol.md` for the command opcodes and status notification format.
+

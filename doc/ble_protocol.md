@@ -71,6 +71,8 @@ The firmware validates the step, decodes it into a temporary `sequence_step_t`, 
 
 With a default ATT MTU of 23 bytes, a 256-byte compact demo sequence fits in approximately 14 `LOAD_CHUNK` writes of 19 data bytes each plus a final shorter chunk. The central should not exceed the negotiated MTU minus three bytes for the opcode and offset fields. When using a 128-byte step payload, a single `UPDATE_STEP_CHUNK` can carry up to MTU-3 bytes per fragment.
 
+A larger ATT MTU can be negotiated between the central and the peripheral. In that case, the chunk size can be increased beyond the default 17 bytes used by `ble_transfer.py`; the practical limit for `LOAD_CHUNK` data is the negotiated ATT MTU minus the application header (`opcode` + `offset`) and the BLE write command header. `ble_transfer.py` exposes this through the `--chunk` option.
+
 ## Error Handling
 
 - Unknown opcodes immediately emit `0x01` invalid command.

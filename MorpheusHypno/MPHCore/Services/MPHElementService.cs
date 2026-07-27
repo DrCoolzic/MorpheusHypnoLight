@@ -1,0 +1,403 @@
+// Ignore Spelling: Dm metadata
+
+using MPHCore.Models;
+using MPHCore.Utilities;
+using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
+
+namespace MPHCore.Services;
+
+/// <summary>
+/// Service for managing Dream Machine elements (programs and sequences).
+/// Handles loading, saving, and validation of elements.
+/// </summary>
+public interface IDmElementService
+{
+    /// <summary>
+    /// Gets the root of the Dream Machine database.
+    /// </summary>
+    LocalRoot DmRoot { get; }
+
+    /// <summary>
+    /// Loads a sequence from the specified directory.
+    /// Supports both encrypted (.bin) and legacy (.json) formats with automatic migration.
+    /// </summary>
+    Task<Sequence> LoadSequenceAsync(string sequenceDir);
+}
+
+/// <summary>
+/// Service for managing Dream Machine elements (programs and sequences).
+/// Handles loading, saving, and validation of elements.
+/// </summary>
+public class DmElementService(ILogger<DmElementService> logger, MetadataService metaDataService) : IDmElementService
+{
+    private readonly ILogger<DmElementService> _logger = logger;
+    private readonly MetadataService _metadataService = metaDataService;
+    public LocalRoot DmRoot { get; } = new();
+
+    private static List<string> MatchGradient(int category)
+    {
+        return category switch
+        {
+            1 => ["#D2FFFC", "#D2FFFC", "#6788F0"],
+            2 => ["#EBB6D0", "#EBB6D0", "#6788F0"],
+            3 => ["#FF20A0", "#EE2060", "#BB20A0"],
+            _ => ["#DDD", "#AAA", "#888"],
+        };
+    }
+
+    /// <summary>
+    /// Loads the local Dream Machine database.
+    /// If the database is already loaded, does nothing.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    public async Task LoadLocalDb()
+    {
+        if (DmRoot.IsLoaded)
+        {
+            _logger.LogInformation("Local database already loaded");
+            return;
+        }
+        
+        // we load the List of DmProgram (but NOT the sequences inside)
+        var programsPath = Path.Combine(DmRoot.RootPath, "Programmes");
+        var programs = await LoadProgramsAsync(programsPath);
+        DmRoot.Programs.Clear();
+        foreach (var program in programs)
+            DmRoot.Programs.Add(program);
+        _logger.LogInformation("DM directory contains {Count} programs", DmRoot.Programs.Count);
+
+        // if the Sequences directory exists, we load the sequences in Sessions program
+        // this should only happen for MPEditor
+        var sequencesPath = Path.Combine(DmRoot.RootPath, "Sequences");
+        if (Directory.Exists(sequencesPath))
+        {
+            _logger.LogInformation("DM directory contains a Sequences folder");
+            var sequences = await LoadDmSequencesAsync(sequencesPath);
+            if (sequences.Count > 0)
+            {
+                var program = (new DmProgram
+                {
+                    DirPath = sequencesPath,
+                    DirName = "Sessions",
+                    SequenceItems = sequences,
+                    Metadata = new ProgramMetadata
+                    {
+                        NameItems = new Dictionary<string, string> { { "default", "Sessions" } },
+                        SummaryItems = new Dictionary<string, string>
+                        {
+                            { "en", "Sorry no description" },
+                            { "fr", "Désolé pas de description" }
+                        },
+                        Version = ProgramMetadata.MetadataVersion,
+                        LastUpdated = DateTime.Now,
+                    },
+                    GradientStops = MatchGradient(0) // Default gradient for sessions
+                });
+                DmRoot.Programs.Add(program);
+                // check if metadata file exists otherwise create it
+                var metadataFile = Path.Combine(sequencesPath, "metadata.json");
+                if (!File.Exists(metadataFile))
+                {
+                    _logger?.LogInformation("Need to create metadata for program in {}", sequencesPath);
+                    var content = program.Metadata;
+                    await content.SaveJsonFileAsync(metadataFile);
+                }
+            }
+        }
+
+        // we load the List of DmPlaylists but NOT the sequences inside
+        var playlistsPath = Path.Combine(DmRoot.RootPath, "Playlists");
+        var playlists = await LoadPlaylistsAsync(playlistsPath);
+        DmRoot.PlaylistElements.Clear();
+        foreach (var playlist in playlists)
+            DmRoot.PlaylistElements.Add(playlist);
+        _logger?.LogInformation("DM directory contains {Count} playlist", DmRoot.PlaylistElements.Count);
+
+        DmRoot.Title = "Sessions";
+        DmRoot.IsLoaded = true;
+    }
+
+    /// <summary>
+    /// Loads a sequence from the specified directory (sequence.json).
+    /// </summary>
+    private async Task<Sequence> LoadSequenceWithFallback(string sequenceDir)
+    {
+        var jsonPath = Path.Combine(sequenceDir, "sequence.json");
+
+        if (File.Exists(jsonPath))
+        {
+            _logger.LogInformation("Loading sequence from JSON: {Path}", jsonPath);
+            return await JsonBase.LoadJsonFileAsync<Sequence>(jsonPath);
+        }
+
+        throw new FileNotFoundException($"sequence.json not found in: {sequenceDir}");
+    }
+
+    /// <summary>
+    /// Loads a sequence from the specified directory.
+    /// </summary>
+    public async Task<Sequence> LoadSequenceAsync(string sequenceDir)
+    {
+        return await LoadSequenceWithFallback(sequenceDir);
+    }
+
+    /// <summary>
+    /// Load DmSequences from a sequence
+    /// </summary>
+    /// <param name="directoryPath"></param>
+    /// <returns></returns>
+    /// <remarks>
+    /// Here we do a Shallow reading of the sequences if possible:
+    /// - if metadata exists it provides enough information to display all information in UI
+    /// - otherwise we also need to read the actual sequence to get the name and gradient
+    /// </remarks>
+    public async Task<List<DmSequence>> LoadDmSequencesAsync(string directoryPath)
+    {
+        var sequences = new List<DmSequence>();
+
+        if (!Directory.Exists(directoryPath))
+        {
+            _logger?.LogWarning("Creating Sequences sequence: {}", directoryPath);
+            Directory.CreateDirectory(directoryPath);
+            return sequences;
+        }
+
+        // Get all directories in the Sequences folder
+        var sequenceDirs = Directory.GetDirectories(directoryPath);
+
+        foreach (var sequenceDir in sequenceDirs)
+        {
+            // Check if sequence contains sequence.bin or sequence.json
+            var sequenceBinPath = Path.Combine(sequenceDir, "sequence.bin");
+            var sequenceJsonPath = Path.Combine(sequenceDir, "sequence.json");
+            if (!File.Exists(sequenceBinPath) && !File.Exists(sequenceJsonPath))
+                continue;
+
+            // read userdata if exists
+            var userDataPath = Path.Combine(sequenceDir, "userdata.json");
+            Userdata userData;
+            if (!File.Exists(userDataPath))
+            {
+                userData = new Userdata(); // create empty user data
+                // _logger.LogInformation("No user data found for sequence: {}", sequenceDir);
+            }
+            else
+            {
+                userData = await JsonBase.LoadJsonFileAsync<Userdata>(userDataPath);
+                // _logger.LogInformation("User data loaded for sequence: {}", sequenceDir);
+            }
+
+            // Read metadata for the sequence
+            var metadataContent = await _metadataService.LoadSequenceMetadataAsync(sequenceDir);
+
+            // Check for audio files in different languages and default
+            var audioItems = new Dictionary<string, bool>();
+
+            // Check for default audio files
+            var defaultSoundPath = Path.Combine(sequenceDir, "son.mp3");
+            var frenchSoundPath = Path.Combine(sequenceDir, "son_fr.mp3");
+            var englishSoundPath = Path.Combine(sequenceDir, "son_en.mp3");
+            if (File.Exists(defaultSoundPath))
+                audioItems["default"] = true;
+            if (File.Exists(frenchSoundPath))
+                audioItems["fr"] = true;
+            if (File.Exists(englishSoundPath))
+                audioItems["en"] = true;
+
+            // Set Audio field based on existence of any sound file 1=hasSound, 2=hasNoSound
+            var audio = audioItems.Count > 0 ? 1 : 2;
+            List<string> gradientStops = MatchGradient(metadataContent.Category);
+
+            var dmSequence = new DmSequence
+            {
+                Sequence = null,
+                Metadata = metadataContent,
+                DirPath = sequenceDir,
+                DirName = StringNormalizer.NormalizeString(Path.GetFileName(sequenceDir)),
+                IsModified = false,
+                AudioItems = audioItems,
+                GradientStops = gradientStops,
+                Audio = audio,
+                Userdata = userData,
+            };
+            sequences.Add(dmSequence);
+        }
+        _logger.LogInformation("{} directory contains {Count} sequences", Path.GetFileName(directoryPath), sequences.Count);
+        return sequences;
+    }
+
+    /// <summary>
+    /// Save the sequence.json and metadata.json to the specified directory path.
+    /// DOES NOT save the sound files
+    /// </summary>
+    /// <param name="directoryPath">The path to the directory where the sequence should be saved</param>
+    /// <param name="dmSequence">The sequence to save</param>
+    /// <returns>Task representing the asynchronous operation</returns>
+    public async Task SaveDmSequencesAsync(string directoryPath, DmSequence dmSequence)
+    {
+        if (!Directory.Exists(directoryPath))
+        {
+            Directory.CreateDirectory(directoryPath);
+        }
+        if (dmSequence.Metadata is SequenceMetadata seqMetadata)
+            await _metadataService.SaveSequenceMetadataAsync(seqMetadata, directoryPath);
+        
+        if (dmSequence.Sequence is not null)
+        {
+            var sequenceJsonPath = Path.Combine(directoryPath, "sequence.json");
+            await dmSequence.Sequence.SaveJsonFileAsync(sequenceJsonPath);
+            _logger.LogInformation("Saved sequence: {Path}", sequenceJsonPath);
+        }
+    }
+
+
+    private async Task<List<DmProgram>> LoadProgramsAsync(string directoryPath)
+    {
+        var programs = new List<DmProgram>();
+
+        try
+        {
+            if (!Directory.Exists(directoryPath))
+            {
+                _logger.LogInformation("Creating Programmes sequence: {}", directoryPath);
+                Directory.CreateDirectory(directoryPath);
+                return programs;    // empty program list
+            }
+
+            // Get all directories in the Programs folder
+            var programDirs = Directory.GetDirectories(directoryPath);
+
+            foreach (var dir in programDirs)
+            {
+                // Check if any subdirectory contains a sequence.bin or sequence.json file
+                var hasSequences = Directory.GetDirectories(dir)
+                    .Any(subDir => File.Exists(Path.Combine(subDir, "sequence.bin")) ||
+                                   File.Exists(Path.Combine(subDir, "sequence.json")));
+
+                if (hasSequences)
+                {
+                    // we need to get the list of sequences for this program
+                    var sequenceItems = await LoadDmSequencesAsync(dir);
+
+                    // Read metadata for the program
+                    var programMetadata = await _metadataService.LoadProgramMetadataAsync(dir);
+
+                    var program = new DmProgram
+                    {
+                        SequenceItems = sequenceItems,
+                        Metadata = programMetadata,
+                        DirPath = dir,
+                        DirName = StringNormalizer.NormalizeString(Path.GetFileName(dir)),
+                        GradientStops = ["#4A4", "#3f5", "#0F0"] // Gradient for programs
+                    };
+                    programs.Add(program);
+                }
+            }
+            return programs;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to get programs in sequence: {}", directoryPath);
+            return programs;
+        }
+    }
+
+    public async Task SaveProgramsAsync(string directoryPath, DmProgram dmProgram)
+    {
+        // Save the program to the specified directory
+        if (!Directory.Exists(directoryPath))
+        {
+            Directory.CreateDirectory(directoryPath);
+        }
+        // Save the metadata
+        await _metadataService.SaveProgramMetadataAsync(dmProgram.Metadata, directoryPath);
+        // Save the sequences TODO ??? not sure if we need to save the sequences here
+        foreach (var sequence in dmProgram.SequenceItems)
+        {
+            await SaveDmSequencesAsync(directoryPath, sequence);
+        }
+    }
+
+    public DmElement? SearchElement(string parent, Dictionary<string, string> nameItems)
+    {
+        // Special handling for Sessions program (which uses "Sequences" directory)
+        // Check if we should look in the Sessions program
+        var sessionsProgram = DmRoot.Programs.FirstOrDefault(p => 
+            string.Equals(p.DirName, "Sessions", StringComparison.OrdinalIgnoreCase));
+        
+        if (sessionsProgram != null)
+        {
+            var sessionSequence = sessionsProgram.SequenceItems.FirstOrDefault(s =>
+                s.Metadata.NameItems.Any(n => nameItems.ContainsKey(n.Key) &&
+                string.Equals(n.Value, nameItems[n.Key], StringComparison.OrdinalIgnoreCase)));
+            
+            if (sessionSequence != null)
+                return sessionSequence;
+        }
+        
+        // Search in regular programs
+        var program = DmRoot.Programs.FirstOrDefault(p => string.Equals(p.DirName, parent, StringComparison.OrdinalIgnoreCase));
+        var seqInProg = program?.SequenceItems.FirstOrDefault(s =>
+            s.Metadata.NameItems.Any(n => nameItems.ContainsKey(n.Key) &&
+            string.Equals(n.Value, nameItems[n.Key], StringComparison.OrdinalIgnoreCase)));
+        return seqInProg;
+    }
+
+    public async Task<List<DmSequence>> LoadPlaylistsAsync(string playlistPath)
+    {
+        var playlists = new List<DmSequence>();
+        if (!Directory.Exists(playlistPath))
+        {
+            _logger.LogInformation("Creating Playlists sequence: {}", playlistPath);
+            Directory.CreateDirectory(playlistPath);
+            return playlists;   // empty playlist
+        }
+
+        var files = Directory.GetFiles(playlistPath, "metadata*.json", SearchOption.TopDirectoryOnly);
+        foreach (string file in files)
+        {
+            var metadata = await MetadataService.LoadPlaylistMetadataAsync(file);
+
+            List<string> gradientStops = MatchGradient(metadata.Category);
+
+            // we need to find the sequence
+            var sequence = SearchElement(metadata.Parent, metadata.NameItems);
+            if (sequence is not null)
+            {
+                // Check for audio files in different languages and default
+                var audioItems = new Dictionary<string, bool>();
+                var defaultSoundPath = Path.Combine(sequence.DirPath, "son.mp3");
+                var frenchSoundPath = Path.Combine(sequence.DirPath, "son_fr.mp3");
+                var englishSoundPath = Path.Combine(sequence.DirPath, "sound_en.mp3");
+                if (File.Exists(defaultSoundPath))
+                    audioItems["default"] = true;
+                if (File.Exists(frenchSoundPath))
+                    audioItems["fr"] = true;
+                if (File.Exists(englishSoundPath))
+                    audioItems["en"] = true;
+                // Set Audio field based on existence of any sound file 1=hasSound, 2=hasNoSound
+                var audio = audioItems.Count > 0 ? 1 : 2;
+
+                var playlist = new DmSequence
+                {
+                    Metadata = metadata,
+                    DirPath = sequence.DirPath,
+                    IsModified = false,
+                    Sequence = null,
+                    FileName = file,
+                    DirName = Path.GetFileName(sequence.DirPath),
+                    AudioItems = audioItems,
+                    GradientStops = gradientStops,
+                    Audio = audio
+                };
+                playlists.Add(playlist);
+            }
+        }
+
+        return playlists;
+    }
+
+}
