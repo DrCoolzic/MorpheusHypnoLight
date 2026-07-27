@@ -73,4 +73,33 @@ compile_commands.json
 CTestTestfile.cmake
 /*.cbp
 
+# .NET / MAUI
+# Build outputs
+**/bin/
+**/obj/
+**/publish/
+**/out/
+
+# Visual Studio / MSBuild
+.vs/
+*.user
+*.userosscache
+*.suo
+*.cache
+*.pdb
+*.ilk
+*.exe
+*.dll
+*.appx
+*.msix
+*.apk
+*.aab
+
+# MAUI / .NET project artifacts
+*.csproj.user
+*.sln.user
+*.sln.cache
+*.sln.docstates
+**/Properties/launchSettings.json
+
 

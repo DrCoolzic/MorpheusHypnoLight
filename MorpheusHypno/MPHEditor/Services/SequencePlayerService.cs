@@ -21,7 +21,6 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
     #region Private Fields
     private readonly IBleService _bleService;
     private readonly ILogger _logger;
-    private readonly ILanguageService _languageService;
     private IAudioPlayer? _audioPlayer;
     private IAudioManager _audioManager;
     private FileStream? _audioFileStream;
@@ -72,10 +71,9 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
     /// </summary>
     /// <param name="bleService">The BLE service for Dream Machine communication</param>
     /// <param name="logger">Logger for diagnostic information</param>
-    public SequencePlayerService(IBleService bleService, ILanguageService languageService, IAudioManager audioManager, ILogger<SequencePlayerService> logger)
+    public SequencePlayerService(IBleService bleService, IAudioManager audioManager, ILogger<SequencePlayerService> logger)
     {
         _bleService = bleService;
-        _languageService = languageService;
         _audioManager = audioManager;
         _logger = logger;
     }
@@ -96,30 +94,28 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
         _duration = _sequence.Duration;
         _logger.LogInformation("Set player sequence to {} with duration {}", _sequence.Name, _sequence.Duration);
 
-        // Check is sequence ha audio and handle audio based on current language
-        var currentLang = _languageService.CurrentLanguage;
+        // Check if sequence has audio and select the appropriate audio file
         string audioPath = string.Empty;
-        if (dmSequence.AudioItems.ContainsKey(currentLang))
+        string audioKey =
+            dmSequence.AudioItems.ContainsKey("default") ? "default" :
+            dmSequence.AudioItems.ContainsKey("en") ? "en" :
+            dmSequence.AudioItems.ContainsKey("fr") ? "fr" :
+            string.Empty;
+
+        if (!string.IsNullOrEmpty(audioKey))
         {
-            var audioName = currentLang switch
+            var audioName = audioKey switch
             {
                 "en" => "son_en.mp3",
                 "fr" => "son_fr.mp3",
                 _ => "son.mp3"
             };
             audioPath = Path.Combine(dmSequence.DirPath, audioName);
-            _logger.LogInformation("Found audio for language {}: {}", currentLang, audioPath);
-        }
-        else if (dmSequence.AudioItems.ContainsKey("default"))
-        {
-            var audioName = "son.mp3";
-            audioPath = Path.Combine(dmSequence.DirPath, audioName);
-            _logger.LogInformation("Using default audio: {}", audioPath);
+            _logger.LogInformation("Found audio for key {}: {}", audioKey, audioPath);
         }
         else
         {
-            audioPath = string.Empty;
-            _logger.LogInformation("No audio found for language {} or default", currentLang);
+            _logger.LogInformation("No audio found for sequence");
         }
 
         // Always dispose existing audio resources first to prevent resource leaks
