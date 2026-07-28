@@ -1,4 +1,4 @@
-// Ignore Spelling: ble dm
+// Ignore Spelling: ble MPH
 
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
@@ -94,24 +94,12 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
         _duration = _sequence.Duration;
         _logger.LogInformation("Set player sequence to {} with duration {}", _sequence.Name, _sequence.Duration);
 
-        // Check if sequence has audio and select the appropriate audio file
+        // Check if sequence has audio
         string audioPath = string.Empty;
-        string audioKey =
-            MPHSequence.AudioItems.ContainsKey("default") ? "default" :
-            MPHSequence.AudioItems.ContainsKey("en") ? "en" :
-            MPHSequence.AudioItems.ContainsKey("fr") ? "fr" :
-            string.Empty;
-
-        if (!string.IsNullOrEmpty(audioKey))
+        if (MPHSequence.HasAudio)
         {
-            var audioName = audioKey switch
-            {
-                "en" => "son_en.mp3",
-                "fr" => "son_fr.mp3",
-                _ => "son.mp3"
-            };
-            audioPath = Path.Combine(MPHSequence.DirPath, audioName);
-            _logger.LogInformation("Found audio for key {}: {}", audioKey, audioPath);
+            audioPath = Path.Combine(MPHSequence.DirPath, "sound.mp3");
+            _logger.LogInformation("Found audio {}", audioPath);
         }
         else
         {

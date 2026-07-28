@@ -1,7 +1,7 @@
 // Ignore Spelling: App
 
-using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 
 namespace MPHEditor.Utilities
@@ -11,6 +11,9 @@ namespace MPHEditor.Utilities
     /// </summary>
     public static class AppDirectories
     {
+        // Keep this in sync with the <ApplicationId> value in MPHEditor.csproj.
+        private const string ApplicationId = "com.drcoolzic.mpheditor";
+
         private static string? _cachedAppDataPath;
         private static ILogger? _logger;
 
@@ -38,9 +41,8 @@ namespace MPHEditor.Utilities
             }
 #else
             var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            var packageName = AppInfo.Current.PackageName;
-            // append the package name to the app data path. If the package name is not set, throw an exception
-            var finalDataPath = Path.Combine(appDataPath, packageName);
+            // append the application id to the app data path to match the documented layout
+            var finalDataPath = Path.Combine(appDataPath, ApplicationId);
 #endif
 
             // Cache the result
@@ -90,27 +92,27 @@ namespace MPHEditor.Utilities
         //    return cacheDir;
         //}
 
-    //    /// <summary>
-    //    /// Gets the storage directory path for Android
-    //    /// </summary>
-    //    public static string GetStorageDirectory()
-    //    {
-    //#if ANDROID
-    //        // Get the app-specific external directory
-    //        var context = Android.App.Application.Context;
-    //        var externalDir = context.GetExternalFilesDir(null)?.AbsolutePath;
+        //    /// <summary>
+        //    /// Gets the storage directory path for Android
+        //    /// </summary>
+        //    public static string GetStorageDirectory()
+        //    {
+        //#if ANDROID
+        //        // Get the app-specific external directory
+        //        var context = Android.App.Application.Context;
+        //        var externalDir = context.GetExternalFilesDir(null)?.AbsolutePath;
 
-    //        if (string.IsNullOrEmpty(externalDir))
-    //        {
-    //            _logger?.LogWarning("External storage not available, falling back to internal storage");
-    //            return GetAppDataDirectory();
-    //        }
-    //        return externalDir;
+        //        if (string.IsNullOrEmpty(externalDir))
+        //        {
+        //            _logger?.LogWarning("External storage not available, falling back to internal storage");
+        //            return GetAppDataDirectory();
+        //        }
+        //        return externalDir;
 
-    //#else
-    //        return GetAppDataDirectory();
-    //#endif
-    //    }
+        //#else
+        //        return GetAppDataDirectory();
+        //#endif
+        //    }
 
 
         /// <summary>

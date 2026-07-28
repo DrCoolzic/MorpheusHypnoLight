@@ -19,7 +19,7 @@ The application data root contains the following entries:
 
 | Path | Description |
 | --- | --- |
-| `mpheditor.log` | Application log file |
+| `logs/mpheditor.log` | Application log file |
 | `settings.json` | User preferences and application settings |
 | `collections/` | Root directory containing all sequence collections |
 

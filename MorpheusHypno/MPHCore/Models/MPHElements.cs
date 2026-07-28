@@ -7,17 +7,15 @@ namespace MPHCore.Models;
 
 /// <summary>
 /// Base class for all Morpheus file system elements (collections, sequences, etc.).
-/// Contains common properties shared by file-system elements such as audio items,
+/// Contains common properties shared by file-system elements such as an audio flag,
 /// directory information, modification state, and user data.
 /// </summary>
 public class MPHElement : INotifyPropertyChanged
 {
     /// <summary>
-    /// Dictionary of audio items associated with this element.
-    /// Key is the audio item identifier ("default","fr","en")
-    /// Value indicates if it's enabled.
+    /// Indicates if audio file exists
     /// </summary>
-    public Dictionary<string, bool> AudioItems { get; set; } = [];
+    public bool HasAudio { get; set; } = false;
 
     /// <summary>
     /// Indicates whether this element has been modified since last save.
@@ -145,7 +143,7 @@ public class MPHRoot
     /// <summary>
     /// List of all collections in the database.
     /// </summary>
-    public List<MPHCollection> Programs { get; set; } = [];
+    public List<MPHCollection> Collections { get; set; } = [];
 
     /// <summary>
     /// List of playlist sequences.

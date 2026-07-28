@@ -64,18 +64,19 @@ The Models namespace contains the core data structures used throughout the appli
 ```mermaid
 classDiagram
     class MPHElement {
-        +ProgramMetadata Metadata
-        +Dictionary~string, bool~ AudioItems
-        +string Directory
+        +bool HasAudio
+        +bool IsModified
+        +string DirName
+        +string DirPath
         +Userdata Userdata
     }
     
     class MPHCollection {
         +List~MPHSequence~ SequenceItems
-        +int FileCount
     }
     
     class MPHSequence {
+        +SequenceMetadata Metadata
         +Sequence Sequence
         +string FileName
         +int FileCount
@@ -84,8 +85,7 @@ classDiagram
     class MPHRoot {
         +string Title
         +string RootPath
-        +List~MPHCollection~ Programs
-        +List~MPHSequence~ SessionElements
+        +List~MPHCollection~ Collections
         +List~MPHSequence~ PlaylistElements
     }
     
@@ -110,7 +110,7 @@ Key services that provide business logic and data access:
    - Tracks file differences
    - Generates sync recommendations
 
-3. **MPHElementService**: Manages local Dream Machine elements
+3. **MPHElementService**: Manages local Morpheus Hypno elements
    - Load/save operations
    - File system interactions
    - Metadata management
