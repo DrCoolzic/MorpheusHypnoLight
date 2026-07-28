@@ -1,36 +1,41 @@
-using System.ComponentModel;
-using System.Windows.Input;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using MPHCore.Services;
 using MPHEditor.Services;
+using MPHEditor.Utilities;
 
 namespace MPHEditor.ViewModels;
 
-public class MainViewModel : INotifyPropertyChanged
+public partial class MainViewModel : ObservableObject
 {
     private readonly ILogger<MainViewModel> _logger;
     private readonly IBleService _bleService;
+    private readonly IMPHElementService _mphElementService;
+
+    [ObservableProperty]
     private string _status = "Ready";
 
-    public string Status
-    {
-        get => _status;
-        set
-        {
-            if (_status == value) return;
-            _status = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Status)));
-        }
-    }
-
-    public ICommand ScanCommand { get; }
-
-    public MainViewModel(ILogger<MainViewModel> logger, IBleService bleService)
+    public MainViewModel(ILogger<MainViewModel> logger, IBleService bleService, IMPHElementService mpHElementService)
     {
         _logger = logger;
         _bleService = bleService;
-        ScanCommand = new Command(async () => await ScanAsync());
+        _mphElementService = mpHElementService;
+
+        _logger.LogInformation("Initializing MainViewModel");
+        _ = InitializeAsync();
+
     }
 
+    private async Task InitializeAsync()
+    {
+        _logger.LogInformation("Starting MainViewModel initialization...");
+        _mphElementService.MPHRoot.RootPath = AppDirectories.GetAppDataDirectory();
+        await _mphElementService.LoadLocalDb();
+        _logger.LogInformation("Collections database loaded");
+    }
+
+    [RelayCommand]
     private async Task ScanAsync()
     {
         _logger.LogInformation("Checking Bluetooth status...");
@@ -45,6 +50,4 @@ public class MainViewModel : INotifyPropertyChanged
             Status = "Bluetooth status check failed";
         }
     }
-
-    public event PropertyChangedEventHandler? PropertyChanged;
 }

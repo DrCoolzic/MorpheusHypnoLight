@@ -21,6 +21,13 @@ public interface IMPHElementService
     MPHRoot MPHRoot { get; }
 
     /// <summary>
+    /// Loads the local Morpheus Hypno database.
+    /// If the database is already loaded, does nothing.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    Task LoadLocalDb();
+
+    /// <summary>
     /// Loads a sequence from the specified directory.
     /// </summary>
     Task<Sequence> LoadSequenceAsync(string sequenceDir);
