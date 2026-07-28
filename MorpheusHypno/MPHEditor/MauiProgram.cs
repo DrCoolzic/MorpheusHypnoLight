@@ -2,8 +2,10 @@ using System.IO;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Hosting;
 using MPHCore.Services;
+using MPHEditor.Pages;
 using MPHEditor.Services;
 using MPHEditor.Utilities;
+using MPHEditor.ViewModels;
 using Plugin.Maui.Audio;
 
 namespace MPHEditor;
@@ -22,6 +24,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<ISequencePlayerService, SequencePlayerService>();
         builder.Services.AddSingleton<MetadataService>();
         builder.Services.AddSingleton<IMPHElementService, MPHElementService>();
+        builder.Services.AddSingleton<MainViewModel>();
+        builder.Services.AddSingleton<MainPage>();
 
 #if DEBUG
         // Configure debug logging
@@ -43,9 +47,10 @@ public static class MauiProgram
                 "com.drcoolzic.mpheditor");
         }
 
-        var logDir = Path.Combine(appData, "logs");
-        Directory.CreateDirectory(logDir);
-        var logPath = Path.Combine(logDir, "mpheditor.log");
+        // var logDir = Path.Combine(appData, "logs");
+        // Directory.CreateDirectory(logDir);
+        // var logPath = Path.Combine(logDir, "mpheditor.log");
+        var logPath = Path.Combine(appData, "mpheditor.log");
 
         builder.Logging.AddProvider(new FileLoggerProvider(logPath));
         var loggerFactory = builder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
@@ -68,7 +73,7 @@ public static class MauiProgram
         // Set up loggers for static services
         var logger = app.Services.GetRequiredService<ILogger<MauiApp>>();
         AppDirectories.SetLogger(logger);
-        AppDirectories.LogDirectories();
+        logger.LogInformation(" - AppDataDirectory: {}", AppDirectories.GetAppDataDirectory());
 #endif
 
         return app;
