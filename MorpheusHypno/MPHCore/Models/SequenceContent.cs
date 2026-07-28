@@ -1,180 +1,253 @@
+// Ignore Spelling: MHL
+
 using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Linq;
 
 namespace MPHCore.Models;
 
 /// <summary>
-/// Represents a single oscillator in a sequence.
+/// Supported oscillator waveform shapes.
+/// </summary>
+[JsonConverter(typeof(StringEnumConverter))]
+public enum OscillatorWaveform
+{
+    Sine,
+    Square,
+    Triangle,
+    Custom
+}
+
+/// <summary>
+/// Supported LFO waveforms for modulators.
+/// </summary>
+public enum LfoWaveform
+{
+    Sine,
+    Square
+}
+
+/// <summary>
+/// Modulator control modes.
+/// </summary>
+public enum ModulatorMode
+{
+    Static,
+    Linear,
+    Lfo
+}
+
+/// <summary>
+/// JSON converter for a modulator, whose shape depends on its mode.
+/// </summary>
+public class ModulatorConverter : JsonConverter<Modulator>
+{
+    public override void WriteJson(JsonWriter writer, Modulator? value, JsonSerializer serializer)
+    {
+        if (value is null)
+        {
+            writer.WriteNull();
+            return;
+        }
+
+        writer.WriteStartObject();
+        writer.WritePropertyName("mode");
+        writer.WriteValue(value.Mode.ToString().ToLowerInvariant());
+
+        switch (value.Mode)
+        {
+            case ModulatorMode.Static:
+                writer.WritePropertyName("value");
+                writer.WriteValue(value.Value);
+                break;
+            case ModulatorMode.Linear:
+                writer.WritePropertyName("start");
+                writer.WriteValue(value.Start);
+                writer.WritePropertyName("end");
+                writer.WriteValue(value.End);
+                break;
+            case ModulatorMode.Lfo:
+                writer.WritePropertyName("waveform");
+                writer.WriteValue(value.LfoWaveform.ToString()?.ToLowerInvariant());
+                writer.WritePropertyName("lfo_frequency");
+                writer.WriteValue(value.LfoFrequency);
+                writer.WritePropertyName("low");
+                writer.WriteValue(value.Low);
+                writer.WritePropertyName("high");
+                writer.WriteValue(value.High);
+                break;
+        }
+
+        writer.WriteEndObject();
+    }
+
+    public override Modulator? ReadJson(JsonReader reader, Type objectType, Modulator? existingValue, bool hasExistingValue, JsonSerializer serializer)
+    {
+        var jObject = JObject.Load(reader);
+        var modeToken = jObject["mode"];
+        if (modeToken is null || !Enum.TryParse<ModulatorMode>(modeToken.ToString(), true, out var mode))
+            throw new JsonSerializationException("Modulator requires a valid 'mode' value (static, linear, or lfo).");
+
+        var modulator = new Modulator { Mode = mode };
+
+        switch (mode)
+        {
+            case ModulatorMode.Static:
+                modulator.Value = GetRequiredDouble(jObject, "value");
+                break;
+            case ModulatorMode.Linear:
+                modulator.Start = GetRequiredDouble(jObject, "start");
+                modulator.End = GetRequiredDouble(jObject, "end");
+                break;
+            case ModulatorMode.Lfo:
+                var waveformToken = jObject["waveform"];
+                if (waveformToken is null || !Enum.TryParse<LfoWaveform>(waveformToken.ToString(), true, out var lfoWaveform))
+                    throw new JsonSerializationException("LFO modulator requires a valid 'waveform' value (sine or square).");
+                modulator.LfoWaveform = lfoWaveform;
+                modulator.LfoFrequency = GetRequiredDouble(jObject, "lfo_frequency");
+                modulator.Low = GetRequiredDouble(jObject, "low");
+                modulator.High = GetRequiredDouble(jObject, "high");
+                break;
+        }
+
+        return modulator;
+    }
+
+    private static double GetRequiredDouble(JObject jObject, string propertyName)
+    {
+        var token = jObject[propertyName];
+        if (token is null)
+            throw new JsonSerializationException($"Modulator requires '{propertyName}' to be a number.");
+        return token.Value<double>();
+    }
+}
+
+/// <summary>
+/// A modulated value: static, linear ramp, or LFO.
+/// </summary>
+[JsonConverter(typeof(ModulatorConverter))]
+public class Modulator : JsonBase
+{
+    /// <summary>
+    /// Modulator mode.
+    /// </summary>
+    public ModulatorMode Mode { get; set; }
+
+    /// <summary>
+    /// Static mode value.
+    /// </summary>
+    public double? Value { get; set; }
+
+    /// <summary>
+    /// Linear ramp start value.
+    /// </summary>
+    public double? Start { get; set; }
+
+    /// <summary>
+    /// Linear ramp end value.
+    /// </summary>
+    public double? End { get; set; }
+
+    /// <summary>
+    /// LFO waveform.
+    /// </summary>
+    public LfoWaveform? LfoWaveform { get; set; }
+
+    /// <summary>
+    /// LFO frequency in hertz.
+    /// </summary>
+    [JsonProperty("lfo_frequency")]
+    public double? LfoFrequency { get; set; }
+
+    /// <summary>
+    /// LFO output low value.
+    /// </summary>
+    public double? Low { get; set; }
+
+    /// <summary>
+    /// LFO output high value.
+    /// </summary>
+    public double? High { get; set; }
+}
+
+/// <summary>
+/// Represents a single oscillator (one of the 5 fixed outputs PB1..PB4 / CG).
 /// </summary>
 public class Oscillator : JsonBase
 {
-    [JsonProperty("led")]
-    public List<string> LEDs { get; set; } = [];
-
-    [JsonProperty("frequencyStart")]
-    public double FrequencyStart { get; set; }
-
-    [JsonProperty("dutyStart")]
-    public double DutyStart { get; set; }
-
-    [JsonProperty("brightnessStart")]
-    public double BrightnessStart { get; set; }
-
-    [JsonProperty("frequencyEnd")]
-    public double FrequencyEnd { get; set; }
-
-    [JsonProperty("dutyEnd")]
-    public double DutyEnd { get; set; }
-
-    [JsonProperty("brightnessEnd")]
-    public double BrightnessEnd { get; set; }
-
-    [JsonProperty("runtimeType")]
-    public string RuntimeType { get; set; } = "legacy";
-
-    public Oscillator()
-    {
-        LEDs = [];
-        FrequencyStart = 0;
-        DutyStart = 0;
-        BrightnessStart = 0;
-        FrequencyEnd = 0;
-        DutyEnd = 0;
-        BrightnessEnd = 0;
-        RuntimeType = "legacy";
-    }
-
-    public override string ToString()
-    {
-        var message = "[";
-        foreach (var led in LEDs)
-        {
-            message += $"{led},";
-        }
-        message += $"] Freq=({FrequencyStart},{FrequencyEnd}), Duty=({DutyStart},{DutyEnd}), Brightness=({BrightnessStart},{BrightnessEnd})";
-        return message;
-    }
+    /// <summary>
+    /// Waveform shape for this oscillator.
+    /// </summary>
+    [JsonProperty("waveform")]
+    public OscillatorWaveform Waveform { get; set; } = OscillatorWaveform.Square;
 
     /// <summary>
-    /// Creates a deep copy of the oscillator.
+    /// Initial phase in degrees.
     /// </summary>
-    /// <returns>A new Oscillator instance with the same values.</returns>
-    public Oscillator Clone()
-    {
-        return new Oscillator
-        {
-            LEDs = new List<string>(LEDs),
-            FrequencyStart = FrequencyStart,
-            DutyStart = DutyStart,
-            BrightnessStart = BrightnessStart,
-            FrequencyEnd = FrequencyEnd,
-            DutyEnd = DutyEnd,
-            BrightnessEnd = BrightnessEnd,
-            RuntimeType = RuntimeType
-        };
-    }
+    [JsonProperty("phase_degrees")]
+    public double PhaseDegrees { get; set; }
+
+    /// <summary>
+    /// Frequency modulator in hertz.
+    /// </summary>
+    [JsonProperty("frequency")]
+    public Modulator Frequency { get; set; } = new Modulator { Mode = ModulatorMode.Static, Value = 0.0 };
+
+    /// <summary>
+    /// Brightness modulator (0.0 to 1.0).
+    /// </summary>
+    [JsonProperty("brightness")]
+    public Modulator Brightness { get; set; } = new Modulator { Mode = ModulatorMode.Static, Value = 0.0 };
+
+    /// <summary>
+    /// Duty cycle modulator (0.0 to 1.0).
+    /// </summary>
+    [JsonProperty("duty")]
+    public Modulator Duty { get; set; } = new Modulator { Mode = ModulatorMode.Static, Value = 0.5 };
 }
 
 /// <summary>
-/// Gradient associated with a sequence.
-/// </summary>
-public class Gradient : JsonBase
-{
-    [JsonProperty("orientation")]
-    public required int Orientation { get; set; }
-
-    [JsonProperty("colors")]
-    public required int[] Colors { get; set; }
-
-    public override string ToString()
-    {
-        string message = $"[{Orientation} (";
-        foreach (var color in Colors)
-        {
-            message += $"{color:X4} ";
-        }
-        return message + ")]";
-    }
-}
-
-/// <summary>
-/// Represents a step in a sequence.
+/// Represents one step in an MHL sequence.
 /// </summary>
 public class Step : JsonBase
 {
-    [JsonProperty("index")]
-    public int Index { get; set; }
+    /// <summary>
+    /// Step duration in seconds.
+    /// </summary>
+    [JsonProperty("duration")]
+    public double DurationSeconds { get; set; }
 
-    [JsonProperty("timeStart")]
-    public int TimeStart { get; set; }
-
-    [JsonProperty("timeEnd")]
-    public int TimeEnd { get; set; }
-
+    /// <summary>
+    /// Step duration in milliseconds, derived from <see cref="DurationSeconds"/>.
+    /// </summary>
     [JsonIgnore]
-    public int Duration { get { return TimeEnd > TimeStart ? TimeEnd - TimeStart : 0; } }
+    public int DurationMs => (int)Math.Round(DurationSeconds * 1000.0);
 
+    /// <summary>
+    /// Oscillator settings for this step (5 oscillators).
+    /// </summary>
     [JsonProperty("oscillators")]
-    [JsonConverter(typeof(NonEmptyLedOscillatorListConverter))]
-    public List<Oscillator> Oscillators { get; set; }
-
-    [JsonProperty("runtimeType")]
-    public string RuntimeType { get; set; } = "legacy";
+    public List<Oscillator> Oscillators { get; set; } = new List<Oscillator>(5);
 
     public Step()
     {
         Oscillators = new List<Oscillator>();
     }
-
-    public Step(int index, int timeStart, int timeEnd, List<Oscillator> oscillators)
-    {
-        Index = index;
-        TimeStart = timeStart;
-        TimeEnd = timeEnd;
-        Oscillators = oscillators;
-        RuntimeType = "legacy";
-    }
-
-    public override string ToString()
-    {
-        var message = $"  Step {Index}: Time=({TimeStart}, {TimeEnd}), Duration=({Duration})";
-        foreach (var oscillator in Oscillators)
-        {
-            message += $"\n{oscillator.ToString()}";
-        }
-        return message;
-    }
-
-    /// <summary>
-    /// Creates a deep copy of the step.
-    /// </summary>
-    /// <returns>A new Step instance with the same values.</returns>
-    public Step Clone()
-    {
-        var clonedOscillators = new List<Oscillator>();
-        foreach (var osc in Oscillators)
-        {
-            clonedOscillators.Add(osc.Clone());
-        }
-
-        return new Step(Index, TimeStart, TimeEnd, clonedOscillators)
-        {
-            RuntimeType = RuntimeType
-        };
-    }
 }
 
-
 /// <summary>
-/// A sequence is a collection of steps with associated parameters such as duration, gradient, etc.
-/// This class only contains data from sequence.json file.
+/// A complete MHL sequence loaded from sequence.json.
 /// </summary>
 public class Sequence : JsonBase
 {
     [JsonProperty("version")]
-    public string? Version { get; set; }
+    public string Version { get; set; } = "1.0.0";
+
+    [JsonProperty("name")]
+    public string Name { get; set; } = string.Empty;
 
     [JsonProperty("author")]
     public string? Author { get; set; }
@@ -182,31 +255,22 @@ public class Sequence : JsonBase
     [JsonProperty("createdAt")]
     public DateTime? CreatedAt { get; set; }
 
-    [JsonProperty("name")]
-    public string Name { get; set; } = string.Empty;
-
-    [JsonProperty("gradient")]
-    public Gradient? Gradient { get; set; }
-
-    [JsonProperty("duration")]
-    public int Duration { get; set; }
-
     [JsonProperty("steps")]
-    public List<Step> Steps { get; set; } = [];
+    public List<Step> Steps { get; set; } = new List<Step>();
 
-    public override string ToString()
-    {
-        return $"{Name} ({Duration}ms)";
-    }
+    /// <summary>
+    /// Total duration in milliseconds, derived from all steps.
+    /// </summary>
+    [JsonIgnore]
+    public int DurationMs => Steps.Sum(s => s.DurationMs);
 
     public Sequence()
     {
         Steps = new List<Step>();
     }
 
-    public Sequence(string name, int duration, List<Step> steps) { Name = name; Duration = duration; Steps = steps; }
-
-    public Sequence(string name, int duration, Gradient gradient, List<Step> steps) { Name = name; Duration = duration; Gradient = gradient; Steps = steps; }
-
+    public override string ToString()
+    {
+        return $"{Name} ({DurationMs}ms)";
+    }
 }
-

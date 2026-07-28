@@ -1,12 +1,12 @@
-using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web;
 using HtmlAgilityPack;
-using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 using MPHCore.Models;
 
 namespace MPHCore.Services;
@@ -126,7 +126,7 @@ public class MetadataService(ILogger<MetadataService> logger)
                     { "en", sequence.Name },
                     { "fr", sequence.Name }
                 },
-                Duration = sequence.Duration,
+                Duration = sequence.DurationMs,
                 Parent = parent ?? string.Empty,
                 Version = ProgramMetadata.MetadataVersion,
                 LastUpdated = DateTime.Now
@@ -154,7 +154,7 @@ public class MetadataService(ILogger<MetadataService> logger)
                 },
                 Category = 0,
                 Level = 0,
-                Duration = sequence.Duration,
+                Duration = sequence.DurationMs,
                 Parent = parent ?? string.Empty,
                 Version = ProgramMetadata.MetadataVersion,
                 LastUpdated = DateTime.Now
