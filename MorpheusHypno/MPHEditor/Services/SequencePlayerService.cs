@@ -91,8 +91,8 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
         }
         _sequence = MPHSequence.Sequence;
         _sequenceToPlay = _sequence;
-        _duration = _sequence.Duration;
-        _logger.LogInformation("Set player sequence to {} with duration {}", _sequence.Name, _sequence.Duration);
+        _duration = (int)Math.Ceiling(_sequence.DurationSeconds);
+        _logger.LogInformation("Set player sequence to {} with duration {}", _sequence.Name, _duration);
 
         // Check if sequence has audio
         string audioPath = string.Empty;
@@ -424,11 +424,11 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
             return;
 
         _logger.LogInformation("Seeking player to position: {} seconds", position);
-        _logger.LogInformation("_sequence: Name={}, Duration={}, Steps.Count={}", _sequence.Name, _sequence.Duration, _sequence.Steps.Count);
+        _logger.LogInformation("_sequence: Name={}, DurationSeconds={}, Steps.Count={}", _sequence.Name, _sequence.DurationSeconds, _sequence.Steps.Count);
         if (_sequence.Steps.Count > 0)
         {
-            _logger.LogInformation("First step: TimeStart={}, TimeEnd={}", _sequence.Steps[0].TimeStart, _sequence.Steps[0].TimeEnd);
-            _logger.LogInformation("Last step: TimeStart={}, TimeEnd={}", _sequence.Steps[^1].TimeStart, _sequence.Steps[^1].TimeEnd);
+            _logger.LogInformation("First step: DurationSeconds={}", _sequence.Steps[0].DurationSeconds);
+            _logger.LogInformation("Last step: DurationSeconds={}", _sequence.Steps[^1].DurationSeconds);
         }
 
         // Only seek audio/BLE if player is not stopped
@@ -477,55 +477,53 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
             // Validate stepIndex before accessing Steps collection
             if (stepIndex == -1)
             {
-                _logger.LogWarning("Seek position {} is out of sequence bounds (duration: {}), cannot create truncated sequence", position, _sequence.Duration);
+                _logger.LogWarning("Seek position {} is out of sequence bounds (duration: {}), cannot create truncated sequence", position, _sequence.DurationSeconds);
                 return;
             }
 
             Step current_step = _sequence.Steps[stepIndex];
 
             // Calculate remaining duration from seek position to end of current step
-            int duration = current_step.TimeEnd - position;
+            double elapsed = posInStep;
+            double remainingSeconds = current_step.DurationSeconds - elapsed;
 
             var oscillators = new List<Oscillator>();
             if (current_step.Oscillators.Count == 0)
                 return;
             foreach (var iter in current_step.Oscillators.Select((oscillator, i) => (oscillator, i)))
             {
+                var value = oscValues[iter.i];
                 Oscillator oscillator = new()
                 {
-                    LEDs = iter.oscillator.LEDs,
-                    FrequencyStart = oscValues[iter.i].frequency,
-                    FrequencyEnd = oscValues[iter.i].frequency,
-                    DutyStart = oscValues[iter.i].dutyCycle,
-                    DutyEnd = oscValues[iter.i].dutyCycle,
-                    BrightnessStart = oscValues[iter.i].brightness,
-                    BrightnessEnd = oscValues[iter.i].brightness
+                    Waveform = iter.oscillator.Waveform,
+                    PhaseDegrees = iter.oscillator.PhaseDegrees,
+                    Frequency = new Modulator { Mode = ModulatorMode.Static, Value = value.frequency },
+                    Brightness = new Modulator { Mode = ModulatorMode.Static, Value = value.brightness },
+                    Duty = new Modulator { Mode = ModulatorMode.Static, Value = value.dutyCycle }
                 };
                 oscillators.Add(oscillator);
             }
-            Step newStep = new(0, 0, duration, oscillators!);
+            Step newStep = new()
+            {
+                DurationSeconds = remainingSeconds,
+                Oscillators = oscillators
+            };
 
             // we create a new sequence starting with the new step
-            _sequenceToPlay = new Sequence("Dummy Sequence", _sequence.Duration - position, [newStep]);
+            _sequenceToPlay = new Sequence
+            {
+                Name = "Dummy Sequence",
+                Steps = new List<Step> { newStep }
+            };
 
             // now we add the following steps if any
-            var last_time = duration;
-            var last_index = 0;
             if (stepIndex != _sequence.Steps.Count - 1)
             {
                 foreach (var step in _sequence.Steps.Skip(stepIndex + 1))
                 {
-                    var clonedStep = step.Clone();
-                    // Save duration before modifying times (Duration is a computed property)
-                    int stepDuration = clonedStep.Duration;
-                    clonedStep.TimeStart = last_time;
-                    clonedStep.TimeEnd = last_time + stepDuration;
-                    clonedStep.Index = ++last_index;
-                    _sequenceToPlay.Steps.Add(clonedStep);
-                    last_time += stepDuration;
+                    _sequenceToPlay.Steps.Add(step.Clone());
                 }
             }
-            _sequenceToPlay.Duration = _sequenceToPlay.Steps[^1].TimeEnd;
             _logger.LogInformation("_sequenceToPlay: {}", _sequenceToPlay);
         }
     }

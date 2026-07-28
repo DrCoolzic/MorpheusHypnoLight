@@ -606,9 +606,7 @@ public class BleService : IBleService
                 for (int i = 0; i < step.Oscillators.Count; i++)
                 {
                     var oscillator = step.Oscillators[i];
-                    if (oscillator.LEDs.Count == 0)
-                        continue;   // skip empty
-                    byte[] buffer = OscToCommand(0, oscillator, i, step.Duration);
+                    byte[] buffer = OscToCommand(0, oscillator, i, (int)(step.DurationSeconds * 10));
                     _logger.LogInformation("async buffer {}", Convert.ToHexString(buffer));
                     command.Add(buffer);
                 }
@@ -639,9 +637,7 @@ public class BleService : IBleService
         for (int i = 0; i < step.Oscillators.Count; i++)
         {
             var oscillator = step.Oscillators[i];
-            if (oscillator.LEDs.Count == 0)
-                continue;   // skip empty
-            byte[] buffer = OscToCommand(0, oscillator, i, step.Duration);
+            byte[] buffer = OscToCommand(0, oscillator, i, (int)(step.DurationSeconds * 10));
             _logger.LogInformation("buffer {}", Convert.ToHexString(buffer));
             command.Add(buffer);
         }
@@ -694,9 +690,7 @@ public class BleService : IBleService
                     for (int j = 0; j < step.Oscillators.Count; j++)
                     {
                         var oscillator = step.Oscillators[j];
-                        if (oscillator.LEDs.Count == 0)
-                            continue;   // skip empty
-                        byte[] buffer = OscToCommand(i, oscillator, j, step.Duration);
+                        byte[] buffer = OscToCommand(i, oscillator, j, (int)(step.DurationSeconds * 10));
                         _logger.LogInformation("{}", Convert.ToHexString(buffer));
                         command.Add(buffer);
                     }
@@ -725,7 +719,7 @@ public class BleService : IBleService
         if (sequence is null || !IsConnected || DmCommandChannel is null)
             return;
         _logger.LogInformation("sequence name {} duration {} steps {}",
-            sequence.Name, sequence.Duration, sequence.Steps.Count);
+            sequence.Name, sequence.DurationSeconds, sequence.Steps.Count);
 
         // Play the sequence
         SendBrightness(CurrentBrightness);
@@ -738,9 +732,7 @@ public class BleService : IBleService
             for (int j = 0; j < step.Oscillators.Count; j++)
             {
                 var oscillator = step.Oscillators[j];
-                if (oscillator.LEDs.Count == 0)
-                    continue;   // skip empty
-                byte[] buffer = OscToCommand(i, oscillator, j, step.Duration);
+                byte[] buffer = OscToCommand(i, oscillator, j, (int)(step.DurationSeconds * 10));
                 _logger.LogInformation("{}", Convert.ToHexString(buffer));
                 command.Add(buffer);
             }
@@ -876,52 +868,12 @@ public class BleService : IBleService
     /// </summary>
     public static byte[] OscToCommand(int stepIndex, Oscillator osc, int oscIndex, int duration)
     {
-        var command = new List<byte>
-        {
-            (byte)stepIndex,
-            (byte)oscIndex
-        };
-
-        var durationBytes = BitConverter.GetBytes((ushort)duration);
-        Array.Reverse(durationBytes);
-        command.AddRange(durationBytes);
-
-        var ledsValue = (ushort)(
-              (ushort)(osc.LEDs.Contains("A1") ? 1 : 0)
-            + (ushort)(osc.LEDs.Contains("A2") ? 2 : 0)
-            + (ushort)(osc.LEDs.Contains("A3") ? 4 : 0) // TODO test
-            + (ushort)(osc.LEDs.Contains("A4") ? 8 : 0)
-            + (ushort)(osc.LEDs.Contains("A5") ? 16 : 0)
-            + (ushort)(osc.LEDs.Contains("B1") ? 32 : 0)
-            + (ushort)(osc.LEDs.Contains("B2") ? 64 : 0)
-            + (ushort)(osc.LEDs.Contains("B3") ? 128 : 0)
-            + (ushort)(osc.LEDs.Contains("B4") ? 256 : 0)
-            + (ushort)(osc.LEDs.Contains("B5") ? 512 : 0)
-        );
-        var ledsBytes = BitConverter.GetBytes(ledsValue);
-        Array.Reverse(ledsBytes);
-        command.AddRange(ledsBytes);
-
-        var freqStartBytes = BitConverter.GetBytes((ushort)(osc.FrequencyStart * 10d));
-        Array.Reverse(freqStartBytes);
-        command.AddRange(freqStartBytes);
-
-        var freqEndBytes = BitConverter.GetBytes((ushort)(osc.FrequencyEnd * 10d));
-        Array.Reverse(freqEndBytes);
-        command.AddRange(freqEndBytes);
-
-        command.Add((byte)(osc.DutyStart));
-        command.Add((byte)(osc.DutyEnd));
-
-        var brightStartBytes = BitConverter.GetBytes((ushort)(osc.BrightnessStart * 10d));
-        Array.Reverse(brightStartBytes);
-        command.AddRange(brightStartBytes);
-
-        var brightEndBytes = BitConverter.GetBytes((ushort)(osc.BrightnessEnd * 10d));
-        Array.Reverse(brightEndBytes);
-        command.AddRange(brightEndBytes);
-
-        return [.. command];
+        // TODO: implement MHL compact wire encoder once the BLE protocol is finalized.
+        _ = stepIndex;
+        _ = osc;
+        _ = oscIndex;
+        _ = duration;
+        return [];
     }
 
 

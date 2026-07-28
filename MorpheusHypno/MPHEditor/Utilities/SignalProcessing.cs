@@ -57,7 +57,10 @@ public static class DmDSP
     /// <returns>The calculated value at the given time.</returns>
     public static double LinearValue(double atTime, double startValue, double endValue, double duration)
     {
-        return startValue + (endValue - startValue) * (atTime / duration);
+        if (duration <= 0)
+            return endValue;
+        double t = Math.Max(0.0, Math.Min(atTime, duration)) / duration;
+        return startValue + (endValue - startValue) * t;
     }
 
     // Step position in sequence
@@ -77,20 +80,22 @@ public static class DmDSP
     /// <returns>A tuple containing the step index and position in the step.</returns>
     public static (int stepIndex, int posInStep) InStepPos(double atTime, Sequence sequence)
     {
-        if (atTime > sequence.Duration)
+        if (atTime < 0 || atTime >= sequence.DurationSeconds)
         {
             return (-1, 0);
         }
 
+        double elapsed = 0;
         for (int stepIndex = 0; stepIndex < sequence.Steps.Count; stepIndex++)
         {
             var step = sequence.Steps[stepIndex];
-            // Use <= for TimeEnd to handle positions exactly at step boundaries
-            if (step.TimeStart <= atTime && atTime < step.TimeEnd)
+            double stepEnd = elapsed + step.DurationSeconds;
+            if (elapsed <= atTime && atTime < stepEnd)
             {
-                int posInStep = (int)Math.Round(atTime - step.TimeStart);
+                int posInStep = (int)Math.Round(atTime - elapsed);
                 return (stepIndex, posInStep);
             }
+            elapsed = stepEnd;
         }
 
         return (-1, 0);
@@ -119,6 +124,7 @@ public static class DmDSP
             (-1.0, 0.0, 0.0),
             (-1.0, 0.0, 0.0),
             (-1.0, 0.0, 0.0),
+            (-1.0, 0.0, 0.0),
             (-1.0, 0.0, 0.0)
         };
 
@@ -128,21 +134,46 @@ public static class DmDSP
             return (stepIndex, posInStep, oscillatorValues);
 
         var step = sequence.Steps[stepIndex];
-        double duration = step.TimeEnd - step.TimeStart;
+        double duration = step.DurationSeconds;
+        double elapsed = Math.Max(0.0, Math.Min(posInStep, duration));
 
-        for (int oscIndex = 0; oscIndex < step.Oscillators.Count; oscIndex++)
+        for (int oscIndex = 0; oscIndex < Math.Min(step.Oscillators.Count, oscillatorValues.Count); oscIndex++)
         {
             var osc = step.Oscillators[oscIndex];
-            if (osc.LEDs.Count == 0) continue; // Skip if no LEDs
 
-            double fValue = Math.Round(LinearValue(posInStep, osc.FrequencyStart, osc.FrequencyEnd, duration), 1);
-            double bValue = Math.Round(LinearValue(posInStep, osc.BrightnessStart, osc.BrightnessEnd, duration), 1);
-            double dValue = Math.Round(LinearValue(posInStep, osc.DutyStart, osc.DutyEnd, duration), 1);
+            double fValue = Math.Round(EvaluateModulator(osc.Frequency, elapsed, duration), 1);
+            double bValue = Math.Round(EvaluateModulator(osc.Brightness, elapsed, duration), 1);
+            double dValue = Math.Round(EvaluateModulator(osc.Duty, elapsed, duration), 1);
 
             oscillatorValues[oscIndex] = (fValue, bValue, dValue);
         }
 
         return (stepIndex, posInStep, oscillatorValues);
+    }
+
+    private static double EvaluateModulator(Modulator mod, double elapsed, double duration)
+    {
+        if (mod is null)
+            return 0.0;
+
+        switch (mod.Mode)
+        {
+            case ModulatorMode.Static:
+                return mod.Value ?? 0.0;
+            case ModulatorMode.Linear:
+                return LinearValue(elapsed, mod.Start ?? 0.0, mod.End ?? 0.0, duration);
+            case ModulatorMode.Lfo:
+                double t = (mod.LfoFrequency ?? 0.0) * elapsed;
+                double phase = t - Math.Floor(t);
+                double lfo = mod.LfoWaveform == LfoWaveform.Square
+                    ? (phase < 0.5 ? 0.0 : 1.0)
+                    : (Math.Sin(2.0 * Math.PI * phase) * 0.5 + 0.5);
+                double low = mod.Low ?? 0.0;
+                double high = mod.High ?? 0.0;
+                return low + (high - low) * lfo;
+            default:
+                return 0.0;
+        }
     }
 
     // PWM Generator

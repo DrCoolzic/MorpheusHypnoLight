@@ -1,11 +1,11 @@
 // Ignore Spelling: MHL
 
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Linq;
 
 namespace MPHCore.Models;
 
@@ -171,6 +171,24 @@ public class Modulator : JsonBase
     /// LFO output high value.
     /// </summary>
     public double? High { get; set; }
+
+    /// <summary>
+    /// Creates a deep copy of this modulator.
+    /// </summary>
+    public Modulator Clone()
+    {
+        return new Modulator
+        {
+            Mode = Mode,
+            Value = Value,
+            Start = Start,
+            End = End,
+            LfoWaveform = LfoWaveform,
+            LfoFrequency = LfoFrequency,
+            Low = Low,
+            High = High
+        };
+    }
 }
 
 /// <summary>
@@ -207,6 +225,21 @@ public class Oscillator : JsonBase
     /// </summary>
     [JsonProperty("duty")]
     public Modulator Duty { get; set; } = new Modulator { Mode = ModulatorMode.Static, Value = 0.5 };
+
+    /// <summary>
+    /// Creates a deep copy of this oscillator and its modulators.
+    /// </summary>
+    public Oscillator Clone()
+    {
+        return new Oscillator
+        {
+            Waveform = Waveform,
+            PhaseDegrees = PhaseDegrees,
+            Frequency = Frequency.Clone(),
+            Brightness = Brightness.Clone(),
+            Duty = Duty.Clone()
+        };
+    }
 }
 
 /// <summary>
@@ -236,6 +269,18 @@ public class Step : JsonBase
     {
         Oscillators = new List<Oscillator>();
     }
+
+    /// <summary>
+    /// Creates a deep copy of this step and its oscillators.
+    /// </summary>
+    public Step Clone()
+    {
+        return new Step
+        {
+            DurationSeconds = DurationSeconds,
+            Oscillators = Oscillators.Select(o => o.Clone()).ToList()
+        };
+    }
 }
 
 /// <summary>
@@ -257,6 +302,12 @@ public class Sequence : JsonBase
 
     [JsonProperty("steps")]
     public List<Step> Steps { get; set; } = new List<Step>();
+
+    /// <summary>
+    /// Total duration in seconds, derived from all steps.
+    /// </summary>
+    [JsonIgnore]
+    public double DurationSeconds => Steps.Sum(s => s.DurationSeconds);
 
     /// <summary>
     /// Total duration in milliseconds, derived from all steps.
