@@ -28,7 +28,7 @@ graph TD
     
     subgraph MPHCore Library
         subgraph Models
-            DmElements[DmElements]
+            MPHElements[MPHElements]
             ServerApi[Server API Models]
             AppSettings[App Settings]
             DbComparison[DB Comparison]
@@ -37,7 +37,7 @@ graph TD
         subgraph Services
             DmServerService[DmServerService]
             DbComparisonService[DbComparisonService]
-            DmElementService[DmElementService]
+            MPHElementService[MPHElementService]
             SettingsService[Settings Service]
         end
         
@@ -63,36 +63,36 @@ The Models namespace contains the core data structures used throughout the appli
 
 ```mermaid
 classDiagram
-    class DmElement {
+    class MPHElement {
         +ProgramMetadata Metadata
         +Dictionary~string, bool~ AudioItems
         +string Directory
         +Userdata Userdata
     }
     
-    class DmProgram {
-        +List~DmSequence~ SequenceItems
+    class MPHCollection {
+        +List~MPHSequence~ SequenceItems
         +int FileCount
     }
     
-    class DmSequence {
+    class MPHSequence {
         +Sequence Sequence
         +string FileName
         +int FileCount
     }
     
-    class LocalRoot {
+    class MPHRoot {
         +string Title
         +string RootPath
-        +List~DmProgram~ Programs
-        +List~DmSequence~ SessionElements
-        +List~DmSequence~ PlaylistElements
+        +List~MPHCollection~ Programs
+        +List~MPHSequence~ SessionElements
+        +List~MPHSequence~ PlaylistElements
     }
     
-    DmElement <|-- DmProgram
-    DmElement <|-- DmSequence
-    LocalRoot "1" *-- "0..*" DmProgram
-    LocalRoot "1" *-- "0..*" DmSequence
+    MPHElement <|-- MPHCollection
+    MPHElement <|-- MPHSequence
+    MPHRoot "1" *-- "0..*" MPHCollection
+    MPHRoot "1" *-- "0..*" MPHSequence
 ```
 
 ### Services
@@ -110,7 +110,7 @@ Key services that provide business logic and data access:
    - Tracks file differences
    - Generates sync recommendations
 
-3. **DmElementService**: Manages local Dream Machine elements
+3. **MPHElementService**: Manages local Dream Machine elements
    - Load/save operations
    - File system interactions
    - Metadata management

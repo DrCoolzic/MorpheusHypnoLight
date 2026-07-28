@@ -42,7 +42,7 @@ public interface ISequencePlayerService
     /// Set the Sequence and potentially the Audio of the Player.
     /// Return the Audio path if sequence has audio, otherwise null
     /// </summary>
-    string SetPlayer(DmSequence dmSequence);
+    string SetPlayer(MPHSequence MPHSequence);
 
 
     /// <summary>
@@ -95,12 +95,12 @@ public enum PlayerStateEnum
     /// Player is stopped, position is reset to beginning
     /// </summary>
     STOPPED,
-    
+
     /// <summary>
     /// Player is actively playing the sequence
     /// </summary>
     PLAYING,
-    
+
     /// <summary>
     /// Player is paused at the current position
     /// </summary>

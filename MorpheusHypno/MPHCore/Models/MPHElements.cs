@@ -1,4 +1,4 @@
-// Ignore Spelling: Dm
+// Ignore Spelling: MPH Userdata
 
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -6,36 +6,18 @@ using System.Runtime.CompilerServices;
 namespace MPHCore.Models;
 
 /// <summary>
-/// Base class for all Dream Machine elements (programs, sequences, etc.).
-/// Contains common properties like metadata, audio settings, and gradient information.
+/// Base class for all Morpheus file system elements (collections, sequences, etc.).
+/// Contains common properties shared by file-system elements such as audio items,
+/// directory information, modification state, and user data.
 /// </summary>
-public class DmElement : INotifyPropertyChanged
+public class MPHElement : INotifyPropertyChanged
 {
-    /// <summary>
-    /// Metadata associated with this element, containing properties like name, description, etc.
-    /// </summary>
-    public virtual ProgramMetadata Metadata { get; set; } = new();
-
     /// <summary>
     /// Dictionary of audio items associated with this element.
     /// Key is the audio item identifier ("default","fr","en")
     /// Value indicates if it's enabled.
     /// </summary>
     public Dictionary<string, bool> AudioItems { get; set; } = [];
-
-    /// <summary>
-    /// Audio configuration value for this element.
-    /// 0 = Unknown
-    /// 1 = Has sound
-    /// 2 = Has no sound
-    /// </summary>
-    public int Audio { get; set; } = 0;
-
-    /// <summary>
-    /// List of gradient color stops in hexadecimal format.
-    /// Default gradient goes from light gray to dark gray.
-    /// </summary>
-    public List<string> GradientStops { get; set; } = ["#DDD", "#BBB", "#999"];
 
     /// <summary>
     /// Indicates whether this element has been modified since last save.
@@ -55,7 +37,7 @@ public class DmElement : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Name of the directory containing this program.
+    /// Name of the directory containing this element.
     /// </summary>
     public string DirName { get; set; } = string.Empty;
 
@@ -79,7 +61,7 @@ public class DmElement : INotifyPropertyChanged
             }
         }
     }
-  
+
     public Userdata Userdata { get; set; } = new Userdata();
 
     #region INotifyPropertyChanged Implementation
@@ -93,39 +75,27 @@ public class DmElement : INotifyPropertyChanged
 }
 
 /// <summary>
-/// Represents a Dream Machine program that can contain multiple sequences.
-/// Programs are organized in directories and can be synchronized with the server.
+/// Represents a Morpheus collection that can contain multiple sequences.
 /// </summary>
-public class DmProgram : DmElement
+public class MPHCollection : MPHElement
 {
     /// <summary>
-    /// List of sequences contained within this program.
+    /// List of sequences contained within this collection.
     /// </summary>
-    public List<DmSequence> SequenceItems { get; set; } = [];
-
-
-    /// <summary>
-    /// Gets the number of .json and .mp3 files in the program directory.
-    /// </summary>
-    public int FileCount
-    {
-        get
-        {
-            if (Path.Exists(DirPath))
-            {
-                return System.IO.Directory.GetFiles(DirPath, "metadata.json").Length;
-            }
-            return 0;
-        }
-    }
+    public List<MPHSequence> SequenceItems { get; set; } = [];
 }
 
+
 /// <summary>
-/// Represents a Dream Machine sequence that contains oscillator patterns and settings.
-/// Sequences can exist standalone or within a program.
+/// Represents a Morpheus sequence that contains oscillator patterns and settings.
 /// </summary>
-public class DmSequence : DmElement
+public class MPHSequence : MPHElement
 {
+    /// <summary>
+    /// Metadata associated with this sequence, containing properties like name, description, etc.
+    /// </summary>
+    public SequenceMetadata Metadata { get; set; } = new();
+
     /// <summary>
     /// The actual sequence data containing steps, oscillators, etc.
     /// Can be null if the sequence hasn't been loaded yet.
@@ -154,25 +124,13 @@ public class DmSequence : DmElement
             return 0;
         }
     }
-
-    private SequenceMetadata _metadata = new();
-    /// <summary>
-    /// Metadata specific to sequences, including duration, category, level, etc.
-    /// </summary>
-    public override ProgramMetadata Metadata
-    {
-        get => _metadata;
-        set => _metadata = value as SequenceMetadata ?? new SequenceMetadata();
-    }
-
-
 }
 
 /// <summary>
-/// Root container for all Dream Machine elements in a local database.
-/// Contains lists of programs, standalone sequences, and playlists.
+/// Root container for Morpheus file-system elements.
+/// Contains collections and playlist sequences.
 /// </summary>
-public class LocalRoot
+public class MPHRoot
 {
     /// <summary>
     /// Title or name of this database root.
@@ -185,18 +143,22 @@ public class LocalRoot
     public string RootPath { get; set; } = string.Empty;
 
     /// <summary>
-    /// List of all programs in the database.
+    /// List of all collections in the database.
     /// </summary>
-    public List<DmProgram> Programs { get; set; } = [];
+    public List<MPHCollection> Programs { get; set; } = [];
 
     /// <summary>
     /// List of playlist sequences.
     /// </summary>
-    public List<DmSequence> PlaylistElements { get; set; } = [];
+    public List<MPHSequence> PlaylistElements { get; set; } = [];
 
     /// <summary>
     /// Indicates whether this database has been modified since last save.
     /// </summary>
     public bool IsModified { get; set; } = false;
+
+    /// <summary>
+    /// Indicates whether this database has been loaded from disk.
+    /// </summary>
     public bool IsLoaded { get; set; } = false;
 }

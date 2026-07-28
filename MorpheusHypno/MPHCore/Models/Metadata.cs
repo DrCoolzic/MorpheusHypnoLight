@@ -6,7 +6,7 @@ namespace MPHCore.Models;
 
 
 /// <summary>
-/// Contains metadata for DmProgram, and DmSession objects.
+/// Contains metadata for MPHCollection and MPHSequence objects.
 /// </summary>
 public class ProgramMetadata : JsonBase
 {
@@ -22,13 +22,13 @@ public class ProgramMetadata : JsonBase
     /// The name of the object as a dictionary of language keys and values.
     /// </summary>
     [JsonProperty("name")]
-    public Dictionary<string, string> NameItems { get; set; } = new () { { "en", "" }, { "fr", "" } };
+    public Dictionary<string, string> NameItems { get; set; } = new() { { "en", "" }, { "fr", "" } };
 
     /// <summary>
     /// A summary description of the object as a dictionary of language keys and values.
     /// </summary>
     [JsonProperty("summary")]
-    public Dictionary<string, string> SummaryItems { get; set; } = new () { { "en", "" }, { "fr", "" } };
+    public Dictionary<string, string> SummaryItems { get; set; } = new() { { "en", "" }, { "fr", "" } };
 
     /// <summary>
     /// the version number of the metadata format

@@ -1,11 +1,11 @@
 // Ignore Spelling: Dm metadata
 
-using MPHCore.Models;
-using MPHCore.Utilities;
-using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using MPHCore.Models;
+using MPHCore.Utilities;
 
 namespace MPHCore.Services;
 
@@ -13,12 +13,12 @@ namespace MPHCore.Services;
 /// Service for managing Dream Machine elements (programs and sequences).
 /// Handles loading, saving, and validation of elements.
 /// </summary>
-public interface IDmElementService
+public interface IMPHElementService
 {
     /// <summary>
     /// Gets the root of the Dream Machine database.
     /// </summary>
-    LocalRoot DmRoot { get; }
+    MPHRoot DmRoot { get; }
 
     /// <summary>
     /// Loads a sequence from the specified directory.
@@ -31,22 +31,22 @@ public interface IDmElementService
 /// Service for managing Dream Machine elements (programs and sequences).
 /// Handles loading, saving, and validation of elements.
 /// </summary>
-public class DmElementService(ILogger<DmElementService> logger, MetadataService metaDataService) : IDmElementService
+public class MPHElementService(ILogger<MPHElementService> logger, MetadataService metaDataService) : IMPHElementService
 {
-    private readonly ILogger<DmElementService> _logger = logger;
+    private readonly ILogger<MPHElementService> _logger = logger;
     private readonly MetadataService _metadataService = metaDataService;
-    public LocalRoot DmRoot { get; } = new();
+    public MPHRoot DmRoot { get; } = new();
 
-    private static List<string> MatchGradient(int category)
-    {
-        return category switch
-        {
-            1 => ["#D2FFFC", "#D2FFFC", "#6788F0"],
-            2 => ["#EBB6D0", "#EBB6D0", "#6788F0"],
-            3 => ["#FF20A0", "#EE2060", "#BB20A0"],
-            _ => ["#DDD", "#AAA", "#888"],
-        };
-    }
+    // private static List<string> MatchGradient(int category)
+    // {
+    //     return category switch
+    //     {
+    //         1 => ["#D2FFFC", "#D2FFFC", "#6788F0"],
+    //         2 => ["#EBB6D0", "#EBB6D0", "#6788F0"],
+    //         3 => ["#FF20A0", "#EE2060", "#BB20A0"],
+    //         _ => ["#DDD", "#AAA", "#888"],
+    //     };
+    // }
 
     /// <summary>
     /// Loads the local Dream Machine database.
@@ -60,8 +60,8 @@ public class DmElementService(ILogger<DmElementService> logger, MetadataService 
             _logger.LogInformation("Local database already loaded");
             return;
         }
-        
-        // we load the List of DmProgram (but NOT the sequences inside)
+
+        // we load the List of MPHCollection (but NOT the sequences inside)
         var programsPath = Path.Combine(DmRoot.RootPath, "Programmes");
         var programs = await LoadProgramsAsync(programsPath);
         DmRoot.Programs.Clear();
@@ -75,36 +75,36 @@ public class DmElementService(ILogger<DmElementService> logger, MetadataService 
         if (Directory.Exists(sequencesPath))
         {
             _logger.LogInformation("DM directory contains a Sequences folder");
-            var sequences = await LoadDmSequencesAsync(sequencesPath);
+            var sequences = await LoadMPHSequencesAsync(sequencesPath);
             if (sequences.Count > 0)
             {
-                var program = (new DmProgram
+                var program = (new MPHCollection
                 {
                     DirPath = sequencesPath,
                     DirName = "Sessions",
                     SequenceItems = sequences,
-                    Metadata = new ProgramMetadata
-                    {
-                        NameItems = new Dictionary<string, string> { { "default", "Sessions" } },
-                        SummaryItems = new Dictionary<string, string>
-                        {
-                            { "en", "Sorry no description" },
-                            { "fr", "Désolé pas de description" }
-                        },
-                        Version = ProgramMetadata.MetadataVersion,
-                        LastUpdated = DateTime.Now,
-                    },
-                    GradientStops = MatchGradient(0) // Default gradient for sessions
+                    //Metadata = new ProgramMetadata
+                    //{
+                    //    NameItems = new Dictionary<string, string> { { "default", "Sessions" } },
+                    //    SummaryItems = new Dictionary<string, string>
+                    //    {
+                    //        { "en", "Sorry no description" },
+                    //        { "fr", "Désolé pas de description" }
+                    //    },
+                    //    Version = ProgramMetadata.MetadataVersion,
+                    //    LastUpdated = DateTime.Now,
+                    //},
+                    //GradientStops = MatchGradient(0) // Default gradient for sessions
                 });
                 DmRoot.Programs.Add(program);
-                // check if metadata file exists otherwise create it
-                var metadataFile = Path.Combine(sequencesPath, "metadata.json");
-                if (!File.Exists(metadataFile))
-                {
-                    _logger?.LogInformation("Need to create metadata for program in {}", sequencesPath);
-                    var content = program.Metadata;
-                    await content.SaveJsonFileAsync(metadataFile);
-                }
+                //// check if metadata file exists otherwise create it
+                //var metadataFile = Path.Combine(sequencesPath, "metadata.json");
+                //if (!File.Exists(metadataFile))
+                //{
+                //    _logger?.LogInformation("Need to create metadata for program in {}", sequencesPath);
+                //    var content = program.Metadata;
+                //    await content.SaveJsonFileAsync(metadataFile);
+                //}
             }
         }
 
@@ -145,7 +145,7 @@ public class DmElementService(ILogger<DmElementService> logger, MetadataService 
     }
 
     /// <summary>
-    /// Load DmSequences from a sequence
+    /// Load MPHSequences from a sequence
     /// </summary>
     /// <param name="directoryPath"></param>
     /// <returns></returns>
@@ -154,9 +154,9 @@ public class DmElementService(ILogger<DmElementService> logger, MetadataService 
     /// - if metadata exists it provides enough information to display all information in UI
     /// - otherwise we also need to read the actual sequence to get the name and gradient
     /// </remarks>
-    public async Task<List<DmSequence>> LoadDmSequencesAsync(string directoryPath)
+    public async Task<List<MPHSequence>> LoadMPHSequencesAsync(string directoryPath)
     {
-        var sequences = new List<DmSequence>();
+        var sequences = new List<MPHSequence>();
 
         if (!Directory.Exists(directoryPath))
         {
@@ -209,9 +209,9 @@ public class DmElementService(ILogger<DmElementService> logger, MetadataService 
 
             // Set Audio field based on existence of any sound file 1=hasSound, 2=hasNoSound
             var audio = audioItems.Count > 0 ? 1 : 2;
-            List<string> gradientStops = MatchGradient(metadataContent.Category);
+            // List<string> gradientStops = MatchGradient(metadataContent.Category);
 
-            var dmSequence = new DmSequence
+            var MPHSequence = new MPHSequence
             {
                 Sequence = null,
                 Metadata = metadataContent,
@@ -219,11 +219,11 @@ public class DmElementService(ILogger<DmElementService> logger, MetadataService 
                 DirName = StringNormalizer.NormalizeString(Path.GetFileName(sequenceDir)),
                 IsModified = false,
                 AudioItems = audioItems,
-                GradientStops = gradientStops,
-                Audio = audio,
+                //GradientStops = gradientStops,
+                //Audio = audio,
                 Userdata = userData,
             };
-            sequences.Add(dmSequence);
+            sequences.Add(MPHSequence);
         }
         _logger.LogInformation("{} directory contains {Count} sequences", Path.GetFileName(directoryPath), sequences.Count);
         return sequences;
@@ -234,29 +234,29 @@ public class DmElementService(ILogger<DmElementService> logger, MetadataService 
     /// DOES NOT save the sound files
     /// </summary>
     /// <param name="directoryPath">The path to the directory where the sequence should be saved</param>
-    /// <param name="dmSequence">The sequence to save</param>
+    /// <param name="MPHSequence">The sequence to save</param>
     /// <returns>Task representing the asynchronous operation</returns>
-    public async Task SaveDmSequencesAsync(string directoryPath, DmSequence dmSequence)
+    public async Task SaveMPHSequencesAsync(string directoryPath, MPHSequence MPHSequence)
     {
         if (!Directory.Exists(directoryPath))
         {
             Directory.CreateDirectory(directoryPath);
         }
-        if (dmSequence.Metadata is SequenceMetadata seqMetadata)
+        if (MPHSequence.Metadata is SequenceMetadata seqMetadata)
             await _metadataService.SaveSequenceMetadataAsync(seqMetadata, directoryPath);
-        
-        if (dmSequence.Sequence is not null)
+
+        if (MPHSequence.Sequence is not null)
         {
             var sequenceJsonPath = Path.Combine(directoryPath, "sequence.json");
-            await dmSequence.Sequence.SaveJsonFileAsync(sequenceJsonPath);
+            await MPHSequence.Sequence.SaveJsonFileAsync(sequenceJsonPath);
             _logger.LogInformation("Saved sequence: {Path}", sequenceJsonPath);
         }
     }
 
 
-    private async Task<List<DmProgram>> LoadProgramsAsync(string directoryPath)
+    private async Task<List<MPHCollection>> LoadProgramsAsync(string directoryPath)
     {
-        var programs = new List<DmProgram>();
+        var programs = new List<MPHCollection>();
 
         try
         {
@@ -280,18 +280,18 @@ public class DmElementService(ILogger<DmElementService> logger, MetadataService 
                 if (hasSequences)
                 {
                     // we need to get the list of sequences for this program
-                    var sequenceItems = await LoadDmSequencesAsync(dir);
+                    var sequenceItems = await LoadMPHSequencesAsync(dir);
 
                     // Read metadata for the program
                     var programMetadata = await _metadataService.LoadProgramMetadataAsync(dir);
 
-                    var program = new DmProgram
+                    var program = new MPHCollection
                     {
                         SequenceItems = sequenceItems,
-                        Metadata = programMetadata,
+                        //Metadata = programMetadata,
                         DirPath = dir,
                         DirName = StringNormalizer.NormalizeString(Path.GetFileName(dir)),
-                        GradientStops = ["#4A4", "#3f5", "#0F0"] // Gradient for programs
+                        //GradientStops = ["#4A4", "#3f5", "#0F0"] // Gradient for programs
                     };
                     programs.Add(program);
                 }
@@ -305,7 +305,7 @@ public class DmElementService(ILogger<DmElementService> logger, MetadataService 
         }
     }
 
-    public async Task SaveProgramsAsync(string directoryPath, DmProgram dmProgram)
+    public async Task SaveProgramsAsync(string directoryPath, MPHCollection MPHCollection)
     {
         // Save the program to the specified directory
         if (!Directory.Exists(directoryPath))
@@ -313,31 +313,32 @@ public class DmElementService(ILogger<DmElementService> logger, MetadataService 
             Directory.CreateDirectory(directoryPath);
         }
         // Save the metadata
-        await _metadataService.SaveProgramMetadataAsync(dmProgram.Metadata, directoryPath);
+        //await _metadataService.SaveProgramMetadataAsync(MPHCollection.Metadata, directoryPath);
+
         // Save the sequences TODO ??? not sure if we need to save the sequences here
-        foreach (var sequence in dmProgram.SequenceItems)
+        foreach (var sequence in MPHCollection.SequenceItems)
         {
-            await SaveDmSequencesAsync(directoryPath, sequence);
+            await SaveMPHSequencesAsync(directoryPath, sequence);
         }
     }
 
-    public DmElement? SearchElement(string parent, Dictionary<string, string> nameItems)
+    public MPHElement? SearchElement(string parent, Dictionary<string, string> nameItems)
     {
         // Special handling for Sessions program (which uses "Sequences" directory)
         // Check if we should look in the Sessions program
-        var sessionsProgram = DmRoot.Programs.FirstOrDefault(p => 
+        var sessionsProgram = DmRoot.Programs.FirstOrDefault(p =>
             string.Equals(p.DirName, "Sessions", StringComparison.OrdinalIgnoreCase));
-        
+
         if (sessionsProgram != null)
         {
             var sessionSequence = sessionsProgram.SequenceItems.FirstOrDefault(s =>
                 s.Metadata.NameItems.Any(n => nameItems.ContainsKey(n.Key) &&
                 string.Equals(n.Value, nameItems[n.Key], StringComparison.OrdinalIgnoreCase)));
-            
+
             if (sessionSequence != null)
                 return sessionSequence;
         }
-        
+
         // Search in regular programs
         var program = DmRoot.Programs.FirstOrDefault(p => string.Equals(p.DirName, parent, StringComparison.OrdinalIgnoreCase));
         var seqInProg = program?.SequenceItems.FirstOrDefault(s =>
@@ -346,9 +347,9 @@ public class DmElementService(ILogger<DmElementService> logger, MetadataService 
         return seqInProg;
     }
 
-    public async Task<List<DmSequence>> LoadPlaylistsAsync(string playlistPath)
+    public async Task<List<MPHSequence>> LoadPlaylistsAsync(string playlistPath)
     {
-        var playlists = new List<DmSequence>();
+        var playlists = new List<MPHSequence>();
         if (!Directory.Exists(playlistPath))
         {
             _logger.LogInformation("Creating Playlists sequence: {}", playlistPath);
@@ -361,7 +362,7 @@ public class DmElementService(ILogger<DmElementService> logger, MetadataService 
         {
             var metadata = await MetadataService.LoadPlaylistMetadataAsync(file);
 
-            List<string> gradientStops = MatchGradient(metadata.Category);
+            // List<string> gradientStops = MatchGradient(metadata.Category);
 
             // we need to find the sequence
             var sequence = SearchElement(metadata.Parent, metadata.NameItems);
@@ -381,7 +382,7 @@ public class DmElementService(ILogger<DmElementService> logger, MetadataService 
                 // Set Audio field based on existence of any sound file 1=hasSound, 2=hasNoSound
                 var audio = audioItems.Count > 0 ? 1 : 2;
 
-                var playlist = new DmSequence
+                var playlist = new MPHSequence
                 {
                     Metadata = metadata,
                     DirPath = sequence.DirPath,
@@ -390,8 +391,8 @@ public class DmElementService(ILogger<DmElementService> logger, MetadataService 
                     FileName = file,
                     DirName = Path.GetFileName(sequence.DirPath),
                     AudioItems = audioItems,
-                    GradientStops = gradientStops,
-                    Audio = audio
+                    //GradientStops = gradientStops,
+                    //Audio = audio
                 };
                 playlists.Add(playlist);
             }

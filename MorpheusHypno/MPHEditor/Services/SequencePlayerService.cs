@@ -1,13 +1,13 @@
 // Ignore Spelling: ble dm
 
+using System.Diagnostics;
+using Microsoft.Extensions.Logging;
+using Microsoft.Maui.Controls;
 using MPHCore.Models;
 using MPHCore.Services;
 using MPHCore.Utilities;
 using MPHEditor.Utilities;
-using Microsoft.Extensions.Logging;
-using Microsoft.Maui.Controls;
 using Plugin.Maui.Audio;
-using System.Diagnostics;
 
 namespace MPHEditor.Services;
 
@@ -82,14 +82,14 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
     #region Interface Methods
 
     /// <inheritdoc />
-    public string SetPlayer(DmSequence dmSequence)
+    public string SetPlayer(MPHSequence MPHSequence)
     {
-        if (dmSequence.Sequence is null)
+        if (MPHSequence.Sequence is null)
         {
             _logger.LogWarning("Attempted to set player with a null sequence");
             return string.Empty;
         }
-        _sequence = dmSequence.Sequence;
+        _sequence = MPHSequence.Sequence;
         _sequenceToPlay = _sequence;
         _duration = _sequence.Duration;
         _logger.LogInformation("Set player sequence to {} with duration {}", _sequence.Name, _sequence.Duration);
@@ -97,9 +97,9 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
         // Check if sequence has audio and select the appropriate audio file
         string audioPath = string.Empty;
         string audioKey =
-            dmSequence.AudioItems.ContainsKey("default") ? "default" :
-            dmSequence.AudioItems.ContainsKey("en") ? "en" :
-            dmSequence.AudioItems.ContainsKey("fr") ? "fr" :
+            MPHSequence.AudioItems.ContainsKey("default") ? "default" :
+            MPHSequence.AudioItems.ContainsKey("en") ? "en" :
+            MPHSequence.AudioItems.ContainsKey("fr") ? "fr" :
             string.Empty;
 
         if (!string.IsNullOrEmpty(audioKey))
@@ -110,7 +110,7 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
                 "fr" => "son_fr.mp3",
                 _ => "son.mp3"
             };
-            audioPath = Path.Combine(dmSequence.DirPath, audioName);
+            audioPath = Path.Combine(MPHSequence.DirPath, audioName);
             _logger.LogInformation("Found audio for key {}: {}", audioKey, audioPath);
         }
         else
