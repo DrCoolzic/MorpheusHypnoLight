@@ -96,7 +96,7 @@ public class MPHElementService(ILogger<MPHElementService> logger, MetadataServic
         //         //var metadataFile = Path.Combine(sequencesPath, "metadata.json");
         //         //if (!File.Exists(metadataFile))
         //         //{
-        //         //    _logger?.LogInformation("Need to create metadata for program in {}", sequencesPath);
+        //         //    _logger.LogInformation("Need to create metadata for program in {}", sequencesPath);
         //         //    var content = program.Metadata;
         //         //    await content.SaveJsonFileAsync(metadataFile);
         //         //}
@@ -109,7 +109,7 @@ public class MPHElementService(ILogger<MPHElementService> logger, MetadataServic
         MPHRoot.PlaylistElements.Clear();
         foreach (var playlist in playlists)
             MPHRoot.PlaylistElements.Add(playlist);
-        _logger?.LogInformation("Database root contains {Count} playlists", MPHRoot.PlaylistElements.Count);
+        _logger.LogInformation("Database root contains {Count} playlists", MPHRoot.PlaylistElements.Count);
 
         MPHRoot.Title = "Sessions";
         MPHRoot.IsLoaded = true;
@@ -155,7 +155,7 @@ public class MPHElementService(ILogger<MPHElementService> logger, MetadataServic
 
         if (!Directory.Exists(directoryPath))
         {
-            _logger?.LogWarning("Creating sequences directory: {}", directoryPath);
+            _logger.LogWarning("Creating sequences directory: {}", directoryPath);
             Directory.CreateDirectory(directoryPath);
             return sequences;
         }
@@ -272,7 +272,7 @@ public class MPHElementService(ILogger<MPHElementService> logger, MetadataServic
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Failed to get collections in directory: {}", directoryPath);
+            _logger.LogError(ex, "Failed to get collections in directory: {}", directoryPath);
             return collections;
         }
     }

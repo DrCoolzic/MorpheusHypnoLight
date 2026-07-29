@@ -1,9 +1,9 @@
 // Ignore Spelling: Username Auth deserialize deserialization
 
-using MPHCore.Utilities;
-using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Linq;
+using MPHCore.Utilities;
+using Newtonsoft.Json;
 
 namespace MPHCore.Models;
 
@@ -79,10 +79,10 @@ public class ApiFile
 
     [JsonProperty("file_hash")]
     public string FileHash { get; set; } = string.Empty;
-    
+
     [JsonProperty("program_id")]
     public int ProgramId { get; set; }
-    
+
     [JsonProperty("sequence_id")]
     public int? SequenceId { get; set; }
 }
@@ -105,8 +105,8 @@ public class ApiUser
     [JsonProperty("role")]
     public string Role { get; set; } = string.Empty;
 
-    public bool IsAdmin 
-    { 
+    public bool IsAdmin
+    {
         get => Role.Equals("admin", StringComparison.CurrentCultureIgnoreCase);
         set => Role = value ? "admin" : "user";
     }
@@ -187,31 +187,57 @@ public enum ApiErrorType
     /// No error occurred
     /// </summary>
     None,
-    
+
     /// <summary>
     /// Authentication failed due to invalid credentials
     /// </summary>
     AuthenticationFailed,
-    
+
     /// <summary>
     /// Server returned an error response
     /// </summary>
     ServerError,
-    
+
     /// <summary>
     /// Connection to the server failed (server down or network issue)
     /// </summary>
     ConnectionFailed,
-    
+
     /// <summary>
     /// Error parsing the server response
     /// </summary>
     ResponseParsingError,
-    
+
     /// <summary>
     /// Other unspecified error
     /// </summary>
     Other
+}
+
+/// <summary>
+/// Represents the current state of the connection to the backend server.
+/// </summary>
+public enum ServerConnectionStatus
+{
+    /// <summary>
+    /// The connection status is being determined.
+    /// </summary>
+    Checking,
+
+    /// <summary>
+    /// The server is reachable and authenticated.
+    /// </summary>
+    Online,
+
+    /// <summary>
+    /// The server is unreachable or the app is offline.
+    /// </summary>
+    Offline,
+
+    /// <summary>
+    /// An error occurred while checking the server status.
+    /// </summary>
+    Error
 }
 
 public class ApiResponse<T>
@@ -233,19 +259,19 @@ public class ApiResponse<T>
     /// </summary>
     [JsonProperty("error")]
     public string? Error { get; set; }
-    
+
     /// <summary>
     /// Detailed error information
     /// </summary>
     [JsonProperty("errorDetails")]
     public ApiError? ErrorDetails { get; set; }
-    
+
     /// <summary>
     /// Type of error that occurred
     /// </summary>
     [JsonProperty("errorType")]
     public ApiErrorType ErrorType { get; set; } = ApiErrorType.None;
-    
+
     /// <summary>
     /// Creates an error response
     /// </summary>
@@ -259,7 +285,7 @@ public class ApiResponse<T>
             ErrorType = errorType
         };
     }
-    
+
     /// <summary>
     /// Creates an error response with just a message
     /// </summary>
@@ -272,7 +298,7 @@ public class ApiResponse<T>
             ErrorType = errorType
         };
     }
-    
+
     /// <summary>
     /// Creates a success response with data
     /// </summary>
@@ -302,14 +328,14 @@ public class ApiError
     /// </summary>
     [JsonProperty("message")]
     public string? Message { get; set; }
-    
+
     /// <summary>
     /// Default constructor
     /// </summary>
     public ApiError()
     {
     }
-    
+
     /// <summary>
     /// Constructor with code and message
     /// </summary>

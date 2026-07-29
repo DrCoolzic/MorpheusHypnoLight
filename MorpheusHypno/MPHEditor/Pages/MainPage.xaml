@@ -14,5 +14,27 @@
         <Button Text="Scan BLE"
                 Command="{Binding ScanCommand}"
                 HorizontalOptions="Center" />
+
+        <Label Text="{Binding IsConnecting, StringFormat='Connecting: {0}'}"
+               FontSize="14"
+               HorizontalOptions="Center" />
+        <Label Text="{Binding IsConnected, StringFormat='Connected: {0}'}"
+               FontSize="14"
+               HorizontalOptions="Center" />
+        <Label Text="{Binding BleStatusMessage, StringFormat='BLE Status: {0}'}"
+               FontSize="14"
+               HorizontalOptions="Center" />
+
+        <HorizontalStackLayout Spacing="15" HorizontalOptions="Center">
+            <Button Text="Play"
+                    Command="{Binding PlayCommand}"
+                    HorizontalOptions="Center" />
+            <Button Text="Pause"
+                    Command="{Binding PauseCommand}"
+                    HorizontalOptions="Center" />
+            <Button Text="Stop"
+                    Command="{Binding StopCommand}"
+                    HorizontalOptions="Center" />
+        </HorizontalStackLayout>
     </VerticalStackLayout>
 </ContentPage>
