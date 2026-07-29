@@ -8,12 +8,14 @@
         <Label Text="Morpheus HypnoLight Player"
                FontSize="24"
                HorizontalOptions="Center" />
-        <Label Text="{Binding Status}"
-               FontSize="14"
-               HorizontalOptions="Center" />
-        <Button Text="Scan BLE"
-                Command="{Binding ScanCommand}"
-                HorizontalOptions="Center" />
+        <HorizontalStackLayout Spacing="15" HorizontalOptions="Center">
+              <Button Text="Connect"
+                     Command="{Binding ConnectCommand}"
+                     HorizontalOptions="Center" />
+              <Button Text="Disconnect"
+                     Command="{Binding DisconnectCommand}"
+                     HorizontalOptions="Center" />
+        </HorizontalStackLayout>
 
         <Label Text="{Binding IsConnecting, StringFormat='Connecting: {0}'}"
                FontSize="14"
@@ -24,8 +26,14 @@
         <Label Text="{Binding BleStatusMessage, StringFormat='BLE Status: {0}'}"
                FontSize="14"
                HorizontalOptions="Center" />
+        <Label Text="{Binding CurrentSequence, StringFormat='Current Sequence: {0}'}"
+               FontSize="14"
+               HorizontalOptions="Center" />
 
         <HorizontalStackLayout Spacing="15" HorizontalOptions="Center">
+            <Button Text="Load Sequence"
+                    Command="{Binding LoadSequenceCommand}"
+                    HorizontalOptions="Center" />
             <Button Text="Play"
                     Command="{Binding PlayCommand}"
                     HorizontalOptions="Center" />
@@ -35,6 +43,12 @@
             <Button Text="Stop"
                     Command="{Binding StopCommand}"
                     HorizontalOptions="Center" />
+            <Label Text="{Binding CommandOpcode, StringFormat='Command Opcode: {0}'}"
+                   FontSize="14"
+                   HorizontalOptions="Center" />
+            <Label Text="{Binding CommandResultCode, StringFormat='Command Result Code: {0}'}"
+                   FontSize="14"
+                   HorizontalOptions="Center" />
         </HorizontalStackLayout>
     </VerticalStackLayout>
 </ContentPage>

@@ -14,8 +14,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IBleService _bleService;
     private readonly IMPHElementService _mes;
 
-    [ObservableProperty]
-    public partial string Status { get; set; } = "Ready";
+    private Sequence? _currentSequence;
 
     public MainViewModel(
         ILogger<MainViewModel> logger,
@@ -39,11 +38,26 @@ public partial class MainViewModel : ObservableObject
         _bleService.ConnectingChanged += (sender, isConnecting) => IsConnecting = isConnecting;
         _bleService.ConnectedChanged += (sender, isConnected) => IsConnected = isConnected;
 
+        _bleService.CommandStatusReceived += (sender, args) =>
+        {
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                // Update observable properties based on command status
+                CommandOpcode = $"0x{args.Opcode:X2}";
+                CommandResultCode = $"0x{args.ResultCode:X2}";
+            });
+        };
 
         _logger.LogInformation("Initializing MainViewModel");
         _ = InitializeAsync();
 
     }
+    
+    [ObservableProperty]
+    public partial string CommandOpcode { get; set; } = "0x??";
+    
+    [ObservableProperty]
+    public partial string CommandResultCode { get; set; } = "0x??";
 
     [ObservableProperty]
     public partial bool IsConnecting { get; set; } = false;
@@ -55,6 +69,9 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     public partial string BleStatusMessage { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string CurrentSequence { get; set; } = "None";
 
 
     private async Task InitializeAsync()
@@ -97,22 +114,35 @@ public partial class MainViewModel : ObservableObject
 
         var sequenceDir = sequenceItem.DirPath;
         _logger.LogInformation("Sequence directory: {SequenceDir}", sequenceDir);
-        var sequence = await _mes.LoadSequenceAsync(sequenceDir);
+        _currentSequence = await _mes.LoadSequenceAsync(sequenceDir);
+        CurrentSequence = _currentSequence?.Name ?? "None";
     }
 
     [RelayCommand]
-    private async Task ScanAsync()
+    private async Task Connect()
     {
-        _logger.LogInformation("Checking Bluetooth status...");
+        _logger.LogInformation("Connecting to device...");
         try
         {
-            var enabled = await _bleService.CheckBluetoothStatusAsync();
-            Status = enabled ? "Bluetooth enabled" : "Bluetooth disabled";
+            await _bleService.ConnectAsync();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Bluetooth status check failed");
-            Status = "Bluetooth status check failed";
+            _logger.LogError(ex, "Connection failed");
+        }
+    }
+
+    [RelayCommand]
+    private async Task Disconnect()
+    {
+        _logger.LogInformation("Disconnecting from device...");
+        try
+        {
+            await _bleService.ForceDisconnectAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Connection failed");
         }
     }
 
@@ -135,5 +165,12 @@ public partial class MainViewModel : ObservableObject
     {
         _logger.LogInformation("Sending STOP command");
         await _bleService.StopAsync();
+    }
+    
+    [RelayCommand]
+    private async Task LoadSequenceAsync()
+    {
+        _logger.LogInformation("Loading sequence");
+        await _bleService.LoadSequenceAsync(_currentSequence!);
     }
 }
