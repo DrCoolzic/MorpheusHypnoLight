@@ -46,6 +46,15 @@ public interface IBleService
     event EventHandler<string> StatusChanged;
 
     /// <summary>
+    /// Raised when a status notification is received from the device's Status characteristic.
+    /// </summary>
+    /// <remarks>
+    /// The tuple contains the echoed opcode and the result code, as described in
+    /// <c>doc/ble_protocol.md</c>.
+    /// </remarks>
+    event EventHandler<(byte Opcode, byte ResultCode)> CommandStatusReceived;
+
+    /// <summary>
     /// Checks whether Bluetooth is enabled and all required permissions are granted.
     /// </summary>
     /// <returns>True if Bluetooth can be used, false otherwise.</returns>

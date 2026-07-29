@@ -3,6 +3,7 @@
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using MPHCore.Models;
+using MPHCore.Utilities;
 using Plugin.BLE;
 using Plugin.BLE.Abstractions.Contracts;
 using Plugin.BLE.Abstractions.EventArgs;
@@ -22,16 +23,16 @@ public class BleService : IBleService
     private readonly IDispatcherTimer? _autoConnectTimer;
     private const int CONNECTION_CHECK_INTERVAL = 5000; // Check every 5 seconds
     private const int AUTO_CONNECT_INTERVAL = 30000;   // Try to connect every 30 seconds
-    private bool _dmConnected = false;
+    private bool _mhlConnected = false;
     private IDevice? MHLIDevice = null;
     private IService? MHLIService { get; set; } = null;
-    private ICharacteristic? MHLBrightChannel { get; set; } = null;
     private ICharacteristic? MHLCommandChannel { get; set; } = null;
-    private readonly SemaphoreSlim _playSequenceSemaphore = new(1, 1);
+    private ICharacteristic? MHLStatusChannel { get; set; } = null;
     private readonly SemaphoreSlim _bleWriteSemaphore = new(1, 1);
     private const int BLE_WRITE_DELAY_MS = 10; // Delay between BLE writes 50?
-    private volatile Sequence? _pendingSequence = null;
-    private volatile Step? _pendingStep = null;
+    // Safe default: fits a 23-byte ATT MTU (1 opcode + 2 offset + 17 data), matches firmware/scripts/ble_transfer.py.
+    private const int BLE_TRANSFER_CHUNK_SIZE = 17;
+    private const int COMMAND_STATUS_TIMEOUT_MS = 5000;
 
     #region properties
     private bool _isConnected = false;
@@ -64,6 +65,11 @@ public class BleService : IBleService
         }
     }
     public event EventHandler<string>? StatusChanged;
+
+    /// <summary>
+    /// Raised when a status notification (echoed opcode + result code) is received from the device.
+    /// </summary>
+    public event EventHandler<(byte Opcode, byte ResultCode)>? CommandStatusReceived;
 
 
     private bool _isConnecting = false;
@@ -279,6 +285,11 @@ public class BleService : IBleService
 
         Status = $"Disconnecting ...";
         StopConnectionCheck();
+        if (MHLStatusChannel != null)
+        {
+            MHLStatusChannel.ValueUpdated -= OnStatusCharacteristicUpdated;
+            MHLStatusChannel = null;
+        }
         try
         {
             // Try to clean up the connection
@@ -289,7 +300,7 @@ public class BleService : IBleService
         {
             _logger.LogError("Error during disconnect cleanup: {}", ex.Message);
         }
-        _dmConnected = false;
+        _mhlConnected = false;
         IsConnected = false;
         Status = $"Disconnected";
         _logger.LogInformation("connection to the MHL closed - restarting auto-connect");
@@ -303,7 +314,7 @@ public class BleService : IBleService
     public async Task ForceDisconnectAsync()
     {
         await DisconnectAsync();
-        _dmConnected = false;
+        _mhlConnected = false;
         IsConnected = false;
         _logger.LogInformation("Force disconnection - stopping auto-connect");
         _autoConnectTimer?.Stop();
@@ -321,7 +332,7 @@ public class BleService : IBleService
     /// </remarks>
     private async void ConnectionCheckTimer_Tick(object? sender, EventArgs e)
     {
-        if (MHLIDevice != null && _dmConnected)
+        if (MHLIDevice != null && _mhlConnected)
         {
             try
             {
@@ -349,7 +360,7 @@ public class BleService : IBleService
     /// </summary>
     private async void AutoConnectTimer_Tick(object? sender, EventArgs e)
     {
-        if (!_dmConnected)
+        if (!_mhlConnected)
         {
             _logger.LogInformation("Auto-connect: attempting to find and connect to MHL");
             await ConnectAsync();
@@ -393,8 +404,8 @@ public class BleService : IBleService
     /// <param name="sender">Event sender</param>
     /// <param name="args">Device event arguments containing discovered device information</param>
     /// <remarks>
-    /// Only processes devices with names starting with "DM_".
-    /// When a Morpheus HypnoLight device is found (devices with names starting with "DM_"), 
+    /// Only processes devices with names starting with "HypnoLight".
+    /// When a Morpheus HypnoLight device is found (devices with names starting with "HypnoLight"), 
     /// scanning is stopped and connection can proceed.
     /// </remarks>
     private async void OnDeviceDiscovered(object? sender, DeviceEventArgs args)
@@ -405,7 +416,7 @@ public class BleService : IBleService
             return;
         }
 
-        if (args.Device.Name.StartsWith("DM_"))
+        if (args.Device.Name.StartsWith("HypnoLight"))
         {
             _logger.LogInformation("Found MHL device: {} (ID: {}, RSSI: {})", args.Device.Name, args.Device.Id, args.Device.Rssi);
             _ = new BleDevice(args.Device.Name, args.Device.Id, args.Device.Rssi);
@@ -489,7 +500,7 @@ public class BleService : IBleService
             Status = $"Connected to {MHLIDevice.Name} looking for MHL Service and Characteristics ...";
             await GetMHLServiceAndCharacteristics();
 
-            if (MHLIService == null || MHLBrightChannel == null || MHLCommandChannel == null)
+            if (MHLIService == null || MHLStatusChannel == null || MHLCommandChannel == null)
             {
                 _logger.LogError("Problem getting MHL characteristics");
                 Status = "Problem getting characteristics";
@@ -517,9 +528,9 @@ public class BleService : IBleService
     /// </remarks>
     private async Task GetMHLServiceAndCharacteristics()
     {
-        Guid ServiceUuid = Guid.Parse("36794f20-3a88-418c-8df8-7394c5c80200");
-        Guid CommandUuid = Guid.Parse("36794f20-3a88-418c-8df8-7394c5c80201");
-        Guid VolumeUuid_ = Guid.Parse("36794f20-3a88-418c-8df8-7394c5c80202");
+        Guid ServiceUuid = Guid.Parse("d4c38bc0-4f25-af02-8f15-a1b5c2a60000");
+        Guid CommandUuid = Guid.Parse("d4c38bc0-4f25-af02-8f15-a1b5c2a60001");
+        Guid StatusUuid = Guid.Parse("d4c38bc0-4f25-af02-8f15-a1b5c2a60002");
 
         if (MHLIDevice == null)
         {
@@ -538,31 +549,50 @@ public class BleService : IBleService
                 return;
             }
 
-            _logger.LogInformation("Getting volume ch: {}", VolumeUuid_);
-            MHLBrightChannel = await MHLIService.GetCharacteristicAsync(VolumeUuid_);
-            if (MHLBrightChannel == null)
-            {
-                _logger.LogError("Failed to get brightness characteristic");
-                return;
-            }
-
-            // Check if characteristic has write permission
-            if (!MHLBrightChannel.CanWrite)
-            {
-                _logger.LogError("Brightness characteristic does not have write permission");
-                return;
-            }
-
             _logger.LogInformation("Getting command ch: {}", CommandUuid);
             MHLCommandChannel = await MHLIService.GetCharacteristicAsync(CommandUuid);
+            if (MHLCommandChannel == null)
+            {
+                _logger.LogError("Failed to get command characteristic");
+                return;
+            }
+
+            _logger.LogInformation("Getting status ch: {}", StatusUuid);
+            MHLStatusChannel = await MHLIService.GetCharacteristicAsync(StatusUuid);
+            if (MHLStatusChannel != null)
+            {
+                MHLStatusChannel.ValueUpdated += OnStatusCharacteristicUpdated;
+                await MHLStatusChannel.StartUpdatesAsync();
+            }
         }
         catch (Exception ex)
         {
             _logger.LogError("Error getting service: {}", ex.Message);
             MHLIService = null;
-            MHLBrightChannel = null;
             MHLCommandChannel = null;
+            MHLStatusChannel = null;
         }
+    }
+
+    /// <summary>
+    /// Handler for status notifications received from the device's Status characteristic.
+    /// </summary>
+    /// <param name="sender">Event sender</param>
+    /// <param name="e">Characteristic update event arguments containing the 2-byte status payload</param>
+    /// <remarks>See <c>doc/ble_protocol.md</c> for the status payload layout.</remarks>
+    private void OnStatusCharacteristicUpdated(object? sender, CharacteristicUpdatedEventArgs e)
+    {
+        var data = e.Characteristic.Value;
+        if (data == null || data.Length < 2)
+        {
+            _logger.LogWarning("Received malformed status notification ({length} bytes)", data?.Length ?? 0);
+            return;
+        }
+
+        byte opcode = data[0];
+        byte resultCode = data[1];
+        _logger.LogInformation("Status notification: opcode=0x{opcode:X2} result=0x{resultCode:X2}", opcode, resultCode);
+        CommandStatusReceived?.Invoke(this, (opcode, resultCode));
     }
 
     /// <summary>
@@ -572,7 +602,7 @@ public class BleService : IBleService
     /// <param name="args">Device event arguments containing connected device information</param>
     private void OnDeviceConnected(object? sender, DeviceEventArgs args)
     {
-        _dmConnected = true;
+        _mhlConnected = true;
         _logger.LogInformation("Event: Connected to Device: {}", args.Device.Name);
         Status = $"Connected to {args.Device.Name}";
         StartConnectionCheck();
@@ -585,7 +615,7 @@ public class BleService : IBleService
     /// <param name="args">Device event arguments containing disconnected device information</param>
     private void OnDeviceDisconnected(object? sender, DeviceEventArgs args)
     {
-        _dmConnected = false;
+        _mhlConnected = false;
         _logger.LogInformation("Event: Disconnected from Device: {}", args.Device.Name);
         Status = $"Disconnected from {args.Device.Name}";
         StopConnectionCheck();
@@ -594,224 +624,37 @@ public class BleService : IBleService
     #endregion
 
     /// <summary>
-    /// Sends a single step to the connected device asynchronously.
-    /// </summary>
-    /// <param name="step">The step to play.</param>
-    public async Task PlayStepAsync(Step step)
-    {
-        if (step is null || !IsConnected || MHLCommandChannel is null)
-            return;
-
-        // Store this as the pending step
-        _pendingStep = step;
-
-        // If we can't get the semaphore immediately, return - another operation is in progress
-        // and will pick up our pending step when it's done
-        if (!_playSequenceSemaphore.Wait(0))
-        {
-            _logger.LogInformation("Step queued, waiting for current operation to complete");
-            return;
-        }
-
-        try
-        {
-            while (true)
-            {
-                // Get the next step to play
-                var stepToPlay = _pendingStep;
-                if (stepToPlay == null)
-                    break;
-
-                // Clear the pending step before playing
-                _pendingStep = null;
-
-                // Play the step
-                await WriteBufferAsync(MHLCommandChannel, [0x01]);  // Start command
-
-                var command = new List<byte[]>();
-                for (int i = 0; i < step.Oscillators.Count; i++)
-                {
-                    var oscillator = step.Oscillators[i];
-                    byte[] buffer = OscToCommand(0, oscillator, i, (int)(step.DurationSeconds * 10));
-                    _logger.LogInformation("async buffer {}", Convert.ToHexString(buffer));
-                    command.Add(buffer);
-                }
-
-                foreach (var item in command)
-                {
-                    await WriteBufferAsync(MHLCommandChannel, item);
-                }
-
-                await WriteBufferAsync(MHLCommandChannel, [0x02]);  // End command
-            }
-        }
-        finally
-        {
-            _playSequenceSemaphore.Release();
-        }
-    }
-
-    /// <summary>
-    /// Sends a single step to the connected device synchronously.
-    /// </summary>
-    /// <param name="step">The step to play.</param>
-    public void PlayStep(Step step)
-    {
-        if (step is null || !IsConnected || MHLCommandChannel is null)
-            return;
-
-        // Play the step
-        MHLCommandChannel.WriteAsync([0x01]);  // Start command
-
-        var command = new List<byte[]>();
-        for (int i = 0; i < step.Oscillators.Count; i++)
-        {
-            var oscillator = step.Oscillators[i];
-            byte[] buffer = OscToCommand(0, oscillator, i, (int)(step.DurationSeconds * 10));
-            _logger.LogInformation("buffer {}", Convert.ToHexString(buffer));
-            command.Add(buffer);
-        }
-
-        foreach (var item in command)
-        {
-            MHLCommandChannel.WriteAsync(item);
-        }
-
-        MHLCommandChannel.WriteAsync([0x02]);  // End command
-
-    }
-
-    /// <summary>
-    /// Sends the full sequence to the connected device asynchronously.
-    /// </summary>
-    /// <param name="sequence">The sequence to play.</param>
-    public async Task PlaySequenceAsync(Sequence sequence)
-    {
-        if (sequence is null || !IsConnected || MHLCommandChannel is null)
-            return;
-
-        // Store this as the pending sequence
-        _pendingSequence = sequence;
-
-        // If we can't get the semaphore immediately, return - another operation is in progress
-        // and will pick up our pending sequence when it's done
-        if (!_playSequenceSemaphore.Wait(0))
-        {
-            _logger.LogInformation("Sequence queued, waiting for current operation to complete");
-            return;
-        }
-
-        try
-        {
-            while (true)
-            {
-                // Get the next sequence to play
-                var sequenceToPlay = _pendingSequence;
-                if (sequenceToPlay == null)
-                    break;
-
-                // Clear the pending sequence before playing
-                _pendingSequence = null;
-
-                // Play the sequence
-                await SendBrightnessAsync(CurrentBrightness);
-                await WriteBufferAsync(MHLCommandChannel, [0x01]);  // Start command
-
-                var command = new List<byte[]>();
-                for (int i = 0; i < sequenceToPlay.Steps.Count; i++)
-                {
-                    var step = sequenceToPlay.Steps[i];
-                    for (int j = 0; j < step.Oscillators.Count; j++)
-                    {
-                        var oscillator = step.Oscillators[j];
-                        byte[] buffer = OscToCommand(i, oscillator, j, (int)(step.DurationSeconds * 10));
-                        _logger.LogInformation("{}", Convert.ToHexString(buffer));
-                        command.Add(buffer);
-                    }
-                }
-
-                foreach (var item in command)
-                {
-                    await WriteBufferAsync(MHLCommandChannel, item);
-                }
-
-                await WriteBufferAsync(MHLCommandChannel, [0x02]);  // End command
-
-                // If a new sequence was queued while we were playing, loop and play it
-            }
-        }
-        finally
-        {
-            _playSequenceSemaphore.Release();
-        }
-    }
-
-
-
-    /// <summary>
-    /// Sends the full sequence to the connected device synchronously.
-    /// </summary>
-    /// <param name="sequence">The sequence to play.</param>
-    public void PlaySequence(Sequence sequence)
-    {
-        if (sequence is null || !IsConnected || MHLCommandChannel is null)
-            return;
-        _logger.LogInformation("sequence name {} duration {} steps {}",
-            sequence.Name, sequence.DurationSeconds, sequence.Steps.Count);
-
-        // Play the sequence
-        SendBrightness(CurrentBrightness);
-        MHLCommandChannel.WriteAsync([0x01]);  // Start of frame
-
-        var command = new List<byte[]>();
-        for (int i = 0; i < sequence.Steps.Count; i++)
-        {
-            var step = sequence.Steps[i];
-            for (int j = 0; j < step.Oscillators.Count; j++)
-            {
-                var oscillator = step.Oscillators[j];
-                byte[] buffer = OscToCommand(i, oscillator, j, (int)(step.DurationSeconds * 10));
-                _logger.LogInformation("{}", Convert.ToHexString(buffer));
-                command.Add(buffer);
-            }
-        }
-
-        foreach (var item in command)
-        {
-            MHLCommandChannel.WriteAsync(item);
-        }
-
-        MHLCommandChannel.WriteAsync([0x02]);  // End of frame command
-    }
-
-    /// <summary>
     /// Sends the <c>PLAY</c> command (opcode <c>0x01</c>) to start or resume playback.
     /// </summary>
-    /// <remarks>
-    /// Stub implementation: the MHL compact wire protocol is not yet wired up.
-    /// See <c>doc/ble_protocol.md</c> for the target protocol.
-    /// </remarks>
-    public Task PlayAsync()
+    /// <remarks>See <c>doc/ble_protocol.md</c> for the wire protocol.</remarks>
+    public async Task PlayAsync()
     {
-        // TODO: send opcode 0x01 (PLAY) once the MHL wire protocol is implemented.
-        _logger.LogWarning("PlayAsync is not implemented yet");
-        return Task.CompletedTask;
+        if (!IsConnected || MHLCommandChannel is null)
+            return;
+
+        _logger.LogInformation("Sending PLAY command");
+        await WriteBufferAsync(MHLCommandChannel, [0x01]);
     }
 
     /// <summary>
     /// Sends the <c>SEEK</c> command (opcode <c>0x04</c>) to jump to an absolute position.
     /// </summary>
     /// <param name="positionMs">The target position, in milliseconds.</param>
-    /// <remarks>
-    /// Stub implementation: the MHL compact wire protocol is not yet wired up.
-    /// See <c>doc/ble_protocol.md</c> for the target protocol.
-    /// </remarks>
-    public Task SeekAsync(int positionMs)
+    /// <remarks>See <c>doc/ble_protocol.md</c> for the wire protocol.</remarks>
+    public async Task SeekAsync(int positionMs)
     {
-        // TODO: send opcode 0x04 (SEEK) with a 4-byte little-endian position_ms payload.
-        _ = positionMs;
-        _logger.LogWarning("SeekAsync is not implemented yet");
-        return Task.CompletedTask;
+        if (!IsConnected || MHLCommandChannel is null)
+            return;
+
+        _logger.LogInformation("Sending SEEK command to {positionMs}ms", positionMs);
+        var positionBytes = BitConverter.GetBytes((uint)positionMs);
+        if (!BitConverter.IsLittleEndian)
+            Array.Reverse(positionBytes);
+
+        var command = new byte[5];
+        command[0] = 0x04;
+        Array.Copy(positionBytes, 0, command, 1, 4);
+        await WriteBufferAsync(MHLCommandChannel, command);
     }
 
     /// <summary>
@@ -819,19 +662,23 @@ public class BleService : IBleService
     /// </summary>
     /// <param name="seq">The sequence to encode and transfer.</param>
     /// <remarks>
-    /// Stub implementation: the MHL compact wire protocol is not yet wired up.
-    /// Once implemented, this method will encode <paramref name="seq"/> into the compact wire
-    /// format and internally drive <c>LOAD_START</c> (<c>0x10</c>), one or more <c>LOAD_CHUNK</c>
-    /// (<c>0x11</c>) messages fragmented to the negotiated ATT MTU, and <c>LOAD_COMMIT</c> (<c>0x12</c>).
-    /// See <c>doc/ble_protocol.md</c>.
+    /// Encodes <paramref name="seq"/> into the MHL compact wire format (see
+    /// <see cref="CompactSequenceEncoder"/>) and drives <c>LOAD_START</c> (<c>0x10</c>), one or
+    /// more <c>LOAD_CHUNK</c> (<c>0x11</c>) messages fragmented to <see cref="BLE_TRANSFER_CHUNK_SIZE"/>
+    /// bytes, and <c>LOAD_COMMIT</c> (<c>0x12</c>). See <c>doc/ble_protocol.md</c>.
     /// </remarks>
-    public Task LoadSequenceAsync(Sequence seq)
+    public async Task LoadSequenceAsync(Sequence seq)
     {
-        // TODO: encode seq to the compact wire format, then implement
-        // LOAD_START/LOAD_CHUNK*/LOAD_COMMIT fragmentation and transfer.
-        _ = seq;
-        _logger.LogWarning("LoadSequenceAsync is not implemented yet");
-        return Task.CompletedTask;
+        ArgumentNullException.ThrowIfNull(seq);
+        if (!IsConnected || MHLCommandChannel is null)
+            return;
+
+        byte[] compact = CompactSequenceEncoder.EncodeSequence(seq);
+        _logger.LogInformation("Uploading compact sequence ({size} bytes)", compact.Length);
+
+        var totalSizeBytes = ToLittleEndian(BitConverter.GetBytes((uint)compact.Length));
+        await SendChunkedTransferAsync(0x10, totalSizeBytes, 0x11, 0x12, compact);
+        _logger.LogInformation("Sequence loaded successfully");
     }
 
     /// <summary>
@@ -840,78 +687,137 @@ public class BleService : IBleService
     /// <param name="stepIndex">The index of the step to update.</param>
     /// <param name="step">The step to encode and transfer.</param>
     /// <remarks>
-    /// Stub implementation: the MHL compact wire protocol is not yet wired up.
-    /// Once implemented, this method will encode <paramref name="step"/> into the compact wire
-    /// format and internally drive <c>UPDATE_STEP_START</c> (<c>0x20</c>), one or more
-    /// <c>UPDATE_STEP_CHUNK</c> (<c>0x21</c>) messages fragmented to the negotiated ATT MTU,
-    /// and <c>UPDATE_STEP_COMMIT</c> (<c>0x22</c>). See <c>doc/ble_protocol.md</c>.
+    /// Encodes <paramref name="step"/> into the MHL compact wire format (see
+    /// <see cref="CompactSequenceEncoder"/>) and drives <c>UPDATE_STEP_START</c> (<c>0x20</c>), one
+    /// or more <c>UPDATE_STEP_CHUNK</c> (<c>0x21</c>) messages fragmented to
+    /// <see cref="BLE_TRANSFER_CHUNK_SIZE"/> bytes, and <c>UPDATE_STEP_COMMIT</c> (<c>0x22</c>).
+    /// See <c>doc/ble_protocol.md</c>.
     /// </remarks>
-    public Task UpdateStepAsync(int stepIndex, Step step)
+    public async Task UpdateStepAsync(int stepIndex, Step step)
     {
-        // TODO: encode step to the compact wire format, then implement
-        // UPDATE_STEP_START/UPDATE_STEP_CHUNK*/UPDATE_STEP_COMMIT fragmentation and transfer.
-        _ = stepIndex;
-        _ = step;
-        _logger.LogWarning("UpdateStepAsync is not implemented yet");
-        return Task.CompletedTask;
+        ArgumentNullException.ThrowIfNull(step);
+        if (stepIndex < 0 || stepIndex > byte.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(stepIndex), "Step index must fit in a single byte (0-255).");
+        if (!IsConnected || MHLCommandChannel is null)
+            return;
+
+        byte[] compact = CompactSequenceEncoder.EncodeStep(step);
+        _logger.LogInformation("Uploading step {index} update ({size} bytes)", stepIndex, compact.Length);
+
+        var sizeBytes = ToLittleEndian(BitConverter.GetBytes((ushort)compact.Length));
+        var startPayload = new byte[] { (byte)stepIndex, sizeBytes[0], sizeBytes[1] };
+        await SendChunkedTransferAsync(0x20, startPayload, 0x21, 0x22, compact);
+        _logger.LogInformation("Step {index} updated successfully", stepIndex);
     }
 
     /// <summary>
-    /// Sends the stop command to the device asynchronously.
+    /// Drives a <c>*_START</c> / <c>*_CHUNK</c>* / <c>*_COMMIT</c> transfer sequence, awaiting a
+    /// successful status notification after each command.
+    /// </summary>
+    /// <param name="startOpcode">The opcode that begins the transfer (e.g. <c>LOAD_START</c>).</param>
+    /// <param name="startPayload">The payload for the start command.</param>
+    /// <param name="chunkOpcode">The opcode used for each data chunk (e.g. <c>LOAD_CHUNK</c>).</param>
+    /// <param name="commitOpcode">The opcode that finalizes the transfer (e.g. <c>LOAD_COMMIT</c>).</param>
+    /// <param name="data">The raw bytes to fragment and send as chunks.</param>
+    private async Task SendChunkedTransferAsync(byte startOpcode, byte[] startPayload, byte chunkOpcode, byte commitOpcode, byte[] data)
+    {
+        await SendCommandAndAwaitStatusAsync(startOpcode, startPayload);
+
+        int offset = 0;
+        while (offset < data.Length)
+        {
+            int length = Math.Min(BLE_TRANSFER_CHUNK_SIZE, data.Length - offset);
+            var offsetBytes = ToLittleEndian(BitConverter.GetBytes((ushort)offset));
+
+            var chunkPayload = new byte[2 + length];
+            Array.Copy(offsetBytes, 0, chunkPayload, 0, 2);
+            Array.Copy(data, offset, chunkPayload, 2, length);
+
+            await SendCommandAndAwaitStatusAsync(chunkOpcode, chunkPayload);
+            offset += length;
+        }
+
+        await SendCommandAndAwaitStatusAsync(commitOpcode, []);
+    }
+
+    /// <summary>
+    /// Writes a command to the command characteristic and awaits the matching status
+    /// notification (echoed opcode) on the status characteristic.
+    /// </summary>
+    /// <param name="opcode">The command opcode.</param>
+    /// <param name="payload">The opcode-specific payload.</param>
+    /// <returns>The result code reported by the device.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the device reports a non-zero result code.</exception>
+    /// <exception cref="TimeoutException">Thrown when no status notification is received in time.</exception>
+    private async Task<byte> SendCommandAndAwaitStatusAsync(byte opcode, byte[] payload)
+    {
+        if (MHLCommandChannel is null)
+            throw new InvalidOperationException("Command characteristic is not available.");
+
+        var tcs = new TaskCompletionSource<byte>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void OnStatus(object? sender, (byte Opcode, byte ResultCode) status)
+        {
+            if (status.Opcode == opcode)
+                tcs.TrySetResult(status.ResultCode);
+        }
+
+        CommandStatusReceived += OnStatus;
+        try
+        {
+            var command = new byte[1 + payload.Length];
+            command[0] = opcode;
+            Array.Copy(payload, 0, command, 1, payload.Length);
+            await WriteBufferAsync(MHLCommandChannel, command);
+
+            var completed = await Task.WhenAny(tcs.Task, Task.Delay(COMMAND_STATUS_TIMEOUT_MS));
+            if (completed != tcs.Task)
+                throw new TimeoutException($"No status notification received for opcode 0x{opcode:X2}.");
+
+            byte result = await tcs.Task;
+            if (result != 0x00)
+                throw new InvalidOperationException($"Command 0x{opcode:X2} failed with result 0x{result:X2}.");
+            return result;
+        }
+        finally
+        {
+            CommandStatusReceived -= OnStatus;
+        }
+    }
+
+    /// <summary>
+    /// Ensures a byte array produced by <see cref="BitConverter"/> is in little-endian order,
+    /// as required by the MHL wire protocol.
+    /// </summary>
+    private static byte[] ToLittleEndian(byte[] bitConverterBytes)
+    {
+        if (!BitConverter.IsLittleEndian)
+            Array.Reverse(bitConverterBytes);
+        return bitConverterBytes;
+    }
+
+    /// <summary>
+    /// Sends the <c>STOP</c> command (opcode <c>0x03</c>) to the device asynchronously.
     /// </summary>
     public async Task StopAsync()
     {
         if (!IsConnected || MHLCommandChannel is null)
             return;
 
-        _logger.LogInformation("Stopping sequence");
-
-        await SendBrightnessAsync(CurrentBrightness);
-        await WriteBufferAsync(MHLCommandChannel, [0xFF]);  // Stop command
+        _logger.LogInformation("Sending STOP command");
+        await WriteBufferAsync(MHLCommandChannel, [0x03]);
     }
 
     /// <summary>
-    /// Sends the stop command to the device synchronously.
-    /// </summary>
-    public void Stop()
-    {
-        if (!IsConnected || MHLCommandChannel is null)
-            return;
-
-        _logger.LogInformation("Stopping sequence");
-
-        SendBrightness(CurrentBrightness);
-        MHLCommandChannel.WriteAsync([0xFF]);  // Stop command
-    }
-
-    /// <summary>
-    /// Sends the pause command to the device asynchronously.
+    /// Sends the <c>PAUSE</c> command (opcode <c>0x02</c>) to the device asynchronously.
     /// </summary>
     public async Task PauseAsync()
     {
         if (!IsConnected || MHLCommandChannel is null)
             return;
 
-        _logger.LogInformation("Pausing sequence");
-
-        //await SendBrightnessAsync(CurrentBrightness);
-        await WriteBufferAsync(MHLCommandChannel, [0x01]);
+        _logger.LogInformation("Sending PAUSE command");
         await WriteBufferAsync(MHLCommandChannel, [0x02]);
-    }
-
-    /// <summary>
-    /// Sends the pause command to the device synchronously.
-    /// </summary>
-    public void PauseSequence()
-    {
-        if (!IsConnected || MHLCommandChannel is null)
-            return;
-
-        _logger.LogInformation("Pausing sequence");
-
-        //SendBrightness(CurrentBrightness);
-        MHLCommandChannel.WriteAsync([0x01]);  // start frame
-        MHLCommandChannel.WriteAsync([0x02]);  // end frame
     }
 
     /// <summary>
@@ -920,41 +826,16 @@ public class BleService : IBleService
     /// <param name="value">The brightness percentage (0-100).</param>
     public async Task SendBrightnessAsync(int value)
     {
-        if (!IsConnected || MHLBrightChannel is null)
+        if (!IsConnected || MHLCommandChannel is null)
             return;
 
         _logger.LogInformation("Sending brightness {value}", value);
         CurrentBrightness = value;
 
-        var brightnessCommand = new byte[] { (byte)value };
+        var brightnessCommand = new byte[] { 0x05, (byte)value };  // BRIGHTNESS opcode
         try
         {
-            await WriteBufferAsync(MHLBrightChannel, brightnessCommand);
-            _logger.LogInformation("Brightness command sent successfully");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("Failed to send brightness command: {error}", ex.Message);
-            throw;
-        }
-    }
-
-    /// <summary>
-    /// Sends the global brightness value to the device synchronously.
-    /// </summary>
-    /// <param name="value">The brightness percentage (0-100).</param>
-    public void SendBrightness(int value)
-    {
-        if (!IsConnected || MHLBrightChannel is null)
-            return;
-
-        _logger.LogInformation("Sending brightness {value}", value);
-        CurrentBrightness = value;
-
-        var brightnessCommand = new byte[] { (byte)value };
-        try
-        {
-            MHLBrightChannel.WriteAsync(brightnessCommand);
+            await WriteBufferAsync(MHLCommandChannel, brightnessCommand);
             _logger.LogInformation("Brightness command sent successfully");
         }
         catch (Exception ex)
@@ -990,32 +871,6 @@ public class BleService : IBleService
     public void WriteBuffer(byte[] data)
     {
         MHLCommandChannel?.WriteAsync(data);
-    }
-
-
-    /// <summary>
-    /// Converts an oscillator step into a compact BLE command.
-    /// </summary>
-    /// <param name="stepIndex">Index of the step containing the oscillator.</param>
-    /// <param name="osc">The oscillator to encode.</param>
-    /// <param name="oscIndex">Index of the oscillator within the step.</param>
-    /// <param name="duration">Duration of the step in 1/10 seconds.</param>
-    /// <returns>
-    /// The encoded command bytes. Currently returns an empty array as the MHL
-    /// compact wire encoder is not yet implemented.
-    /// </returns>
-    /// <remarks>
-    /// This method is a placeholder. The MHL compact BLE wire encoder still
-    /// needs to be implemented once the protocol is finalized.
-    /// </remarks>
-    public static byte[] OscToCommand(int stepIndex, Oscillator osc, int oscIndex, int duration)
-    {
-        // TODO: implement MHL compact wire encoder once the BLE protocol is finalized.
-        _ = stepIndex;
-        _ = osc;
-        _ = oscIndex;
-        _ = duration;
-        return [];
     }
 
 
