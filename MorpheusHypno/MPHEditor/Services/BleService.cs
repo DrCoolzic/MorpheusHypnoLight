@@ -1,16 +1,16 @@
 // Ignore Spelling: Ble Osc
 
+using System.Linq;
+using Microsoft.Extensions.Logging;
+using MPHCore.Models;
 using Plugin.BLE;
 using Plugin.BLE.Abstractions.Contracts;
 using Plugin.BLE.Abstractions.EventArgs;
-using MPHCore.Models;
-using Microsoft.Extensions.Logging;
-using System.Linq;
 
 namespace MPHEditor.Services;
 
 /// <summary>
-/// Service for managing Bluetooth Low Energy (BLE) communications with Dream Machine devices.
+/// Service for managing Bluetooth Low Energy (BLE) communications with Morpheus HypnoLight devices.
 /// Handles device discovery, connection management, and command transmission.
 /// </summary>
 public class BleService : IBleService
@@ -23,10 +23,10 @@ public class BleService : IBleService
     private const int CONNECTION_CHECK_INTERVAL = 5000; // Check every 5 seconds
     private const int AUTO_CONNECT_INTERVAL = 30000;   // Try to connect every 30 seconds
     private bool _dmConnected = false;
-    private IDevice? DmIDevice = null;
-    private IService? DmIService { get; set; } = null;
-    private ICharacteristic? DmBrightChannel { get; set; } = null;
-    private ICharacteristic? DmCommandChannel { get; set; } = null;
+    private IDevice? MHLIDevice = null;
+    private IService? MHLIService { get; set; } = null;
+    private ICharacteristic? MHLBrightChannel { get; set; } = null;
+    private ICharacteristic? MHLCommandChannel { get; set; } = null;
     private readonly SemaphoreSlim _playSequenceSemaphore = new(1, 1);
     private readonly SemaphoreSlim _bleWriteSemaphore = new(1, 1);
     private const int BLE_WRITE_DELAY_MS = 10; // Delay between BLE writes 50?
@@ -35,6 +35,9 @@ public class BleService : IBleService
 
     #region properties
     private bool _isConnected = false;
+    /// <summary>
+    /// Gets a value indicating whether a Morpheus HypnoLight device is currently connected.
+    /// </summary>
     public bool IsConnected
     {
         get => _isConnected;
@@ -47,7 +50,10 @@ public class BleService : IBleService
     public event EventHandler<bool>? ConnectedChanged;
 
 
-    private string _status = "DM not connected";
+    private string _status = "MHL not connected";
+    /// <summary>
+    /// Gets or sets the current status message for the user.
+    /// </summary>
     public string Status
     {
         get => _status;
@@ -61,6 +67,9 @@ public class BleService : IBleService
 
 
     private bool _isConnecting = false;
+    /// <summary>
+    /// Gets a value indicating whether the service is currently trying to connect to a device.
+    /// </summary>
     public bool IsConnecting
     {
         get => _isConnecting;
@@ -74,6 +83,9 @@ public class BleService : IBleService
 
 
     private int _currentBrightness = 80;
+    /// <summary>
+    /// Gets or sets the current global brightness value (0-100).
+    /// </summary>
     public int CurrentBrightness
     {
         get => _currentBrightness;
@@ -106,7 +118,7 @@ public class BleService : IBleService
     public BleService(ILogger<BleService> logger)
     {
         _logger = logger;
-        
+
         // Initialize timers first (safe operations)
         _connectionCheckTimer = Application.Current?.Dispatcher.CreateTimer();
         if (_connectionCheckTimer != null)
@@ -185,12 +197,11 @@ public class BleService : IBleService
     }
 
     #region Bluetooth management
-    
+
     /// <summary>
-    /// Checks if Bluetooth is enabled and available on the device.
-    /// Also checks for necessary permissions on Android.
+    /// Checks if Bluetooth is enabled and available and that all required permissions are granted.
     /// </summary>
-    /// <returns>True if Bluetooth is enabled and permissions are granted, false otherwise</returns>
+    /// <returns>True if Bluetooth can be used, false otherwise.</returns>
     public async Task<bool> CheckBluetoothStatusAsync()
     {
         try
@@ -202,13 +213,13 @@ public class BleService : IBleService
             }
 
             // Check if Bluetooth is available and enabled
-            if (!_bluetoothManager.IsAvailable)
+            if (!_bluetoothManager?.IsAvailable ?? true)
             {
                 _logger.LogWarning("Bluetooth is not available on this device");
                 return false;
             }
 
-            if (!_bluetoothManager.IsOn)
+            if (!_bluetoothManager?.IsOn ?? true)
             {
                 _logger.LogWarning("Bluetooth is not enabled");
                 return false;
@@ -230,6 +241,9 @@ public class BleService : IBleService
         }
     }
 
+    /// <summary>
+    /// Starts scanning for Morpheus HypnoLight devices and connects to the first one found.
+    /// </summary>
     public async Task ConnectAsync()
     {
         if (_adapter == null)
@@ -243,15 +257,18 @@ public class BleService : IBleService
 
         IsConnecting = true;
         _autoConnectTimer?.Stop();
-        _logger.LogInformation("Auto-connect stopped. Scanning for DM");
+        _logger.LogInformation("Auto-connect stopped. Scanning for MHL");
 
-        await ScanForDM();
+        await ScanForMHL();
 
-        if (DmIDevice != null)
+        if (MHLIDevice != null)
             await ConnectToDevice();
         IsConnecting = false;
     }
 
+    /// <summary>
+    /// Disconnects from the current Morpheus HypnoLight device and restarts the auto-connect timer.
+    /// </summary>
     public async Task DisconnectAsync()
     {
         if (_adapter == null)
@@ -265,8 +282,8 @@ public class BleService : IBleService
         try
         {
             // Try to clean up the connection
-            if (DmIDevice is not null)
-                await _adapter.DisconnectDeviceAsync(DmIDevice);
+            if (MHLIDevice is not null)
+                await _adapter.DisconnectDeviceAsync(MHLIDevice);
         }
         catch (Exception ex)
         {
@@ -275,14 +292,14 @@ public class BleService : IBleService
         _dmConnected = false;
         IsConnected = false;
         Status = $"Disconnected";
-        _logger.LogInformation("connection to the DM closed - restarting auto-connect");
+        _logger.LogInformation("connection to the MHL closed - restarting auto-connect");
         _autoConnectTimer?.Start();
     }
 
     /// <summary>
-    /// Mainly for testing does not restart auto-connect timer
+    /// Disconnects from the current device without restarting the auto-connect timer.
     /// </summary>
-    /// <returns></returns>
+    /// <remarks>Primarily used for testing.</remarks>
     public async Task ForceDisconnectAsync()
     {
         await DisconnectAsync();
@@ -304,22 +321,22 @@ public class BleService : IBleService
     /// </remarks>
     private async void ConnectionCheckTimer_Tick(object? sender, EventArgs e)
     {
-        if (DmIDevice != null && _dmConnected)
+        if (MHLIDevice != null && _dmConnected)
         {
             try
             {
                 // Check if device is still reachable
-                var services = await DmIDevice.GetServicesAsync();
+                var services = await MHLIDevice.GetServicesAsync();
                 if (services == null || !services.Any())
                 {
-                    _logger.LogInformation("ToggleConnectionToDm lost detected by status check");
+                    _logger.LogInformation("ToggleConnectionToMHL lost detected by status check");
                     await DisconnectAsync();
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError("Error checking connection: {}", ex.Message);
-                if (DmIDevice != null)
+                if (MHLIDevice != null)
                 {
                     await DisconnectAsync();
                 }
@@ -327,11 +344,14 @@ public class BleService : IBleService
         }
     }
 
+    /// <summary>
+    /// Periodically attempts to auto-connect to a Morpheus HypnoLight device.
+    /// </summary>
     private async void AutoConnectTimer_Tick(object? sender, EventArgs e)
     {
         if (!_dmConnected)
         {
-            _logger.LogInformation("Auto-connect: attempting to find and connect to DM");
+            _logger.LogInformation("Auto-connect: attempting to find and connect to MHL");
             await ConnectAsync();
         }
     }
@@ -362,8 +382,8 @@ public class BleService : IBleService
     /// <param name="e">Event arguments</param>
     private void Adapter_ScanTimeoutElapsed(object? sender, EventArgs e)
     {
-        _logger.LogInformation("Could not find a Dream Machine - restarting auto-connection timer");
-        Status = "DM not found";
+        _logger.LogInformation("Could not find a Morpheus HypnoLight - restarting auto-connection timer");
+        Status = "MHL not found";
         _autoConnectTimer?.Start();
     }
 
@@ -374,7 +394,7 @@ public class BleService : IBleService
     /// <param name="args">Device event arguments containing discovered device information</param>
     /// <remarks>
     /// Only processes devices with names starting with "DM_".
-    /// When a Dream Machine device is found (devices with names starting with "DM_"), 
+    /// When a Morpheus HypnoLight device is found (devices with names starting with "DM_"), 
     /// scanning is stopped and connection can proceed.
     /// </remarks>
     private async void OnDeviceDiscovered(object? sender, DeviceEventArgs args)
@@ -387,10 +407,11 @@ public class BleService : IBleService
 
         if (args.Device.Name.StartsWith("DM_"))
         {
-            _logger.LogInformation("Found DM device: {} (ID: {}, RSSI: {})", args.Device.Name, args.Device.Id, args.Device.Rssi);
+            _logger.LogInformation("Found MHL device: {} (ID: {}, RSSI: {})", args.Device.Name, args.Device.Id, args.Device.Rssi);
             _ = new BleDevice(args.Device.Name, args.Device.Id, args.Device.Rssi);
-            DmIDevice = args.Device;
-            await _adapter.StopScanningForDevicesAsync();
+            MHLIDevice = args.Device;
+            if (_adapter != null)
+                await _adapter.StopScanningForDevicesAsync();
             Status = $"Found {args.Device.Name}";
         }
         else
@@ -400,18 +421,18 @@ public class BleService : IBleService
     }
 
     /// <summary>
-    /// Initiates a scan for Dream Machine devices.
+    /// Initiates a scan for Morpheus HypnoLight devices.
     /// </summary>
     /// <remarks>
     /// Checks for necessary Bluetooth permissions before starting the scan.
     /// Updates status messages to inform the user of the scanning process.
     /// </remarks>
-    private async Task ScanForDM()
+    private async Task ScanForMHL()
     {
         try
         {
-            _logger.LogInformation("Scanning for a Dream Machine...");
-            Status = "Searching DM ...";
+            _logger.LogInformation("Scanning for a Morpheus HypnoLight...");
+            Status = "Searching MHL ...";
 
             if (!await CheckAndRequestBluetoothPermissions())
             {
@@ -421,7 +442,7 @@ public class BleService : IBleService
                 _autoConnectTimer?.Start();
                 return;
             }
-            if (!(_bluetoothManager.IsAvailable && _bluetoothManager.IsOn))
+            if (_bluetoothManager == null || _adapter == null || !(_bluetoothManager.IsAvailable && _bluetoothManager.IsOn))
             {
                 _logger.LogError("Bluetooth is not enabled");
                 Status = "Bluetooth is not enabled";
@@ -443,7 +464,7 @@ public class BleService : IBleService
     }
 
     /// <summary>
-    /// Attempts to connect to the discovered Dream Machine device.
+    /// Attempts to connect to the discovered Morpheus HypnoLight device.
     /// </summary>
     /// <remarks>
     /// This method is called after a device is discovered during scanning.
@@ -451,31 +472,32 @@ public class BleService : IBleService
     /// </remarks>
     private async Task ConnectToDevice()
     {
-        if (DmIDevice == null)
+        if (MHLIDevice == null)
         {
-            _logger.LogError("DM not found");
-            Status = "DM not found";
+            _logger.LogError("MHL not found");
+            Status = "MHL not found";
             return;
         }
 
         try
         {
-            Status = $"Connecting to {DmIDevice.Name}...";
-            await _adapter.ConnectToDeviceAsync(DmIDevice);
-            _logger.LogInformation("Connected to device {}", DmIDevice.Name);
+            Status = $"Connecting to {MHLIDevice.Name}...";
+            if (_adapter != null)
+                await _adapter.ConnectToDeviceAsync(MHLIDevice);
+            _logger.LogInformation("Connected to device {}", MHLIDevice.Name);
 
-            Status = $"Connected to {DmIDevice.Name} looking for DM Service and Characteristics ...";
-            await GetDmServiceAndCharacteristics();
+            Status = $"Connected to {MHLIDevice.Name} looking for MHL Service and Characteristics ...";
+            await GetMHLServiceAndCharacteristics();
 
-            if (DmIService == null || DmBrightChannel == null || DmCommandChannel == null)
+            if (MHLIService == null || MHLBrightChannel == null || MHLCommandChannel == null)
             {
-                _logger.LogError("Problem getting DM characteristics");
+                _logger.LogError("Problem getting MHL characteristics");
                 Status = "Problem getting characteristics";
                 await DisconnectAsync();
                 return;
             }
 
-            Status = $"{DmIDevice.Name} ready";
+            Status = $"{MHLIDevice.Name} ready";
             IsConnected = true;
         }
         catch (Exception ex)
@@ -487,59 +509,59 @@ public class BleService : IBleService
     }
 
     /// <summary>
-    /// Discovers the necessary services and characteristics for communication with the Dream Machine device.
+    /// Discovers the necessary services and characteristics for communication with the Morpheus HypnoLight device.
     /// </summary>
     /// <remarks>
     /// This method is called after a device is connected.
     /// It discovers the services and characteristics needed for sending commands and setting brightness.
     /// </remarks>
-    private async Task GetDmServiceAndCharacteristics()
+    private async Task GetMHLServiceAndCharacteristics()
     {
         Guid ServiceUuid = Guid.Parse("36794f20-3a88-418c-8df8-7394c5c80200");
         Guid CommandUuid = Guid.Parse("36794f20-3a88-418c-8df8-7394c5c80201");
         Guid VolumeUuid_ = Guid.Parse("36794f20-3a88-418c-8df8-7394c5c80202");
 
-        if (DmIDevice == null)
+        if (MHLIDevice == null)
         {
-            _logger.LogError("No Dream Machine found");
+            _logger.LogError("No Morpheus HypnoLight found");
             return;
         }
 
         try
         {
             _logger.LogInformation("Getting service: {}", ServiceUuid);
-            DmIService = await DmIDevice.GetServiceAsync(ServiceUuid);
+            MHLIService = await MHLIDevice.GetServiceAsync(ServiceUuid);
 
-            if (DmIService == null)
+            if (MHLIService == null)
             {
-                _logger.LogError("Failed to get DM service");
+                _logger.LogError("Failed to get MHL service");
                 return;
             }
 
             _logger.LogInformation("Getting volume ch: {}", VolumeUuid_);
-            DmBrightChannel = await DmIService.GetCharacteristicAsync(VolumeUuid_);
-            if (DmBrightChannel == null)
+            MHLBrightChannel = await MHLIService.GetCharacteristicAsync(VolumeUuid_);
+            if (MHLBrightChannel == null)
             {
                 _logger.LogError("Failed to get brightness characteristic");
                 return;
             }
 
             // Check if characteristic has write permission
-            if (!DmBrightChannel.CanWrite)
+            if (!MHLBrightChannel.CanWrite)
             {
                 _logger.LogError("Brightness characteristic does not have write permission");
                 return;
             }
 
             _logger.LogInformation("Getting command ch: {}", CommandUuid);
-            DmCommandChannel = await DmIService.GetCharacteristicAsync(CommandUuid);
+            MHLCommandChannel = await MHLIService.GetCharacteristicAsync(CommandUuid);
         }
         catch (Exception ex)
         {
             _logger.LogError("Error getting service: {}", ex.Message);
-            DmIService = null;
-            DmBrightChannel = null;
-            DmCommandChannel = null;
+            MHLIService = null;
+            MHLBrightChannel = null;
+            MHLCommandChannel = null;
         }
     }
 
@@ -571,9 +593,13 @@ public class BleService : IBleService
 
     #endregion
 
+    /// <summary>
+    /// Sends a single step to the connected device asynchronously.
+    /// </summary>
+    /// <param name="step">The step to play.</param>
     public async Task PlayStepAsync(Step step)
     {
-        if (step is null || !IsConnected || DmCommandChannel is null)
+        if (step is null || !IsConnected || MHLCommandChannel is null)
             return;
 
         // Store this as the pending step
@@ -600,7 +626,7 @@ public class BleService : IBleService
                 _pendingStep = null;
 
                 // Play the step
-                await WriteBufferAsync(DmCommandChannel, [0x01]);  // Start command
+                await WriteBufferAsync(MHLCommandChannel, [0x01]);  // Start command
 
                 var command = new List<byte[]>();
                 for (int i = 0; i < step.Oscillators.Count; i++)
@@ -613,10 +639,10 @@ public class BleService : IBleService
 
                 foreach (var item in command)
                 {
-                    await WriteBufferAsync(DmCommandChannel, item);
+                    await WriteBufferAsync(MHLCommandChannel, item);
                 }
 
-                await WriteBufferAsync(DmCommandChannel, [0x02]);  // End command
+                await WriteBufferAsync(MHLCommandChannel, [0x02]);  // End command
             }
         }
         finally
@@ -625,13 +651,17 @@ public class BleService : IBleService
         }
     }
 
+    /// <summary>
+    /// Sends a single step to the connected device synchronously.
+    /// </summary>
+    /// <param name="step">The step to play.</param>
     public void PlayStep(Step step)
     {
-        if (step is null || !IsConnected || DmCommandChannel is null)
+        if (step is null || !IsConnected || MHLCommandChannel is null)
             return;
 
         // Play the step
-        DmCommandChannel.WriteAsync([0x01]);  // Start command
+        MHLCommandChannel.WriteAsync([0x01]);  // Start command
 
         var command = new List<byte[]>();
         for (int i = 0; i < step.Oscillators.Count; i++)
@@ -644,16 +674,20 @@ public class BleService : IBleService
 
         foreach (var item in command)
         {
-            DmCommandChannel.WriteAsync(item);
+            MHLCommandChannel.WriteAsync(item);
         }
 
-        DmCommandChannel.WriteAsync([0x02]);  // End command
+        MHLCommandChannel.WriteAsync([0x02]);  // End command
 
     }
 
+    /// <summary>
+    /// Sends the full sequence to the connected device asynchronously.
+    /// </summary>
+    /// <param name="sequence">The sequence to play.</param>
     public async Task PlaySequenceAsync(Sequence sequence)
     {
-        if (sequence is null || !IsConnected || DmCommandChannel is null)
+        if (sequence is null || !IsConnected || MHLCommandChannel is null)
             return;
 
         // Store this as the pending sequence
@@ -681,7 +715,7 @@ public class BleService : IBleService
 
                 // Play the sequence
                 await SendBrightnessAsync(CurrentBrightness);
-                await WriteBufferAsync(DmCommandChannel, [0x01]);  // Start command
+                await WriteBufferAsync(MHLCommandChannel, [0x01]);  // Start command
 
                 var command = new List<byte[]>();
                 for (int i = 0; i < sequenceToPlay.Steps.Count; i++)
@@ -698,10 +732,10 @@ public class BleService : IBleService
 
                 foreach (var item in command)
                 {
-                    await WriteBufferAsync(DmCommandChannel, item);
+                    await WriteBufferAsync(MHLCommandChannel, item);
                 }
 
-                await WriteBufferAsync(DmCommandChannel, [0x02]);  // End command
+                await WriteBufferAsync(MHLCommandChannel, [0x02]);  // End command
 
                 // If a new sequence was queued while we were playing, loop and play it
             }
@@ -714,16 +748,20 @@ public class BleService : IBleService
 
 
 
+    /// <summary>
+    /// Sends the full sequence to the connected device synchronously.
+    /// </summary>
+    /// <param name="sequence">The sequence to play.</param>
     public void PlaySequence(Sequence sequence)
     {
-        if (sequence is null || !IsConnected || DmCommandChannel is null)
+        if (sequence is null || !IsConnected || MHLCommandChannel is null)
             return;
         _logger.LogInformation("sequence name {} duration {} steps {}",
             sequence.Name, sequence.DurationSeconds, sequence.Steps.Count);
 
         // Play the sequence
         SendBrightness(CurrentBrightness);
-        DmCommandChannel.WriteAsync([0x01]);  // Start of frame
+        MHLCommandChannel.WriteAsync([0x01]);  // Start of frame
 
         var command = new List<byte[]>();
         for (int i = 0; i < sequence.Steps.Count; i++)
@@ -740,65 +778,149 @@ public class BleService : IBleService
 
         foreach (var item in command)
         {
-            DmCommandChannel.WriteAsync(item);
+            MHLCommandChannel.WriteAsync(item);
         }
 
-        DmCommandChannel.WriteAsync([0x02]);  // End of frame command
+        MHLCommandChannel.WriteAsync([0x02]);  // End of frame command
     }
 
+    /// <summary>
+    /// Sends the <c>PLAY</c> command (opcode <c>0x01</c>) to start or resume playback.
+    /// </summary>
+    /// <remarks>
+    /// Stub implementation: the MHL compact wire protocol is not yet wired up.
+    /// See <c>doc/ble_protocol.md</c> for the target protocol.
+    /// </remarks>
+    public Task PlayAsync()
+    {
+        // TODO: send opcode 0x01 (PLAY) once the MHL wire protocol is implemented.
+        _logger.LogWarning("PlayAsync is not implemented yet");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Sends the <c>SEEK</c> command (opcode <c>0x04</c>) to jump to an absolute position.
+    /// </summary>
+    /// <param name="positionMs">The target position, in milliseconds.</param>
+    /// <remarks>
+    /// Stub implementation: the MHL compact wire protocol is not yet wired up.
+    /// See <c>doc/ble_protocol.md</c> for the target protocol.
+    /// </remarks>
+    public Task SeekAsync(int positionMs)
+    {
+        // TODO: send opcode 0x04 (SEEK) with a 4-byte little-endian position_ms payload.
+        _ = positionMs;
+        _logger.LogWarning("SeekAsync is not implemented yet");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Transfers a full sequence to the device.
+    /// </summary>
+    /// <param name="seq">The sequence to encode and transfer.</param>
+    /// <remarks>
+    /// Stub implementation: the MHL compact wire protocol is not yet wired up.
+    /// Once implemented, this method will encode <paramref name="seq"/> into the compact wire
+    /// format and internally drive <c>LOAD_START</c> (<c>0x10</c>), one or more <c>LOAD_CHUNK</c>
+    /// (<c>0x11</c>) messages fragmented to the negotiated ATT MTU, and <c>LOAD_COMMIT</c> (<c>0x12</c>).
+    /// See <c>doc/ble_protocol.md</c>.
+    /// </remarks>
+    public Task LoadSequenceAsync(Sequence seq)
+    {
+        // TODO: encode seq to the compact wire format, then implement
+        // LOAD_START/LOAD_CHUNK*/LOAD_COMMIT fragmentation and transfer.
+        _ = seq;
+        _logger.LogWarning("LoadSequenceAsync is not implemented yet");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Transfers an updated single step to the device.
+    /// </summary>
+    /// <param name="stepIndex">The index of the step to update.</param>
+    /// <param name="step">The step to encode and transfer.</param>
+    /// <remarks>
+    /// Stub implementation: the MHL compact wire protocol is not yet wired up.
+    /// Once implemented, this method will encode <paramref name="step"/> into the compact wire
+    /// format and internally drive <c>UPDATE_STEP_START</c> (<c>0x20</c>), one or more
+    /// <c>UPDATE_STEP_CHUNK</c> (<c>0x21</c>) messages fragmented to the negotiated ATT MTU,
+    /// and <c>UPDATE_STEP_COMMIT</c> (<c>0x22</c>). See <c>doc/ble_protocol.md</c>.
+    /// </remarks>
+    public Task UpdateStepAsync(int stepIndex, Step step)
+    {
+        // TODO: encode step to the compact wire format, then implement
+        // UPDATE_STEP_START/UPDATE_STEP_CHUNK*/UPDATE_STEP_COMMIT fragmentation and transfer.
+        _ = stepIndex;
+        _ = step;
+        _logger.LogWarning("UpdateStepAsync is not implemented yet");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Sends the stop command to the device asynchronously.
+    /// </summary>
     public async Task StopAsync()
     {
-        if (!IsConnected || DmCommandChannel is null)
+        if (!IsConnected || MHLCommandChannel is null)
             return;
 
         _logger.LogInformation("Stopping sequence");
 
         await SendBrightnessAsync(CurrentBrightness);
-        await WriteBufferAsync(DmCommandChannel, [0xFF]);  // Stop command
+        await WriteBufferAsync(MHLCommandChannel, [0xFF]);  // Stop command
     }
 
+    /// <summary>
+    /// Sends the stop command to the device synchronously.
+    /// </summary>
     public void Stop()
     {
-        if (!IsConnected || DmCommandChannel is null)
+        if (!IsConnected || MHLCommandChannel is null)
             return;
 
         _logger.LogInformation("Stopping sequence");
 
         SendBrightness(CurrentBrightness);
-        DmCommandChannel.WriteAsync([0xFF]);  // Stop command
+        MHLCommandChannel.WriteAsync([0xFF]);  // Stop command
     }
 
-    public async Task PauseSequenceAsync()
+    /// <summary>
+    /// Sends the pause command to the device asynchronously.
+    /// </summary>
+    public async Task PauseAsync()
     {
-        if (!IsConnected || DmCommandChannel is null)
+        if (!IsConnected || MHLCommandChannel is null)
             return;
 
         _logger.LogInformation("Pausing sequence");
 
         //await SendBrightnessAsync(CurrentBrightness);
-        await WriteBufferAsync(DmCommandChannel, [0x01]);
-        await WriteBufferAsync(DmCommandChannel, [0x02]);
+        await WriteBufferAsync(MHLCommandChannel, [0x01]);
+        await WriteBufferAsync(MHLCommandChannel, [0x02]);
     }
 
+    /// <summary>
+    /// Sends the pause command to the device synchronously.
+    /// </summary>
     public void PauseSequence()
     {
-        if (!IsConnected || DmCommandChannel is null)
+        if (!IsConnected || MHLCommandChannel is null)
             return;
 
         _logger.LogInformation("Pausing sequence");
 
         //SendBrightness(CurrentBrightness);
-        DmCommandChannel.WriteAsync([0x01]);  // start frame
-        DmCommandChannel.WriteAsync([0x02]);  // end frame
+        MHLCommandChannel.WriteAsync([0x01]);  // start frame
+        MHLCommandChannel.WriteAsync([0x02]);  // end frame
     }
 
     /// <summary>
-    /// Send brightness value to Dream Machine
+    /// Sends the global brightness value to the device asynchronously.
     /// </summary>
-    /// <param name="value">Brightness value (0-100)</param>
+    /// <param name="value">The brightness percentage (0-100).</param>
     public async Task SendBrightnessAsync(int value)
     {
-        if (!IsConnected || DmBrightChannel is null)
+        if (!IsConnected || MHLBrightChannel is null)
             return;
 
         _logger.LogInformation("Sending brightness {value}", value);
@@ -807,7 +929,7 @@ public class BleService : IBleService
         var brightnessCommand = new byte[] { (byte)value };
         try
         {
-            await WriteBufferAsync(DmBrightChannel, brightnessCommand);
+            await WriteBufferAsync(MHLBrightChannel, brightnessCommand);
             _logger.LogInformation("Brightness command sent successfully");
         }
         catch (Exception ex)
@@ -817,9 +939,13 @@ public class BleService : IBleService
         }
     }
 
+    /// <summary>
+    /// Sends the global brightness value to the device synchronously.
+    /// </summary>
+    /// <param name="value">The brightness percentage (0-100).</param>
     public void SendBrightness(int value)
     {
-        if (!IsConnected || DmBrightChannel is null)
+        if (!IsConnected || MHLBrightChannel is null)
             return;
 
         _logger.LogInformation("Sending brightness {value}", value);
@@ -828,7 +954,7 @@ public class BleService : IBleService
         var brightnessCommand = new byte[] { (byte)value };
         try
         {
-            DmBrightChannel.WriteAsync(brightnessCommand);
+            MHLBrightChannel.WriteAsync(brightnessCommand);
             _logger.LogInformation("Brightness command sent successfully");
         }
         catch (Exception ex)
@@ -838,6 +964,11 @@ public class BleService : IBleService
         }
     }
 
+    /// <summary>
+    /// Writes a data buffer to a BLE characteristic with a small inter-write delay.
+    /// </summary>
+    /// <param name="characteristic">The target BLE characteristic.</param>
+    /// <param name="data">The bytes to write.</param>
     private async Task WriteBufferAsync(ICharacteristic characteristic, byte[] data)
     {
         try
@@ -852,20 +983,31 @@ public class BleService : IBleService
         }
     }
 
+    /// <summary>
+    /// Writes a raw byte buffer to the command characteristic.
+    /// </summary>
+    /// <param name="data">The bytes to send.</param>
     public void WriteBuffer(byte[] data)
     {
-        DmCommandChannel?.WriteAsync(data);
+        MHLCommandChannel?.WriteAsync(data);
     }
 
 
     /// <summary>
-    /// Converts the values of an Oscillator into a command to be sent to the DM
-    /// <param name="stepIndex">Index of the step</param>
-    /// <param name="osc">Oscillator to convert</param>
-    /// <param name="oscIndex">Index of the oscillator in the step</param>
-    /// <param name="duration">Duration of the step in 1/10 seconds</param>
-    /// <returns>The command to be sent to the DM (16 bytes array)</returns>
+    /// Converts an oscillator step into a compact BLE command.
     /// </summary>
+    /// <param name="stepIndex">Index of the step containing the oscillator.</param>
+    /// <param name="osc">The oscillator to encode.</param>
+    /// <param name="oscIndex">Index of the oscillator within the step.</param>
+    /// <param name="duration">Duration of the step in 1/10 seconds.</param>
+    /// <returns>
+    /// The encoded command bytes. Currently returns an empty array as the MHL
+    /// compact wire encoder is not yet implemented.
+    /// </returns>
+    /// <remarks>
+    /// This method is a placeholder. The MHL compact BLE wire encoder still
+    /// needs to be implemented once the protocol is finalized.
+    /// </remarks>
     public static byte[] OscToCommand(int stepIndex, Oscillator osc, int oscIndex, int duration)
     {
         // TODO: implement MHL compact wire encoder once the BLE protocol is finalized.
@@ -877,6 +1019,10 @@ public class BleService : IBleService
     }
 
 
+    /// <summary>
+    /// Checks and requests the Bluetooth permissions required on the current platform.
+    /// </summary>
+    /// <returns>True if all required permissions are granted, false otherwise.</returns>
     private async Task<bool> CheckAndRequestBluetoothPermissions()
     {
         try

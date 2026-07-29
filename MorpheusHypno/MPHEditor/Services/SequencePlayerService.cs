@@ -330,11 +330,8 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
         {
             Stopwatch stopwatch = new();
             stopwatch.Start();  // Start timing
-#if ANDROID
-            _bleService.PlaySequenceAsync(_sequenceToPlay);
-#else
-            _bleService.PlaySequence(_sequenceToPlay);
-#endif
+            _bleService.LoadSequenceAsync(_sequenceToPlay);
+            _bleService.PlayAsync();
             stopwatch.Stop();   // Stop timing
             _logger.LogInformation("Time to send ble sequence: {}ms", stopwatch.ElapsedMilliseconds);
         }
@@ -393,11 +390,7 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
 
         if (_bleService.IsConnected)
         {
-#if ANDROID
-            _bleService.PauseSequenceAsync();
-#else
-            _bleService.PauseSequence();
-#endif
+            _bleService.PauseAsync();
             // Create truncated sequence at rounded position for resume
             SeekToAction(roundedPosition);
         }
@@ -411,11 +404,7 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
         _audioPlayer?.Stop();
 
         if (_bleService.IsConnected)
-#if ANDROID
             _bleService.StopAsync();
-#else
-            _bleService.Stop();
-#endif
     }
 
     private void SeekToAction(int position)
@@ -568,7 +557,7 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
 
             // Stop the BLE sequence but preserve audio player state
             if (_bleService.IsConnected)
-                _bleService.Stop();
+                await _bleService.StopAsync();
 
             // Stop audio but don't dispose it
             _audioPlayer?.Stop();
