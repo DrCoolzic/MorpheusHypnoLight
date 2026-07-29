@@ -297,13 +297,8 @@ esp_err_t sequence_load(const sequence_step_t *steps, uint32_t step_count) {
   sequence_playing = false;
   taskEXIT_CRITICAL(&sequence_lock);
 
-  if (step_count > 0U) {
-    const esp_err_t error = apply_step(0U);
-    if (error != ESP_OK) {
-      return error;
-    }
-  }
-
+  /* Loading does not start playback. The first step will be applied when
+   * sequence_play() is called. */
   return ESP_OK;
 }
 
@@ -335,7 +330,9 @@ esp_err_t sequence_load_compact(const uint8_t *data, size_t data_length) {
   sequence_elapsed_ms = 0U;
   taskEXIT_CRITICAL(&sequence_lock);
 
-  return apply_step(0U);
+  /* Loading does not start playback. The first step will be applied when
+   * sequence_play() is called. */
+  return ESP_OK;
 }
 
 esp_err_t sequence_replace_step(uint32_t step_index,
