@@ -12,7 +12,7 @@ namespace MPHCore.Models;
 /// <summary>
 /// Supported oscillator waveform shapes.
 /// </summary>
-[JsonConverter(typeof(StringEnumConverter))]
+[JsonConverter(typeof(StringEnumConverter), true)]
 public enum OscillatorWaveform
 {
     Sine,
@@ -45,6 +45,12 @@ public enum ModulatorMode
 /// </summary>
 public class ModulatorConverter : JsonConverter<Modulator>
 {
+    /// <summary>
+    /// Writes a Modulator object to JSON format.
+    /// </summary>
+    /// <param name="writer">The JSON writer.</param>
+    /// <param name="value">The Modulator value to serialize.</param>
+    /// <param name="serializer">The JSON serializer.</param>
     public override void WriteJson(JsonWriter writer, Modulator? value, JsonSerializer serializer)
     {
         if (value is null)
@@ -84,6 +90,15 @@ public class ModulatorConverter : JsonConverter<Modulator>
         writer.WriteEndObject();
     }
 
+    /// <summary>
+    /// Reads and deserializes a Modulator from JSON.
+    /// </summary>
+    /// <param name="reader">The JSON reader.</param>
+    /// <param name="objectType">The type of object being deserialized.</param>
+    /// <param name="existingValue">The existing value of the object being read.</param>
+    /// <param name="hasExistingValue">Whether there is an existing value.</param>
+    /// <param name="serializer">The JSON serializer.</param>
+    /// <returns>The deserialized Modulator instance.</returns>
     public override Modulator? ReadJson(JsonReader reader, Type objectType, Modulator? existingValue, bool hasExistingValue, JsonSerializer serializer)
     {
         var jObject = JObject.Load(reader);
@@ -116,6 +131,13 @@ public class ModulatorConverter : JsonConverter<Modulator>
         return modulator;
     }
 
+    /// <summary>
+    /// Gets a required double value from a JSON object.
+    /// </summary>
+    /// <param name="jObject">The JSON object to read from.</param>
+    /// <param name="propertyName">The name of the property to retrieve.</param>
+    /// <returns>The double value of the property.</returns>
+    /// <exception cref="JsonSerializationException">Thrown when the property is missing.</exception>
     private static double GetRequiredDouble(JObject jObject, string propertyName)
     {
         var token = jObject[propertyName];

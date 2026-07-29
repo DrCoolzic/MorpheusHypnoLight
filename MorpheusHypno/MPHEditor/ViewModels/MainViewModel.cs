@@ -11,7 +11,7 @@ public partial class MainViewModel : ObservableObject
 {
     private readonly ILogger<MainViewModel> _logger;
     private readonly IBleService _bleService;
-    private readonly IMPHElementService _mphElementService;
+    private readonly IMPHElementService _mes;
 
     [ObservableProperty]
     private string _status = "Ready";
@@ -20,7 +20,7 @@ public partial class MainViewModel : ObservableObject
     {
         _logger = logger;
         _bleService = bleService;
-        _mphElementService = mpHElementService;
+        _mes = mpHElementService;
 
         _logger.LogInformation("Initializing MainViewModel");
         _ = InitializeAsync();
@@ -30,9 +30,24 @@ public partial class MainViewModel : ObservableObject
     private async Task InitializeAsync()
     {
         _logger.LogInformation("Starting MainViewModel initialization...");
-        _mphElementService.MPHRoot.RootPath = AppDirectories.GetAppDataDirectory();
-        await _mphElementService.LoadLocalDb();
-        _logger.LogInformation("Collections database loaded");
+        _mes.MPHRoot.RootPath = AppDirectories.GetAppDataDirectory();
+        await _mes.LoadLocalDb();
+        _logger.LogInformation("Collections database loaded");  
+
+        var sequenceItem = _mes.MPHRoot.Collections
+            .FirstOrDefault()
+            ?.SequenceItems
+            .FirstOrDefault();
+
+        if (sequenceItem is null)
+        {
+            _logger.LogWarning("No sequence found to load");
+            return;
+        }
+
+        var sequenceDir = sequenceItem.DirPath;
+        _logger.LogInformation("Sequence directory: {SequenceDir}", sequenceDir);
+        var sequence = await _mes.LoadSequenceAsync(sequenceDir);
     }
 
     [RelayCommand]
