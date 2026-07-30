@@ -252,12 +252,7 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
         CurrentPosition = clampedPosition;
         PositionChanged?.Invoke(this, CurrentPosition);
 
-        // Do not send a BLE seek while stopped: the device would apply the step and turn LEDs on.
-        // The next Start will seek to this position if needed.
-        if (PlayerState != PlayerStateEnum.STOPPED)
-        {
-            await SeekToActionAsync(clampedPosition);
-        }
+        await SeekToActionAsync(clampedPosition);
 
         // If the player is playing, restart the timer
         if (PlayerState == PlayerStateEnum.PLAYING)
@@ -323,8 +318,9 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
 
 
     /// <summary>
-    /// Loads the full sequence onto the device, optionally seeks to the current
-    /// position, and starts playback. Used when starting from the stopped state.
+    /// Loads the sequence onto the device if needed and starts playback.
+    /// The device cursor is expected to already be at the desired position
+    /// (either 0 after a stop, or set by a previous SeekPlayer call).
     /// </summary>
     private async Task StartActionAsync()
     {
@@ -344,15 +340,9 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
                 _sequenceLoadedOnDevice = true;
             }
 
-            int positionMs = (int)Math.Round(CurrentPosition * 1000.0);
-            if (positionMs > 0)
-            {
-                await _bleService.SeekAsync(positionMs);
-            }
-
             await _bleService.PlayAsync();
             stopwatch.Stop();
-            _logger.LogInformation("Time to send BLE commands: {} ms", stopwatch.ElapsedMilliseconds);
+            _logger.LogInformation("Time to send PLAY command: {} ms", stopwatch.ElapsedMilliseconds);
         }
 
         if (_audioPlayer != null)

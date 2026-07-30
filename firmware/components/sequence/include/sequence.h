@@ -117,6 +117,14 @@ esp_err_t sequence_play(void);
 esp_err_t sequence_pause(void);
 
 /**
+ * @brief Stop playback, reset the cursor to the beginning and turn all LEDs
+ * off.
+ *
+ * @return ESP_OK on success.
+ */
+esp_err_t sequence_stop(void);
+
+/**
  * @brief Jump to a position in the sequence and apply the corresponding step.
  *
  * The position is resolved to a step and an offset inside that step. The

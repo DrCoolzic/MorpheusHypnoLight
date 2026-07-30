@@ -38,6 +38,9 @@ static uint32_t sequence_elapsed_ms = 0U;
 /** @brief Whether playback is currently active. */
 static bool sequence_playing = false;
 
+/** @brief Whether playback is currently paused (step state is preserved). */
+static bool sequence_paused = false;
+
 /** @brief Internal periodic timer that drives playback. */
 static esp_timer_handle_t sequence_timer = NULL;
 
@@ -295,6 +298,7 @@ esp_err_t sequence_load(const sequence_step_t *steps, uint32_t step_count) {
   sequence_current_step = 0U;
   sequence_elapsed_ms = 0U;
   sequence_playing = false;
+  sequence_paused = false;
   taskEXIT_CRITICAL(&sequence_lock);
 
   /* Loading does not start playback. The first step will be applied when
@@ -316,6 +320,7 @@ esp_err_t sequence_load_compact(const uint8_t *data, size_t data_length) {
 
   taskENTER_CRITICAL(&sequence_lock);
   sequence_playing = false;
+  sequence_paused = false;
   taskEXIT_CRITICAL(&sequence_lock);
 
   error = sequence_decode_compact(data, data_length, sequence_steps,
@@ -421,6 +426,7 @@ esp_err_t sequence_play(void) {
 
   taskENTER_CRITICAL(&sequence_lock);
   sequence_playing = true;
+  sequence_paused = false;
   taskEXIT_CRITICAL(&sequence_lock);
 
   return ESP_OK;
@@ -434,6 +440,7 @@ esp_err_t sequence_pause(void) {
   taskENTER_CRITICAL(&sequence_lock);
   const bool was_playing = sequence_playing;
   sequence_playing = false;
+  sequence_paused = was_playing;
   taskEXIT_CRITICAL(&sequence_lock);
 
   if (was_playing) {
@@ -442,6 +449,23 @@ esp_err_t sequence_pause(void) {
       led_engine_pause_modulators(oscillator_id);
     }
   }
+
+  return ESP_OK;
+}
+
+esp_err_t sequence_stop(void) {
+  if (sequence_timer != NULL) {
+    esp_timer_stop(sequence_timer);
+  }
+
+  taskENTER_CRITICAL(&sequence_lock);
+  sequence_playing = false;
+  sequence_paused = false;
+  sequence_current_step = 0U;
+  sequence_elapsed_ms = 0U;
+  taskEXIT_CRITICAL(&sequence_lock);
+
+  led_engine_all_off();
 
   return ESP_OK;
 }
@@ -462,13 +486,14 @@ esp_err_t sequence_seek(uint32_t position_ms) {
   sequence_current_step = step_index;
   sequence_elapsed_ms = offset_ms;
   const bool continue_playing = sequence_playing;
+  const bool is_paused = sequence_paused;
   taskEXIT_CRITICAL(&sequence_lock);
 
-  // Only apply the step if playback was active. When the player is stopped or
-  // paused, applying the step would turn the LEDs on while no timer is running.
-  // The next sequence_play() will apply the correct step and offset before
-  // restarting the timer, so the resume position is still correct.
-  if (continue_playing) {
+  // Apply the step when playing or paused, so the outputs reflect the new
+  // cursor position. When stopped, leave the outputs off; the next
+  // sequence_play() will apply the correct step and offset before restarting
+  // the timer, so the resume position is still correct.
+  if (continue_playing || is_paused) {
     esp_err_t error = apply_step(step_index);
     if (error != ESP_OK) {
       return error;

@@ -130,15 +130,7 @@ static uint8_t mhl_map_esp_err(esp_err_t err, uint8_t validation_code,
 /**
  * @brief Stop playback, seek to zero, and turn all LEDs off.
  */
-static void mhl_stop_playback(void) {
-  (void)sequence_pause();
-  (void)sequence_seek(0U);
-  for (uint8_t oscillator = 0U; oscillator < OSCILLATOR_COUNT; oscillator++) {
-    (void)led_engine_set_frequency(oscillator, 0.0f);
-    (void)led_engine_set_brightness(oscillator, 0.0f);
-  }
-  (void)led_engine_all_off();
-}
+static void mhl_stop_playback(void) { (void)sequence_stop(); }
 
 /**
  * @brief Process a validated command payload.
