@@ -465,6 +465,16 @@ esp_err_t sequence_stop(void) {
   sequence_elapsed_ms = 0U;
   taskEXIT_CRITICAL(&sequence_lock);
 
+  // led_engine_all_off() only writes the hardware once; the independent
+  // oscillator tick timer keeps re-evaluating each modulator and would
+  // otherwise overwrite that write on its next cycle. Reset every
+  // modulator to a static zero value so the outputs stay off.
+  for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
+       oscillator_id++) {
+    (void)led_engine_set_frequency(oscillator_id, 0.0f);
+    (void)led_engine_set_brightness(oscillator_id, 0.0f);
+  }
+
   led_engine_all_off();
 
   return ESP_OK;
