@@ -50,5 +50,29 @@
                    FontSize="14"
                    HorizontalOptions="Center" />
         </HorizontalStackLayout>
+
+        <HorizontalStackLayout Spacing="15" HorizontalOptions="Center">
+            <Button Text="Set Player"
+                    Command="{Binding SetPlayerCommand}"
+                    HorizontalOptions="Center" />
+            <Button Text="Start Player"
+                    Command="{Binding StartPlayerCommand}"
+                    HorizontalOptions="Center" />
+            <Button Text="Pause Player"
+                    Command="{Binding PausePlayerCommand}"
+                    HorizontalOptions="Center" />
+            <Button Text="Stop Player"
+                    Command="{Binding StopPlayerCommand}"
+                    HorizontalOptions="Center" />
+        </HorizontalStackLayout>
+
+        <HorizontalStackLayout Spacing="15" HorizontalOptions="Center">
+            <Label Text="{Binding PlayerState, StringFormat='Player State: {0}'}"
+                   FontSize="14"
+                   HorizontalOptions="Center" />
+            <Label Text="{Binding CurrentPositionText, StringFormat='Position: {0}'}"
+                   FontSize="14"
+                   HorizontalOptions="Center" />
+        </HorizontalStackLayout>
     </VerticalStackLayout>
 </ContentPage>
