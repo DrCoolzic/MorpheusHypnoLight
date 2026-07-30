@@ -31,7 +31,9 @@ public class BleService : IBleService
     private readonly SemaphoreSlim _bleWriteSemaphore = new(1, 1);
     private const int BLE_WRITE_DELAY_MS = 10; // Delay between BLE writes 50?
     // Safe default: fits a 23-byte ATT MTU (1 opcode + 2 offset + 17 data), matches firmware/scripts/ble_transfer.py.
-    private const int BLE_TRANSFER_CHUNK_SIZE = 17;
+    private const int DEFAULT_BLE_TRANSFER_CHUNK_SIZE = 17;
+    private const int REQUESTED_BLE_MTU = 512;
+    private int _bleTransferChunkSize = DEFAULT_BLE_TRANSFER_CHUNK_SIZE;
     private const int COMMAND_STATUS_TIMEOUT_MS = 5000;
 
     #region properties
@@ -512,6 +514,8 @@ public class BleService : IBleService
                 return;
             }
 
+            await NegotiateBleMtuAsync();
+
             Status = $"{MHLIDevice.Name} ready";
             IsConnected = true;
         }
@@ -520,6 +524,46 @@ public class BleService : IBleService
             _logger.LogError("Connection error: {}", ex.Message);
             Status = $"Connection error: {ex.Message}";
             await DisconnectAsync();
+        }
+    }
+
+    /// <summary>
+    /// Requests a larger ATT MTU from the connected device and adjusts the chunk size used for
+    /// sequence and step transfers. The firmware supports writes up to 517 bytes, so requesting 512
+    /// lets us send payloads close to 200+ bytes per BLE packet.
+    /// </summary>
+    private async Task NegotiateBleMtuAsync()
+    {
+        if (MHLIDevice == null)
+        {
+            _logger.LogWarning("Cannot negotiate MTU: no connected device");
+            return;
+        }
+
+        try
+        {
+            int negotiatedMtu = await MHLIDevice.RequestMtuAsync(REQUESTED_BLE_MTU);
+            // Reserve 3 bytes for the BLE command header: 1 opcode + 2 offset bytes.
+            int mtuChunkSize = negotiatedMtu - 3;
+            if (mtuChunkSize < DEFAULT_BLE_TRANSFER_CHUNK_SIZE)
+            {
+                _logger.LogWarning(
+                    "Negotiated MTU {negotiatedMtu} is too small; falling back to default chunk size {defaultChunkSize}",
+                    negotiatedMtu, DEFAULT_BLE_TRANSFER_CHUNK_SIZE);
+                _bleTransferChunkSize = DEFAULT_BLE_TRANSFER_CHUNK_SIZE;
+            }
+            else
+            {
+                _bleTransferChunkSize = mtuChunkSize;
+                _logger.LogInformation(
+                    "BLE MTU negotiated: {negotiatedMtu}, transfer chunk size: {chunkSize} bytes",
+                    negotiatedMtu, _bleTransferChunkSize);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "MTU negotiation failed; using default chunk size {defaultChunkSize}", DEFAULT_BLE_TRANSFER_CHUNK_SIZE);
+            _bleTransferChunkSize = DEFAULT_BLE_TRANSFER_CHUNK_SIZE;
         }
     }
 
@@ -712,8 +756,8 @@ public class BleService : IBleService
     /// <remarks>
     /// Encodes <paramref name="seq"/> into the MHL compact wire format (see
     /// <see cref="CompactSequenceEncoder"/>) and drives <c>LOAD_START</c> (<c>0x10</c>), one or
-    /// more <c>LOAD_CHUNK</c> (<c>0x11</c>) messages fragmented to <see cref="BLE_TRANSFER_CHUNK_SIZE"/>
-    /// bytes, and <c>LOAD_COMMIT</c> (<c>0x12</c>). See <c>doc/ble_protocol.md</c>.
+    /// more <c>LOAD_CHUNK</c> (<c>0x11</c>) messages fragmented according to the negotiated ATT
+    /// MTU, and <c>LOAD_COMMIT</c> (<c>0x12</c>). See <c>doc/ble_protocol.md</c>.
     /// </remarks>
     public async Task LoadSequenceAsync(Sequence seq)
     {
@@ -737,8 +781,8 @@ public class BleService : IBleService
     /// <remarks>
     /// Encodes <paramref name="step"/> into the MHL compact wire format (see
     /// <see cref="CompactSequenceEncoder"/>) and drives <c>UPDATE_STEP_START</c> (<c>0x20</c>), one
-    /// or more <c>UPDATE_STEP_CHUNK</c> (<c>0x21</c>) messages fragmented to
-    /// <see cref="BLE_TRANSFER_CHUNK_SIZE"/> bytes, and <c>UPDATE_STEP_COMMIT</c> (<c>0x22</c>).
+    /// or more <c>UPDATE_STEP_CHUNK</c> (<c>0x21</c>) messages fragmented according to the
+    /// negotiated ATT MTU, and <c>UPDATE_STEP_COMMIT</c> (<c>0x22</c>).
     /// See <c>doc/ble_protocol.md</c>.
     /// </remarks>
     public async Task UpdateStepAsync(int stepIndex, Step step)
@@ -774,7 +818,7 @@ public class BleService : IBleService
         int offset = 0;
         while (offset < data.Length)
         {
-            int length = Math.Min(BLE_TRANSFER_CHUNK_SIZE, data.Length - offset);
+            int length = Math.Min(_bleTransferChunkSize, data.Length - offset);
             var offsetBytes = ToLittleEndian(BitConverter.GetBytes((ushort)offset));
 
             var chunkPayload = new byte[2 + length];
