@@ -31,18 +31,29 @@ LED_FACTORS = {
     "B2": 3,
     "B3": 3,
     "B4": 3,
-    "B5": 3,
-    "B6": 3,
-    "B7": 3,
 }
 BCOEF_DIVISOR = 21
 
 
 def compute_bcoef(leds: list[str]) -> float:
-    """Compute the average brightness correction factor for a list of LEDs."""
+    """Compute the average brightness correction factor for a list of LEDs.
+
+    Unknown LED names are ignored (factor 0) rather than contributing a
+    default factor, so that malformed or unexpected LED names cannot push
+    the coefficient above 1.0.
+    """
     if not leds:
         return 0.0
-    total = sum(LED_FACTORS.get(led.upper(), 1) for led in leds)
+    total = 0
+    for led in leds:
+        factor = LED_FACTORS.get(led.upper())
+        if factor is None:
+            print(
+                f"Warning: unknown LED '{led}', ignored in Bcoef computation.",
+                file=sys.stderr,
+            )
+            continue
+        total += factor
     return total / BCOEF_DIVISOR
 
 
@@ -77,12 +88,12 @@ def convert_oscillator(dm_osc: dict) -> dict:
         "waveform": "square",
         "phase_degrees": 0,
         "frequency": make_linear_modulator(
-            dm_osc.get("frequencyStart", 0.0),
-            dm_osc.get("frequencyEnd", 0.0),
+            min(dm_osc.get("frequencyStart", 0.0), 100.0),
+            min(dm_osc.get("frequencyEnd", 0.0), 100.0),
         ),
         "brightness": make_linear_modulator(
-            round(dm_osc.get("brightnessStart", 0.0) * bcoef / 100.0, 4),
-            round(dm_osc.get("brightnessEnd", 0.0) * bcoef / 100.0, 4),
+            min(round(dm_osc.get("brightnessStart", 0.0) * bcoef / 100.0, 4), 1.0),
+            min(round(dm_osc.get("brightnessEnd", 0.0) * bcoef / 100.0, 4), 1.0),
         ),
         "duty": make_linear_modulator(
             round(dm_osc.get("dutyStart", 0.0) / 100.0, 4),

@@ -32,7 +32,7 @@ For each of the 4 Dream Machine oscillators:
 
 | MHL field | Mode | Start value | End value |
 |---|---|---|---|
-| `frequency` | `linear` | `frequencyStart` | `frequencyEnd` |
+| `frequency` | `linear` | `min(frequencyStart, 100)` | `min(frequencyEnd, 100)` |
 | `brightness` | `linear` | `brightnessStart * Bcoef / 100` | `brightnessEnd * Bcoef / 100` |
 | `duty` | `linear` | `dutyStart / 100` | `dutyEnd / 100` |
 | `waveform` | `square` | — | — |
