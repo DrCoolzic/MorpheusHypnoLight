@@ -97,6 +97,9 @@ public partial class MainViewModel : ObservableObject
 
     public string CurrentPositionText => $"{CurrentPosition:F2} s";
 
+    [ObservableProperty]
+    public partial double SeekPosition { get; set; } = 0.0;
+
     private async Task InitializeAsync()
     {
         _logger.LogInformation("Starting MainViewModel initialization...");
@@ -230,5 +233,12 @@ public partial class MainViewModel : ObservableObject
     {
         _logger.LogInformation("Stopping player");
         await _sequencePlayerService.StopPlayerAsync();
+    }
+
+    [RelayCommand]
+    private async Task SeekPlayerAsync()
+    {
+        _logger.LogInformation("Seeking player to {SeekPosition}s", SeekPosition);
+        await _sequencePlayerService.SeekToPositionAsync(SeekPosition);
     }
 }

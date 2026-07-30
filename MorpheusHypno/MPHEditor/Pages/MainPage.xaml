@@ -74,5 +74,18 @@
                    FontSize="14"
                    HorizontalOptions="Center" />
         </HorizontalStackLayout>
+
+        <HorizontalStackLayout Spacing="15" HorizontalOptions="Center">
+            <Label Text="Seek (s):"
+                   FontSize="14"
+                   VerticalOptions="Center" />
+            <Entry Text="{Binding SeekPosition, Mode=TwoWay}"
+                   Keyboard="Numeric"
+                   WidthRequest="80"
+                   VerticalOptions="Center" />
+            <Button Text="Seek Player"
+                    Command="{Binding SeekPlayerCommand}"
+                    HorizontalOptions="Center" />
+        </HorizontalStackLayout>
     </VerticalStackLayout>
 </ContentPage>

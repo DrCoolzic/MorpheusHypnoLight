@@ -464,14 +464,20 @@ esp_err_t sequence_seek(uint32_t position_ms) {
   const bool continue_playing = sequence_playing;
   taskEXIT_CRITICAL(&sequence_lock);
 
-  esp_err_t error = apply_step(step_index);
-  if (error != ESP_OK) {
-    return error;
-  }
+  // Only apply the step if playback was active. When the player is stopped or
+  // paused, applying the step would turn the LEDs on while no timer is running.
+  // The next sequence_play() will apply the correct step and offset before
+  // restarting the timer, so the resume position is still correct.
+  if (continue_playing) {
+    esp_err_t error = apply_step(step_index);
+    if (error != ESP_OK) {
+      return error;
+    }
 
-  error = apply_step_offset(step_index, offset_ms);
-  if (error != ESP_OK) {
-    return error;
+    error = apply_step_offset(step_index, offset_ms);
+    if (error != ESP_OK) {
+      return error;
+    }
   }
 
   if (continue_playing && sequence_timer != NULL) {
