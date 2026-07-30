@@ -167,59 +167,41 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
         if (PlayerState == PlayerStateEnum.PLAYING)
             return; // Already playing
 
-        // Resume from paused state
+        _cancellationTokenSource?.Cancel();
+        _cancellationTokenSource = new CancellationTokenSource();
+        SetPlayerState(PlayerStateEnum.PLAYING);
+
+        // Resume from paused state: the firmware has kept its internal position,
+        // so we only need to resume both the device and the audio.
         if (PlayerState == PlayerStateEnum.PAUSED)
         {
             _logger.LogInformation("Resuming playback from position: {} seconds", CurrentPosition);
-            // Now continue playback
-            SetPlayerState(PlayerStateEnum.PLAYING);
-            PlayAction();
+            await ResumeActionAsync();
             _stopwatch?.Start();
-            _cancellationTokenSource = new CancellationTokenSource();
             await ContinueTimerAsync();
             return;
         }
 
         // Starting from the stopped state
-        _cancellationTokenSource?.Cancel();
-        _cancellationTokenSource = new CancellationTokenSource();
-        SetPlayerState(PlayerStateEnum.PLAYING);
         _logger.LogInformation("Start player from position: {} seconds", CurrentPosition);
-
-        // Reconstruct truncated sequence at current position before playing
-        // This ensures BLE starts from the correct position (not always from 0)
-        int roundedPosition = (int)Math.Round(CurrentPosition);
-        SeekToAction(roundedPosition);
-
-        PlayAction();
+        await StartActionAsync();
         _stopwatch = Stopwatch.StartNew();
         await ContinueTimerAsync();
     }
 
 
     /// <inheritdoc />
-    public void PausePlayer()
+    public async Task PausePlayerAsync()
     {
-        if (_cancellationTokenSource != null && PlayerState == PlayerStateEnum.PLAYING)
-        {
-            // Round position to nearest integer before pausing
-            // This ensures audio and BLE resume from the same position
-            // Dream Machine doesn't support pause, so we create a truncated sequence at integer position
-            double originalPosition = CurrentPosition;
-            CurrentPosition = Math.Round(CurrentPosition);
+        if (PlayerState != PlayerStateEnum.PLAYING)
+            return;
 
-            if (originalPosition != CurrentPosition)
-            {
-                _logger.LogInformation("Pause: Rounded position from {} to {} seconds", originalPosition, CurrentPosition);
-            }
+        _logger.LogInformation("Pause player at position: {} seconds", CurrentPosition);
+        SetPlayerState(PlayerStateEnum.PAUSED);
+        _stopwatch?.Stop();
 
-            SetPlayerState(PlayerStateEnum.PAUSED);
-            PauseAction();
-            _stopwatch?.Stop(); // Stop the Stopwatch
-
-            // Notify UI of the rounded position
-            PositionChanged?.Invoke(this, CurrentPosition);
-        }
+        await PauseActionAsync();
+        PositionChanged?.Invoke(this, CurrentPosition);
     }
 
 
@@ -231,7 +213,7 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
 
         _cancellationTokenSource?.Cancel();
         SetPlayerState(PlayerStateEnum.STOPPED);
-        StopAction();
+        await StopActionAsync();
         await SeekToPositionAsync(0);
         CurrentPosition = 0;
         _stopwatch?.Stop();
@@ -242,23 +224,20 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
     /// <inheritdoc />
     public async Task SeekToPositionAsync(double positionInSeconds)
     {
-        // Stop the timer if active
+        // Clamp to valid range
+        double clampedPosition = Math.Max(0.0, Math.Min(positionInSeconds, _duration));
+        _logger.LogInformation("Seek requested to {} seconds (clamped to {} seconds)", positionInSeconds, clampedPosition);
+
         _cancellationTokenSource?.Cancel();
-
-        // Round to nearest integer to ensure audio and BLE stay synchronized
-        // Dream Machine only operates on second boundaries
-        int roundedPosition = (int)Math.Round(positionInSeconds);
-
-        // Update CurrentPosition and seek to the new position
-        CurrentPosition = roundedPosition;
+        CurrentPosition = clampedPosition;
         PositionChanged?.Invoke(this, CurrentPosition);
 
-        SeekToAction(roundedPosition);
-        _logger.LogInformation("Seek requested to {} seconds, rounded to {} seconds", positionInSeconds, roundedPosition);
+        await SeekToActionAsync(clampedPosition);
 
         // If the player is playing, restart the timer
         if (PlayerState == PlayerStateEnum.PLAYING)
         {
+            _stopwatch?.Restart();
             _cancellationTokenSource = new CancellationTokenSource();
             await ContinueTimerAsync();
         }
@@ -318,22 +297,32 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
     }
 
 
-    private void PlayAction()
+    /// <summary>
+    /// Loads the full sequence onto the device, optionally seeks to the current
+    /// position, and starts playback. Used when starting from the stopped state.
+    /// </summary>
+    private async Task StartActionAsync()
     {
         if (_sequenceToPlay is null)
         {
-            _logger.LogInformation("Trying to play a null sequence");
+            _logger.LogWarning("Trying to start playback with a null sequence");
             return;
         }
 
         if (_bleService.IsConnected)
         {
-            Stopwatch stopwatch = new();
-            stopwatch.Start();  // Start timing
-            _bleService.LoadSequenceAsync(_sequenceToPlay);
-            _bleService.PlayAsync();
-            stopwatch.Stop();   // Stop timing
-            _logger.LogInformation("Time to send ble sequence: {}ms", stopwatch.ElapsedMilliseconds);
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            await _bleService.LoadSequenceAsync(_sequenceToPlay);
+
+            int positionMs = (int)Math.Round(CurrentPosition * 1000.0);
+            if (positionMs > 0)
+            {
+                await _bleService.SeekAsync(positionMs);
+            }
+
+            await _bleService.PlayAsync();
+            stopwatch.Stop();
+            _logger.LogInformation("Time to send BLE sequence: {} ms", stopwatch.ElapsedMilliseconds);
         }
 
         if (_audioPlayer != null)
@@ -343,11 +332,10 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
                 _logger.LogInformation("Starting audio playback Volume={}, Duration={}, CurrentPosition={}",
                     _audioPlayer.Volume, _audioPlayer.Duration, _audioPlayer.CurrentPosition);
                 _audioPlayer.Play();
-                _logger.LogInformation("Audio play command sent successfully");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to start audio playback - attempting to recreate audio player");
+                _logger.LogError(ex, "Failed to start audio playback");
             }
         }
         else
@@ -356,166 +344,107 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
         }
     }
 
-
-    private void PauseAction()
+    /// <summary>
+    /// Resumes playback on the device and in the audio player. Used when resuming
+    /// from a paused state.
+    /// </summary>
+    private async Task ResumeActionAsync()
     {
-        if (_sequenceToPlay is null)
-            return;
+        if (_bleService.IsConnected)
+        {
+            await _bleService.PlayAsync();
+        }
 
-        // Round to nearest integer to ensure audio and BLE stay synchronized
-        // Dream Machine only operates on second boundaries
-        int roundedPosition = (int)Math.Round(CurrentPosition);
-
-        // Update CurrentPosition and seek to the new position
-        CurrentPosition = roundedPosition;
-        PositionChanged?.Invoke(this, CurrentPosition);
-
-        // Pause audio at current position (already rounded in PausePlayer)
-        _audioPlayer?.Pause();
-        // Seek audio to the rounded position to ensure sync on resume
         if (_audioPlayer != null)
         {
             try
             {
-                _audioPlayer.Seek(roundedPosition);
-                _logger.LogInformation("Pause: Audio sought to rounded position {} seconds", roundedPosition);
+                _audioPlayer.Play();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to seek audio during pause");
+                _logger.LogError(ex, "Failed to resume audio playback");
             }
-        }
-
-        _logger.LogInformation("Pause player at position: {} seconds", roundedPosition);
-
-        if (_bleService.IsConnected)
-        {
-            _bleService.PauseAsync();
-            // Create truncated sequence at rounded position for resume
-            SeekToAction(roundedPosition);
         }
     }
 
+    /// <summary>
+    /// Pauses playback on the device and in the audio player.
+    /// </summary>
+    private async Task PauseActionAsync()
+    {
+        if (_audioPlayer != null)
+        {
+            try
+            {
+                _audioPlayer.Pause();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to pause audio playback");
+            }
+        }
 
-    private void StopAction()
+        if (_bleService.IsConnected)
+        {
+            await _bleService.PauseAsync();
+        }
+    }
+
+    /// <summary>
+    /// Stops playback on the device and in the audio player.
+    /// </summary>
+    private async Task StopActionAsync()
     {
         _logger.LogInformation("Stop player at position: {} seconds", CurrentPosition);
 
         _audioPlayer?.Stop();
 
         if (_bleService.IsConnected)
-            _bleService.StopAsync();
+        {
+            await _bleService.StopAsync();
+        }
     }
 
-    private void SeekToAction(int position)
+    /// <summary>
+    /// Seeks the audio player and the BLE device to the specified position.
+    /// The device expects the position in milliseconds, while the audio player
+    /// works in seconds.
+    /// </summary>
+    /// <param name="positionInSeconds">Target position in seconds.</param>
+    private async Task SeekToActionAsync(double positionInSeconds)
     {
-        if (_sequence is null)
-            return;
-
-        _logger.LogInformation("Seeking player to position: {} seconds", position);
-        _logger.LogInformation("_sequence: Name={}, DurationSeconds={}, Steps.Count={}", _sequence.Name, _sequence.DurationSeconds, _sequence.Steps.Count);
-        if (_sequence.Steps.Count > 0)
+        if (positionInSeconds < 0.0 || positionInSeconds > _duration)
         {
-            _logger.LogInformation("First step: DurationSeconds={}", _sequence.Steps[0].DurationSeconds);
-            _logger.LogInformation("Last step: DurationSeconds={}", _sequence.Steps[^1].DurationSeconds);
+            _logger.LogWarning("Seek position {} is out of bounds (0-{}), skipping seek", positionInSeconds, _duration);
+            return;
         }
 
-        // Only seek audio/BLE if player is not stopped
-        // When stopped, we just reconstruct the truncated sequence for later playback
-        bool shouldSeekAudioAndBle = PlayerState != PlayerStateEnum.STOPPED;
-
-        // Defensive audio seeking with error handling to prevent COMException crashes
-        if (_audioPlayer != null && shouldSeekAudioAndBle)
+        // Audio player works in seconds
+        if (_audioPlayer != null)
         {
             try
             {
-                // Validate seek position is within bounds
-                if (position >= 0 && position <= _duration)
-                {
-                    _audioPlayer.Seek(position);
-                    // _logger.LogInformation("Seek players to position: {} seconds", positionInSeconds);
-                }
-                else
-                {
-                    _logger.LogWarning("Seek position {} is out of bounds (0-{}), skipping audio seek", position, _duration);
-                }
+                _audioPlayer.Seek(positionInSeconds);
             }
             catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException || ex is InvalidOperationException || ex is ObjectDisposedException)
             {
-                _logger.LogError(ex, "Failed to seek audio player to position {} - audio player may be in invalid state. Attempting to recreate audio player.", position);
+                _logger.LogError(ex, "Failed to seek audio player to position {} seconds", positionInSeconds);
             }
         }
 
-        // Always reconstruct truncated sequence, even when stopped or not connected
-        // This ensures _sequenceToPlay is ready when StartPlayerAsync is called
-        if (position == 0)
-            _sequenceToPlay = _sequence;
-        else
+        // BLE device works in milliseconds
+        if (_bleService.IsConnected)
         {
-            //// Use integer position for BLE operations to ensure audio/light sync
-            //int positionSeconds = CurrentPositionSeconds;
-            var (stepIndex, posInStep, oscValues) = DmDSP.ParametersAtPos(position, _sequence);
-            _logger.LogInformation("@{} step:{} pos:{} f0:F({})-D({})-B({}) f1:F({})-D({})-B({}) f2:F({})-D({})-B({}) f3:F({})-D({})-B({})",
-                position, stepIndex, posInStep,
-                oscValues[0].frequency, oscValues[0].dutyCycle, oscValues[0].brightness,
-                oscValues[1].frequency, oscValues[1].dutyCycle, oscValues[1].brightness,
-                oscValues[2].frequency, oscValues[2].dutyCycle, oscValues[2].brightness,
-                oscValues[3].frequency, oscValues[3].dutyCycle, oscValues[3].brightness
-            );
-
-            // Validate stepIndex before accessing Steps collection
-            if (stepIndex == -1)
-            {
-                _logger.LogWarning("Seek position {} is out of sequence bounds (duration: {}), cannot create truncated sequence", position, _sequence.DurationSeconds);
-                return;
-            }
-
-            Step current_step = _sequence.Steps[stepIndex];
-
-            // Calculate remaining duration from seek position to end of current step
-            double elapsed = posInStep;
-            double remainingSeconds = current_step.DurationSeconds - elapsed;
-
-            var oscillators = new List<Oscillator>();
-            if (current_step.Oscillators.Count == 0)
-                return;
-            foreach (var iter in current_step.Oscillators.Select((oscillator, i) => (oscillator, i)))
-            {
-                var value = oscValues[iter.i];
-                Oscillator oscillator = new()
-                {
-                    Waveform = iter.oscillator.Waveform,
-                    PhaseDegrees = iter.oscillator.PhaseDegrees,
-                    Frequency = new Modulator { Mode = ModulatorMode.Static, Value = value.frequency },
-                    Brightness = new Modulator { Mode = ModulatorMode.Static, Value = value.brightness },
-                    Duty = new Modulator { Mode = ModulatorMode.Static, Value = value.dutyCycle }
-                };
-                oscillators.Add(oscillator);
-            }
-            Step newStep = new()
-            {
-                DurationSeconds = remainingSeconds,
-                Oscillators = oscillators
-            };
-
-            // we create a new sequence starting with the new step
-            _sequenceToPlay = new Sequence
-            {
-                Name = "Dummy Sequence",
-                Steps = new List<Step> { newStep }
-            };
-
-            // now we add the following steps if any
-            if (stepIndex != _sequence.Steps.Count - 1)
-            {
-                foreach (var step in _sequence.Steps.Skip(stepIndex + 1))
-                {
-                    _sequenceToPlay.Steps.Add(step.Clone());
-                }
-            }
-            _logger.LogInformation("_sequenceToPlay: {}", _sequenceToPlay);
+            int positionMs = (int)Math.Round(positionInSeconds * 1000.0);
+            await _bleService.SeekAsync(positionMs);
         }
     }
+
+    /// <summary>
+    /// Converts the current position from seconds to milliseconds for BLE commands.
+    /// </summary>
+    private int CurrentPositionMs => (int)Math.Round(CurrentPosition * 1000.0);
 
     /// <summary>
     /// Continues the timer when the player is playing.

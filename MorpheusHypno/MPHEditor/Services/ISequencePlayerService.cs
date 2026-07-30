@@ -53,7 +53,7 @@ public interface ISequencePlayerService
     /// <summary>
     /// Pause the current playback
     /// </summary>
-    void PausePlayer();
+    Task PausePlayerAsync();
 
     /// <summary>
     /// Stop playback and reset position to beginning
