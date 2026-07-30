@@ -498,6 +498,10 @@ public class BleService : IBleService
             _logger.LogInformation("Connected to device {}", MHLIDevice.Name);
 
             Status = $"Connected to {MHLIDevice.Name} looking for MHL Service and Characteristics ...";
+
+            // Give the Windows BLE stack a moment to finish service discovery.
+            await Task.Delay(500);
+
             await GetMHLServiceAndCharacteristics();
 
             if (MHLIService == null || MHLStatusChannel == null || MHLCommandChannel == null)
@@ -538,10 +542,26 @@ public class BleService : IBleService
             return;
         }
 
+        const int maxRetries = 3;
+        const int retryDelayMs = 500;
+
         try
         {
-            _logger.LogInformation("Getting service: {}", ServiceUuid);
-            MHLIService = await MHLIDevice.GetServiceAsync(ServiceUuid);
+            for (int attempt = 0; attempt < maxRetries; attempt++)
+            {
+                _logger.LogInformation("Getting service: {} (attempt {})", ServiceUuid, attempt + 1);
+                MHLIService = await MHLIDevice.GetServiceAsync(ServiceUuid);
+                if (MHLIService != null)
+                {
+                    break;
+                }
+
+                if (attempt < maxRetries - 1)
+                {
+                    _logger.LogWarning("MHL service not found, retrying...");
+                    await Task.Delay(retryDelayMs);
+                }
+            }
 
             if (MHLIService == null)
             {
@@ -549,16 +569,44 @@ public class BleService : IBleService
                 return;
             }
 
-            _logger.LogInformation("Getting command ch: {}", CommandUuid);
-            MHLCommandChannel = await MHLIService.GetCharacteristicAsync(CommandUuid);
+            for (int attempt = 0; attempt < maxRetries; attempt++)
+            {
+                _logger.LogInformation("Getting command ch: {} (attempt {})", CommandUuid, attempt + 1);
+                MHLCommandChannel = await MHLIService.GetCharacteristicAsync(CommandUuid);
+                if (MHLCommandChannel != null)
+                {
+                    break;
+                }
+
+                if (attempt < maxRetries - 1)
+                {
+                    _logger.LogWarning("Command characteristic not found, retrying...");
+                    await Task.Delay(retryDelayMs);
+                }
+            }
+
             if (MHLCommandChannel == null)
             {
                 _logger.LogError("Failed to get command characteristic");
                 return;
             }
 
-            _logger.LogInformation("Getting status ch: {}", StatusUuid);
-            MHLStatusChannel = await MHLIService.GetCharacteristicAsync(StatusUuid);
+            for (int attempt = 0; attempt < maxRetries; attempt++)
+            {
+                _logger.LogInformation("Getting status ch: {} (attempt {})", StatusUuid, attempt + 1);
+                MHLStatusChannel = await MHLIService.GetCharacteristicAsync(StatusUuid);
+                if (MHLStatusChannel != null)
+                {
+                    break;
+                }
+
+                if (attempt < maxRetries - 1)
+                {
+                    _logger.LogWarning("Status characteristic not found, retrying...");
+                    await Task.Delay(retryDelayMs);
+                }
+            }
+
             if (MHLStatusChannel != null)
             {
                 MHLStatusChannel.ValueUpdated += OnStatusCharacteristicUpdated;
