@@ -40,9 +40,10 @@ public interface ISequencePlayerService
 
     /// <summary>
     /// Set the Sequence and potentially the Audio of the Player.
+    /// Loads the sequence onto the device if connected.
     /// Return the Audio path if sequence has audio, otherwise null
     /// </summary>
-    string SetPlayer(MPHSequence MPHSequence);
+    Task<string> SetPlayerAsync(MPHSequence MPHSequence);
 
 
     /// <summary>

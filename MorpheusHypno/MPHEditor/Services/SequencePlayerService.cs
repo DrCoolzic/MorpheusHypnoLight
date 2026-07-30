@@ -29,6 +29,7 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
     private int _duration = 0;
     private CancellationTokenSource? _cancellationTokenSource;
     private Stopwatch? _stopwatch;
+    private bool _sequenceLoadedOnDevice = false;
 
     // Add timeout constant for sequence changes
     private const int SequenceChangeTimeoutMs = 5000; // 5 seconds timeout
@@ -82,7 +83,7 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
     #region Interface Methods
 
     /// <inheritdoc />
-    public string SetPlayer(MPHSequence MPHSequence)
+    public async Task<string> SetPlayerAsync(MPHSequence MPHSequence)
     {
         if (MPHSequence.Sequence is null)
         {
@@ -92,6 +93,7 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
         _sequence = MPHSequence.Sequence;
         _sequenceToPlay = _sequence;
         _duration = (int)Math.Ceiling(_sequence.DurationSeconds);
+        _sequenceLoadedOnDevice = false;
         _logger.LogInformation("Set player sequence to {} with duration {}", _sequence.Name, _duration);
 
         // Check if sequence has audio
@@ -120,6 +122,22 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
         {
             _audioPlayer = null;
             _audioFileStream = null;
+        }
+
+        // Load the sequence onto the device if connected
+        if (_bleService.IsConnected)
+        {
+            try
+            {
+                await _bleService.LoadSequenceAsync(_sequenceToPlay);
+                _sequenceLoadedOnDevice = true;
+                _logger.LogInformation("Sequence loaded onto device");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to load sequence onto device");
+                _sequenceLoadedOnDevice = false;
+            }
         }
 
         // If audioPath is not empty, create the audio player
@@ -167,15 +185,15 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
         if (PlayerState == PlayerStateEnum.PLAYING)
             return; // Already playing
 
-        _cancellationTokenSource?.Cancel();
-        _cancellationTokenSource = new CancellationTokenSource();
+        bool wasPaused = PlayerState == PlayerStateEnum.PAUSED;
         SetPlayerState(PlayerStateEnum.PLAYING);
 
         // Resume from paused state: the firmware has kept its internal position,
         // so we only need to resume both the device and the audio.
-        if (PlayerState == PlayerStateEnum.PAUSED)
+        if (wasPaused)
         {
             _logger.LogInformation("Resuming playback from position: {} seconds", CurrentPosition);
+            _cancellationTokenSource = new CancellationTokenSource();
             await ResumeActionAsync();
             _stopwatch?.Start();
             await ContinueTimerAsync();
@@ -183,6 +201,8 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
         }
 
         // Starting from the stopped state
+        _cancellationTokenSource?.Cancel();
+        _cancellationTokenSource = new CancellationTokenSource();
         _logger.LogInformation("Start player from position: {} seconds", CurrentPosition);
         await StartActionAsync();
         _stopwatch = Stopwatch.StartNew();
@@ -214,8 +234,8 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
         _cancellationTokenSource?.Cancel();
         SetPlayerState(PlayerStateEnum.STOPPED);
         await StopActionAsync();
-        await SeekToPositionAsync(0);
         CurrentPosition = 0;
+        PositionChanged?.Invoke(this, CurrentPosition);
         _stopwatch?.Stop();
         _stopwatch = null; // Reset the stopwatch
     }
@@ -232,7 +252,12 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
         CurrentPosition = clampedPosition;
         PositionChanged?.Invoke(this, CurrentPosition);
 
-        await SeekToActionAsync(clampedPosition);
+        // Do not send a BLE seek while stopped: the device would apply the step and turn LEDs on.
+        // The next Start will seek to this position if needed.
+        if (PlayerState != PlayerStateEnum.STOPPED)
+        {
+            await SeekToActionAsync(clampedPosition);
+        }
 
         // If the player is playing, restart the timer
         if (PlayerState == PlayerStateEnum.PLAYING)
@@ -312,7 +337,12 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
         if (_bleService.IsConnected)
         {
             Stopwatch stopwatch = Stopwatch.StartNew();
-            await _bleService.LoadSequenceAsync(_sequenceToPlay);
+
+            if (!_sequenceLoadedOnDevice)
+            {
+                await _bleService.LoadSequenceAsync(_sequenceToPlay);
+                _sequenceLoadedOnDevice = true;
+            }
 
             int positionMs = (int)Math.Round(CurrentPosition * 1000.0);
             if (positionMs > 0)
@@ -322,7 +352,7 @@ public partial class SequencePlayerService : ISequencePlayerService, IDisposable
 
             await _bleService.PlayAsync();
             stopwatch.Stop();
-            _logger.LogInformation("Time to send BLE sequence: {} ms", stopwatch.ElapsedMilliseconds);
+            _logger.LogInformation("Time to send BLE commands: {} ms", stopwatch.ElapsedMilliseconds);
         }
 
         if (_audioPlayer != null)

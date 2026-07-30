@@ -199,7 +199,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void SetPlayer()
+    private async Task SetPlayerAsync()
     {
         if (_currentMphSequence is null || _currentMphSequence.Sequence is null)
         {
@@ -208,7 +208,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         _logger.LogInformation("Setting player sequence to {SequenceName}", _currentMphSequence.Sequence.Name);
-        _sequencePlayerService.SetPlayer(_currentMphSequence);
+        await _sequencePlayerService.SetPlayerAsync(_currentMphSequence);
     }
 
     [RelayCommand]
