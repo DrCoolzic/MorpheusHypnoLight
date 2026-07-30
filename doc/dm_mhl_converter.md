@@ -85,3 +85,25 @@ The script takes a Dream Machine `Programmes` directory as input and recursively
 - Copy `son.mp3` to `sound.mp3` if it exists.
 
 Files that are not in Dream Machine format (e.g., already converted MHL files) are skipped.
+
+## Spread mode (`--spread`)
+
+Dream Machine sequences often describe a single oscillator driving several LED groups, while Morpheus HypnoLight maps one oscillator to one LED group. The optional `--spread` flag addresses this by replicating the active oscillator across the first four MHL oscillators when a Dream Machine step contains exactly one active oscillator.
+
+An oscillator is considered **active** when its `led` list is non-empty. Dream Machine files frequently declare all four oscillator slots, leaving the unused ones with an empty `led` array; those empty slots are ignored for the spread decision.
+
+- Frequency, brightness, and duty modulators are copied unchanged.
+- If a step contains zero, two, three, or four active Dream Machine oscillators, the normal mapping is used.
+
+Because spreading one oscillator across four LED groups can make those steps much brighter than steps with multiple active oscillators, you can adjust the replicated brightness with `--spread-scale FACTOR`.
+
+- `--spread-scale 1.0` keeps the original brightness on each of the four oscillators (default).
+- `--spread-scale 0.5` halves the brightness on each replicated oscillator.
+- `--spread-scale 0.25` divides the brightness by 4 on each replicated oscillator.
+
+Example:
+
+```bash
+python dm_to_mhl_converter.py --spread path/to/sequence.json
+python dm_to_mhl_converter.py --spread --spread-scale 0.5 path/to/Programmes
+```

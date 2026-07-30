@@ -3,9 +3,11 @@
 
 Usage (single file):
     python dm_to_mhl_converter.py path/to/sequence.json
+    python dm_to_mhl_converter.py --spread path/to/sequence.json
 
 Usage (batch):
     python dm_to_mhl_converter.py path/to/Programmes
+    python dm_to_mhl_converter.py --spread path/to/Programmes
 
 For each converted sequence:
 - The original Dream Machine ``sequence.json`` is renamed to ``sequence.dm``.
@@ -14,6 +16,7 @@ For each converted sequence:
 """
 
 import argparse
+import copy
 import json
 import shutil
 import sys
@@ -102,7 +105,33 @@ def convert_oscillator(dm_osc: dict) -> dict:
     }
 
 
-def convert_step(dm_step: dict) -> dict:
+def _scale_brightness(osc: dict, scale: float) -> dict:
+    """Scale the brightness modulator of ``osc`` by ``scale``."""
+    scaled = copy.deepcopy(osc)
+    modulator = scaled["brightness"]
+    if modulator["mode"] == "static":
+        modulator["value"] = round(modulator["value"] * scale, 4)
+    elif modulator["mode"] == "linear":
+        modulator["start"] = round(modulator["start"] * scale, 4)
+        modulator["end"] = round(modulator["end"] * scale, 4)
+    return scaled
+
+
+def _replicate_oscillator(
+    base_osc: dict, count: int, brightness_scale: float
+) -> list[dict]:
+    """Create ``count`` copies of ``base_osc`` with brightness scaled."""
+    return [_scale_brightness(base_osc, brightness_scale) for _ in range(count)]
+
+
+def _active_oscillators(dm_oscillators: list[dict]) -> list[dict]:
+    """Return Dream Machine oscillators that actually drive LEDs."""
+    return [osc for osc in dm_oscillators if osc.get("led")]
+
+
+def convert_step(
+    dm_step: dict, *, spread: bool = False, spread_scale: float = 1.0
+) -> dict:
     """Convert a Dream Machine step to an MHL step."""
     time_start = dm_step.get("timeStart", 0)
     time_end = dm_step.get("timeEnd", time_start)
@@ -110,13 +139,22 @@ def convert_step(dm_step: dict) -> dict:
     dm_oscillators = dm_step.get("oscillators", [])
     mhl_oscillators: list[dict] = []
 
-    # Map the first 4 Dream Machine oscillators to MHL slots 0..3.
-    for dm_osc in dm_oscillators[:4]:
-        mhl_oscillators.append(convert_oscillator(dm_osc))
+    # When only one Dream Machine oscillator is actually used (i.e. has LEDs) and
+    # the spread option is enabled, replicate it across the first 4 MHL
+    # oscillators so the brightness is distributed over 4 LED groups instead of
+    # lighting only one.
+    active_oscillators = _active_oscillators(dm_oscillators)
+    if spread and len(active_oscillators) == 1:
+        base_osc = convert_oscillator(active_oscillators[0])
+        mhl_oscillators = _replicate_oscillator(base_osc, 4, spread_scale)
+    else:
+        # Map the first 4 Dream Machine oscillators to MHL slots 0..3.
+        for dm_osc in dm_oscillators[:4]:
+            mhl_oscillators.append(convert_oscillator(dm_osc))
 
-    # Fill remaining slots (up to 4) with default "off" oscillators.
-    while len(mhl_oscillators) < 4:
-        mhl_oscillators.append(make_default_oscillator())
+        # Fill remaining slots (up to 4) with default "off" oscillators.
+        while len(mhl_oscillators) < 4:
+            mhl_oscillators.append(make_default_oscillator())
 
     # Slot 4 (oscillator 5) is always off.
     mhl_oscillators.append(make_default_oscillator())
@@ -127,7 +165,9 @@ def convert_step(dm_step: dict) -> dict:
     }
 
 
-def convert_sequence(dm_data: dict) -> dict:
+def convert_sequence(
+    dm_data: dict, *, spread: bool = False, spread_scale: float = 1.0
+) -> dict:
     """Convert a Dream Machine sequence dictionary to an MHL sequence dictionary."""
     created_at = dm_data.get("createdAt")
     if not created_at:
@@ -138,18 +178,23 @@ def convert_sequence(dm_data: dict) -> dict:
         "name": dm_data.get("name", ""),
         "author": dm_data.get("author", ""),
         "createdAt": created_at,
-        "steps": [convert_step(step) for step in dm_data.get("steps", [])],
+        "steps": [
+            convert_step(step, spread=spread, spread_scale=spread_scale)
+            for step in dm_data.get("steps", [])
+        ],
     }
 
 
-def convert_single_sequence(sequence_path: Path) -> Path:
+def convert_single_sequence(
+    sequence_path: Path, *, spread: bool = False, spread_scale: float = 1.0
+) -> Path:
     """Convert one ``sequence.json`` file and copy the audio file if present."""
     sequence_path = Path(sequence_path)
     if not sequence_path.exists():
         raise FileNotFoundError(f"Sequence file not found: {sequence_path}")
 
     dm_data = json.loads(sequence_path.read_text(encoding="utf-8"))
-    mhl_data = convert_sequence(dm_data)
+    mhl_data = convert_sequence(dm_data, spread=spread, spread_scale=spread_scale)
 
     # Preserve the original Dream Machine file.
     original_path = sequence_path.with_suffix(".dm")
@@ -200,7 +245,9 @@ def is_dream_machine_sequence(data: dict) -> bool:
     )
 
 
-def batch_convert(root: Path) -> int:
+def batch_convert(
+    root: Path, *, spread: bool = False, spread_scale: float = 1.0
+) -> int:
     """Convert every Dream Machine ``sequence.json`` found recursively under ``root``."""
     root = Path(root)
     converted = 0
@@ -211,7 +258,7 @@ def batch_convert(root: Path) -> int:
             if not is_dream_machine_sequence(data):
                 print(f"Skipping (already MHL or unknown format): {seq_file}")
                 continue
-            convert_single_sequence(seq_file)
+            convert_single_sequence(seq_file, spread=spread, spread_scale=spread_scale)
             converted += 1
             print(f"Converted: {seq_file}")
         except Exception as exc:  # noqa: BLE001
@@ -228,6 +275,27 @@ def main() -> int:
         "path",
         help="Path to a sequence.json file or to a Programmes directory.",
     )
+    parser.add_argument(
+        "--spread",
+        action="store_true",
+        help=(
+            "When a Dream Machine step contains a single active oscillator, replicate it "
+            "across the first 4 MHL oscillators so the output is distributed over "
+            "4 LED groups instead of a single one."
+        ),
+    )
+    parser.add_argument(
+        "--spread-scale",
+        type=float,
+        default=1.0,
+        metavar="FACTOR",
+        help=(
+            "Brightness scale factor applied to each replicated oscillator when "
+            "--spread is used. 1.0 keeps the original brightness, 0.5 divides it by 2, "
+            "0.25 divides it by 4. Use this to balance sequences where single-oscillator "
+            "steps would otherwise be much brighter than multi-oscillator steps."
+        ),
+    )
     args = parser.parse_args()
 
     path = Path(args.path)
@@ -236,10 +304,12 @@ def main() -> int:
         return 1
 
     if path.is_file():
-        output = convert_single_sequence(path)
+        output = convert_single_sequence(
+            path, spread=args.spread, spread_scale=args.spread_scale
+        )
         print(f"Converted: {output}")
     else:
-        count = batch_convert(path)
+        count = batch_convert(path, spread=args.spread, spread_scale=args.spread_scale)
         print(f"Converted {count} sequence(s).")
 
     return 0

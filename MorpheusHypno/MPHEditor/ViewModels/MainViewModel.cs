@@ -212,6 +212,7 @@ public partial class MainViewModel : ObservableObject
 
         _logger.LogInformation("Setting player sequence to {SequenceName}", _currentMphSequence.Sequence.Name);
         await _sequencePlayerService.SetPlayerAsync(_currentMphSequence);
+        await _bleService.SendBrightnessAsync(80);
     }
 
     [RelayCommand]
