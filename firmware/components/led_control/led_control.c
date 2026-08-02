@@ -35,6 +35,25 @@ static float led_control_global_brightness =
 /** @brief Gamma correction exponent to linearize perceived brightness. */
 #define LED_CONTROL_GAMMA 2.2f
 
+/**
+ * @brief Brightness value below which a linear lift is applied.
+ *
+ * Below this threshold the gamma curve compresses values so much that LEDs
+ * stay dark. The lift ramps linearly from 0 at brightness 0 up to
+ * LED_CONTROL_LOW_END_LIFT at this threshold, then stays constant.
+ */
+#define LED_CONTROL_LOW_END_THRESHOLD 0.02f
+
+/**
+ * @brief Output lift applied at the low-end brightness threshold.
+ *
+ * This duty offset is added after gamma correction to make the LED turn-on
+ * point occur at approximately LED_CONTROL_LOW_END_THRESHOLD for all global
+ * dimmer settings. It is intentionally small so it does not dominate at higher
+ * brightness values and the global dimmer remains effective.
+ */
+#define LED_CONTROL_LOW_END_LIFT 0.005f
+
 /** @brief GPIO mapping indexed by fixed oscillator ID. */
 static const int led_control_gpios[LED_CONTROL_OSCILLATOR_COUNT] = {
     4, 5, 6, 7, 15,
@@ -117,11 +136,21 @@ esp_err_t led_control_update(uint8_t oscillator_id, float osc_value,
   const float global_brightness = led_control_global_brightness;
   taskEXIT_CRITICAL(&led_control_lock);
 
-  const float combined_brightness =
-      clamp_unit(current_brightness) * global_brightness;
-  const float corrected_brightness =
-      powf(combined_brightness, LED_CONTROL_GAMMA);
-  const float final_brightness = clamp_unit(osc_value) * corrected_brightness;
+  /* Apply gamma correction to the dimmed brightness and then add a small,
+   * saturating low-end lift. The lift makes the LED turn-on threshold occur at
+   * roughly the same brightness parameter value regardless of the global
+   * dimmer, while keeping the gamma response dominant at higher brightness so
+   * the global dimmer remains effective. */
+  const float local_brightness = clamp_unit(current_brightness);
+  const float dimmed_brightness = local_brightness * global_brightness;
+  const float gamma_corrected = powf(dimmed_brightness, LED_CONTROL_GAMMA);
+  const float low_end_lift =
+      LED_CONTROL_LOW_END_LIFT *
+      fminf(local_brightness / LED_CONTROL_LOW_END_THRESHOLD, 1.0f);
+  const float blended_brightness = gamma_corrected + low_end_lift;
+  const float final_brightness =
+      clamp_unit(osc_value) *
+      (global_brightness > 0.0f ? clamp_unit(blended_brightness) : 0.0f);
   const uint32_t duty =
       (uint32_t)(final_brightness * LED_CONTROL_MAX_DUTY + 0.5f);
 
