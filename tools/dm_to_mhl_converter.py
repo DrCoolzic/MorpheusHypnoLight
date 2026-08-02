@@ -120,8 +120,13 @@ def _scale_brightness(osc: dict, scale: float) -> dict:
 def _replicate_oscillator(
     base_osc: dict, count: int, brightness_scale: float
 ) -> list[dict]:
-    """Create ``count`` copies of ``base_osc`` with brightness scaled."""
-    return [_scale_brightness(base_osc, brightness_scale) for _ in range(count)]
+    """Create ``count`` copies of ``base_osc`` with brightness scaled and phase offset."""
+    replicated: list[dict] = []
+    for i in range(count):
+        osc = _scale_brightness(base_osc, brightness_scale)
+        osc["phase_degrees"] = round(i * (360.0 / count), 1)
+        replicated.append(osc)
+    return replicated
 
 
 def _active_oscillators(dm_oscillators: list[dict]) -> list[dict]:

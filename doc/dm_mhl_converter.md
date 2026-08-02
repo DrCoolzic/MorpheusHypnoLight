@@ -93,6 +93,7 @@ Dream Machine sequences often describe a single oscillator driving several LED g
 An oscillator is considered **active** when its `led` list is non-empty. Dream Machine files frequently declare all four oscillator slots, leaving the unused ones with an empty `led` array; those empty slots are ignored for the spread decision.
 
 - Frequency, brightness, and duty modulators are copied unchanged.
+- The replicated oscillators are phase-shifted by 90°: slot 0 at 0°, slot 1 at 90°, slot 2 at 180°, and slot 3 at 270°.
 - If a step contains zero, two, three, or four active Dream Machine oscillators, the normal mapping is used.
 
 Because spreading one oscillator across four LED groups can make those steps much brighter than steps with multiple active oscillators, you can adjust the replicated brightness with `--spread-scale FACTOR`.
