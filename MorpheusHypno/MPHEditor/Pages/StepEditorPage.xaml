@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:MPHEditor.Controls;assembly=MPHEditor"
+             xmlns:vm="clr-namespace:MPHEditor.ViewModels;assembly=MPHEditor"
+             x:Class="MPHEditor.Pages.StepEditorPage"
+             x:DataType="vm:StepEditorViewModel"
+             Title="Step Editor">
+    <controls:StepEditor Step="{Binding CurrentStep}" Title="Edit Step" />
+</ContentPage>
