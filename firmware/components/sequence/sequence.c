@@ -520,6 +520,16 @@ esp_err_t sequence_seek(uint32_t position_ms) {
         sequence_timer, (uint64_t)SEQUENCE_STEP_TICK_PERIOD_MS * 1000ULL);
   }
 
+  /* Re-apply step config while paused resets the modulator paused state.
+   * Pause them again so the 1 kHz led_engine tick does not keep advancing
+   * the modulators while the sequence is paused. */
+  if (is_paused) {
+    for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
+         oscillator_id++) {
+      led_engine_pause_modulators(oscillator_id);
+    }
+  }
+
   return ESP_OK;
 }
 
