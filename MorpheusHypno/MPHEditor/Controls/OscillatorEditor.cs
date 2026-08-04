@@ -1,3 +1,4 @@
+using Microsoft.Maui.Controls.Shapes;
 using MPHCore.Models;
 
 namespace MPHEditor.Controls;
@@ -126,7 +127,7 @@ public class OscillatorEditor : ContentView
             Content = modulatorRow,
         };
 
-        Content = new VerticalStackLayout
+        VerticalStackLayout layout = new VerticalStackLayout
         {
             Spacing = 4,
             Children =
@@ -136,7 +137,16 @@ public class OscillatorEditor : ContentView
             },
         };
 
-        BackgroundColor = Colors.Transparent;
+        Content = new Border
+        {
+            Stroke = Colors.Gray,
+            StrokeThickness = 1,
+            StrokeShape = new RoundRectangle { CornerRadius = 8 },
+            Padding = 8,
+            BackgroundColor = Colors.Transparent,
+            Content = layout,
+        };
+
         RebuildEditor();
     }
 

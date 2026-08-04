@@ -1,3 +1,4 @@
+using Microsoft.Maui.Controls.Shapes;
 using MPHCore.Models;
 
 namespace MPHEditor.Controls;
@@ -131,8 +132,15 @@ public class ModulatorEditor : ContentView
         grid.Add(_modePicker, 0, 1);
         grid.Add(_contentLayout, 1, 1);
 
-        Content = grid;
-        BackgroundColor = Colors.Transparent;
+        Content = new Border
+        {
+            Stroke = Colors.Gray,
+            StrokeThickness = 1,
+            StrokeShape = new RoundRectangle { CornerRadius = 6 },
+            Padding = 6,
+            BackgroundColor = Colors.Transparent,
+            Content = grid,
+        };
         RebuildEditor();
     }
 

@@ -135,7 +135,6 @@ public class RotaryButton : GraphicsView
 
     public event EventHandler<ValueChangedEventArgs>? ValueChanged;
 
-    private PointF _dragStart;
     private double _dragStartValue;
     private bool _isDragging;
     private const float DragSensitivity = 0.25f;
@@ -144,10 +143,10 @@ public class RotaryButton : GraphicsView
     {
         Drawable = new RotaryButtonDrawable(this);
         BackgroundColor = Colors.Transparent;
-        StartInteraction += OnStartInteraction;
-        DragInteraction += OnDragInteraction;
-        EndInteraction += OnEndInteraction;
-        CancelInteraction += OnCancelInteraction;
+
+        PanGestureRecognizer pan = new PanGestureRecognizer();
+        pan.PanUpdated += OnPanUpdated;
+        GestureRecognizers.Add(pan);
 
         TapGestureRecognizer tap = new TapGestureRecognizer();
         tap.Tapped += OnTappedAsync;
@@ -160,39 +159,33 @@ public class RotaryButton : GraphicsView
         Invalidate();
     }
 
-    private void OnStartInteraction(object? sender, TouchEventArgs e)
+    private void OnPanUpdated(object? sender, PanUpdatedEventArgs e)
     {
-        _isDragging = true;
-        _dragStart = e.Touches[0];
-        _dragStartValue = Value;
-    }
-
-    private void OnDragInteraction(object? sender, TouchEventArgs e)
-    {
-        if (!_isDragging || !e.Touches.Any())
+        switch (e.StatusType)
         {
-            return;
+            case GestureStatus.Started:
+                _isDragging = true;
+                _dragStartValue = Value;
+                break;
+
+            case GestureStatus.Running:
+                if (!_isDragging)
+                {
+                    return;
+                }
+
+                // Up/right increases the value, down/left decreases it.
+                float delta = (float)(e.TotalX - e.TotalY);
+                double change = delta * DragSensitivity * Increment;
+                double newValue = _dragStartValue + change;
+                Value = Clamp(newValue, Minimum, Maximum);
+                break;
+
+            case GestureStatus.Completed:
+            case GestureStatus.Canceled:
+                _isDragging = false;
+                break;
         }
-
-        PointF current = e.Touches[0];
-        float deltaX = current.X - _dragStart.X;
-        float deltaY = current.Y - _dragStart.Y;
-
-        // Up/right increases the value, down/left decreases it.
-        float delta = deltaX - deltaY;
-        double change = delta * DragSensitivity * Increment;
-        double newValue = _dragStartValue + change;
-        Value = Clamp(newValue, Minimum, Maximum);
-    }
-
-    private void OnEndInteraction(object? sender, TouchEventArgs e)
-    {
-        _isDragging = false;
-    }
-
-    private void OnCancelInteraction(object? sender, EventArgs e)
-    {
-        _isDragging = false;
     }
 
     private async void OnTappedAsync(object? sender, TappedEventArgs e)
@@ -203,11 +196,10 @@ public class RotaryButton : GraphicsView
             return;
         }
 
-        string currentValue = Value.ToString(DisplayFormat, CultureInfo.InvariantCulture);
         string? result = await page.DisplayPromptAsync(
             Title,
             "Enter value",
-            initialValue: currentValue,
+            initialValue: string.Empty,
             maxLength: 10,
             keyboard: Keyboard.Numeric);
 
