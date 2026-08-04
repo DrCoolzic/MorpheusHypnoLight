@@ -124,8 +124,7 @@ static bool decode_target_value(compact_reader_t *reader,
 }
 
 static bool decode_modulator(compact_reader_t *reader, compact_target_t target,
-                             uint32_t duration_ms,
-                             modulator_config_t *config) {
+                             uint32_t duration_ms, modulator_config_t *config) {
   uint8_t mode = 0U;
   if (config == NULL || !read_u8(reader, &mode)) {
     return false;
@@ -150,8 +149,7 @@ static bool decode_modulator(compact_reader_t *reader, compact_target_t target,
     uint16_t frequency_code = 0U;
     config->mode = MODULATOR_MODE_LFO;
     if (!read_u8(reader, &waveform_code) ||
-        !decode_lfo_waveform(waveform_code,
-                             &config->lfo_config.waveform) ||
+        !decode_lfo_waveform(waveform_code, &config->lfo_config.waveform) ||
         !read_u16(reader, &frequency_code) || frequency_code == 0U) {
       return false;
     }
@@ -193,8 +191,7 @@ static bool decode_oscillator(compact_reader_t *reader, uint32_t duration_ms,
 
 static bool decode_step(compact_reader_t *reader, sequence_step_t *step) {
   uint16_t duration_code = 0U;
-  if (step == NULL || !read_u16(reader, &duration_code) ||
-      duration_code == 0U) {
+  if (step == NULL || !read_u16(reader, &duration_code)) {
     return false;
   }
 
@@ -247,7 +244,8 @@ esp_err_t sequence_decode_compact(const uint8_t *data, size_t data_length,
   const uint32_t expected_crc = read_u32_at(&data[10]);
   if (encoded_step_count == 0U || encoded_step_count > SEQUENCE_MAX_STEPS ||
       payload_length != data_length - COMPACT_HEADER_SIZE ||
-      compact_crc32(&data[COMPACT_HEADER_SIZE], payload_length) != expected_crc ||
+      compact_crc32(&data[COMPACT_HEADER_SIZE], payload_length) !=
+          expected_crc ||
       (steps != NULL && steps_capacity < encoded_step_count)) {
     return ESP_ERR_INVALID_ARG;
   }

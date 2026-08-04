@@ -21,7 +21,7 @@ public partial class RealtimeEditorViewModel : ObservableObject
 
     private static Step CreateSampleStep()
     {
-        var step = new Step { DurationSeconds = 4.0 };
+        var step = new Step { DurationSeconds = 0.0 };
 
         for (int i = 0; i < 5; i++)
         {

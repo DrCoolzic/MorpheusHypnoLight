@@ -41,6 +41,10 @@ static bool sequence_playing = false;
 /** @brief Whether playback is currently paused (step state is preserved). */
 static bool sequence_paused = false;
 
+/** @brief Whether the loaded sequence is a single zero-duration realtime step.
+ */
+static bool sequence_realtime = false;
+
 /** @brief Internal periodic timer that drives playback. */
 static esp_timer_handle_t sequence_timer = NULL;
 
@@ -130,7 +134,7 @@ oscillator_step_is_valid(const sequence_oscillator_step_t *oscillator_step) {
  * @return true when the step can be loaded.
  */
 static bool step_is_valid(const sequence_step_t *step) {
-  if (step == NULL || step->duration_ms == 0U) {
+  if (step == NULL) {
     return false;
   }
 
@@ -260,6 +264,8 @@ esp_err_t sequence_init(void) {
   sequence_current_step = 0U;
   sequence_elapsed_ms = 0U;
   sequence_playing = false;
+  sequence_paused = false;
+  sequence_realtime = false;
   taskEXIT_CRITICAL(&sequence_lock);
 
   if (sequence_timer == NULL) {
@@ -286,6 +292,17 @@ esp_err_t sequence_load(const sequence_step_t *steps, uint32_t step_count) {
     }
   }
 
+  const bool realtime =
+      (step_count == 1U && steps != NULL && steps[0].duration_ms == 0U);
+
+  if (!realtime) {
+    for (uint32_t i = 0; i < step_count; i++) {
+      if (steps[i].duration_ms == 0U) {
+        return ESP_ERR_INVALID_ARG;
+      }
+    }
+  }
+
   if (sequence_timer != NULL) {
     esp_timer_stop(sequence_timer);
   }
@@ -299,6 +316,7 @@ esp_err_t sequence_load(const sequence_step_t *steps, uint32_t step_count) {
   sequence_elapsed_ms = 0U;
   sequence_playing = false;
   sequence_paused = false;
+  sequence_realtime = realtime;
   taskEXIT_CRITICAL(&sequence_lock);
 
   /* Loading does not start playback. The first step will be applied when
@@ -329,10 +347,25 @@ esp_err_t sequence_load_compact(const uint8_t *data, size_t data_length) {
     return error;
   }
 
+  const bool realtime =
+      (step_count == 1U && sequence_steps[0].duration_ms == 0U);
+
+  if (!realtime) {
+    for (uint32_t i = 0; i < step_count; i++) {
+      if (sequence_steps[i].duration_ms == 0U) {
+        taskENTER_CRITICAL(&sequence_lock);
+        sequence_step_count = 0U;
+        taskEXIT_CRITICAL(&sequence_lock);
+        return ESP_ERR_INVALID_ARG;
+      }
+    }
+  }
+
   taskENTER_CRITICAL(&sequence_lock);
   sequence_step_count = step_count;
   sequence_current_step = 0U;
   sequence_elapsed_ms = 0U;
+  sequence_realtime = realtime;
   taskEXIT_CRITICAL(&sequence_lock);
 
   /* Loading does not start playback. The first step will be applied when
@@ -347,19 +380,32 @@ esp_err_t sequence_replace_step(uint32_t step_index,
     return ESP_ERR_INVALID_ARG;
   }
 
-  if (sequence_timer != NULL) {
-    esp_timer_stop(sequence_timer);
-  }
-
   taskENTER_CRITICAL(&sequence_lock);
   const bool was_playing = sequence_playing;
-  sequence_playing = false;
+  const bool is_realtime = sequence_realtime;
   if (step_index >= sequence_step_count) {
     taskEXIT_CRITICAL(&sequence_lock);
     return ESP_ERR_INVALID_ARG;
   }
+
+  if (!is_realtime && step->duration_ms == 0U) {
+    taskEXIT_CRITICAL(&sequence_lock);
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  if (sequence_timer != NULL) {
+    esp_timer_stop(sequence_timer);
+  }
+
+  sequence_playing = false;
   memcpy(&sequence_steps[step_index], step, sizeof(*step));
+
+  if (is_realtime && sequence_step_count == 1U) {
+    sequence_realtime = (step_index == 0U && step->duration_ms == 0U);
+  }
+
   const bool is_current = (step_index == sequence_current_step);
+  const bool stay_realtime = sequence_realtime;
   taskEXIT_CRITICAL(&sequence_lock);
 
   if (is_current) {
@@ -369,15 +415,21 @@ esp_err_t sequence_replace_step(uint32_t step_index,
     }
   }
 
-  if (was_playing && sequence_timer != NULL) {
-    const esp_err_t error = esp_timer_start_periodic(
-        sequence_timer, (uint64_t)SEQUENCE_STEP_TICK_PERIOD_MS * 1000ULL);
-    if (error != ESP_OK) {
-      return error;
+  if (was_playing) {
+    if (stay_realtime) {
+      taskENTER_CRITICAL(&sequence_lock);
+      sequence_playing = true;
+      taskEXIT_CRITICAL(&sequence_lock);
+    } else if (sequence_timer != NULL) {
+      const esp_err_t error = esp_timer_start_periodic(
+          sequence_timer, (uint64_t)SEQUENCE_STEP_TICK_PERIOD_MS * 1000ULL);
+      if (error != ESP_OK) {
+        return error;
+      }
+      taskENTER_CRITICAL(&sequence_lock);
+      sequence_playing = true;
+      taskEXIT_CRITICAL(&sequence_lock);
     }
-    taskENTER_CRITICAL(&sequence_lock);
-    sequence_playing = true;
-    taskEXIT_CRITICAL(&sequence_lock);
   }
 
   return ESP_OK;
@@ -389,6 +441,7 @@ esp_err_t sequence_play(void) {
     taskEXIT_CRITICAL(&sequence_lock);
     return ESP_OK;
   }
+  const bool realtime = sequence_realtime;
   taskEXIT_CRITICAL(&sequence_lock);
 
   for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
@@ -412,16 +465,18 @@ esp_err_t sequence_play(void) {
     return error;
   }
 
-  if (sequence_timer == NULL) {
-    return ESP_ERR_INVALID_STATE;
-  }
+  if (!realtime) {
+    if (sequence_timer == NULL) {
+      return ESP_ERR_INVALID_STATE;
+    }
 
-  (void)esp_timer_stop(sequence_timer);
+    (void)esp_timer_stop(sequence_timer);
 
-  error = esp_timer_start_periodic(
-      sequence_timer, (uint64_t)SEQUENCE_STEP_TICK_PERIOD_MS * 1000ULL);
-  if (error != ESP_OK) {
-    return error;
+    error = esp_timer_start_periodic(
+        sequence_timer, (uint64_t)SEQUENCE_STEP_TICK_PERIOD_MS * 1000ULL);
+    if (error != ESP_OK) {
+      return error;
+    }
   }
 
   taskENTER_CRITICAL(&sequence_lock);
@@ -433,6 +488,13 @@ esp_err_t sequence_play(void) {
 }
 
 esp_err_t sequence_pause(void) {
+  taskENTER_CRITICAL(&sequence_lock);
+  if (sequence_realtime) {
+    taskEXIT_CRITICAL(&sequence_lock);
+    return ESP_ERR_INVALID_STATE;
+  }
+  taskEXIT_CRITICAL(&sequence_lock);
+
   if (sequence_timer != NULL) {
     esp_timer_stop(sequence_timer);
   }
@@ -461,6 +523,7 @@ esp_err_t sequence_stop(void) {
   taskENTER_CRITICAL(&sequence_lock);
   sequence_playing = false;
   sequence_paused = false;
+  sequence_realtime = false;
   sequence_current_step = 0U;
   sequence_elapsed_ms = 0U;
   taskEXIT_CRITICAL(&sequence_lock);
@@ -481,6 +544,15 @@ esp_err_t sequence_stop(void) {
 }
 
 esp_err_t sequence_seek(uint32_t position_ms) {
+  (void)position_ms;
+
+  taskENTER_CRITICAL(&sequence_lock);
+  if (sequence_realtime) {
+    taskEXIT_CRITICAL(&sequence_lock);
+    return ESP_ERR_INVALID_STATE;
+  }
+  taskEXIT_CRITICAL(&sequence_lock);
+
   if (sequence_timer != NULL) {
     esp_timer_stop(sequence_timer);
   }
@@ -539,7 +611,7 @@ static void sequence_tick(void) {
   bool stop_timer = false;
 
   taskENTER_CRITICAL(&sequence_lock);
-  if (!sequence_playing || sequence_step_count == 0U) {
+  if (!sequence_playing || sequence_step_count == 0U || sequence_realtime) {
     taskEXIT_CRITICAL(&sequence_lock);
     return;
   }

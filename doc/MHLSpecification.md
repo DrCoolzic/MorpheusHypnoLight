@@ -438,6 +438,8 @@ Only two states exist in this mode: `Stop` and an active frozen state called `Ho
 
 - **Hold state.** The timeline is frozen, but the LED engine remains active. Linear modulators are treated as if they were static: only their `start` value is used because no elapsed time exists. LFOs continue to run, so any parameters controlled by an LFO keep breathing. Static values and oscillator phase are held until a new step arrives.
 
+Note that in this operating mode, since time does not change, a linear modulator behaves like a static modulator and uses only the initial value.
+
 Parameters are updated by sending an `updateStep` command with a new single-step sequence. The firmware validates and applies the new step immediately, replacing the current live parameters while remaining in the `Hold` state. This allows live editing of frequency, brightness, duty, phase, waveform, or modulator configuration without stopping the light.
 
 A `stop` command returns the device to the `Stop` state and turns the LEDs off. Since there is no timeline, `seek` and `pause` are not applicable in Realtime Mode.

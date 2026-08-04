@@ -59,9 +59,14 @@ esp_err_t modulator_set_config(modulator_state_t *state,
 
   case MODULATOR_MODE_LINEAR:
     if (!isfinite(config->linear_config.start_value) ||
-        !isfinite(config->linear_config.end_value) ||
-        config->linear_config.duration_ms == 0U) {
+        !isfinite(config->linear_config.end_value)) {
       return ESP_ERR_INVALID_ARG;
+    }
+    if (config->linear_config.duration_ms == 0U) {
+      state->config.mode = MODULATOR_MODE_STATIC;
+      state->config.static_config.value = config->linear_config.start_value;
+      state->current_value = config->linear_config.start_value;
+      return ESP_OK;
     }
     break;
 
