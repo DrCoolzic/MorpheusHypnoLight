@@ -63,8 +63,8 @@ public static class CompactSequenceEncoder
     {
         ArgumentNullException.ThrowIfNull(step);
 
-        if (step.DurationSeconds <= 0)
-            throw new InvalidOperationException("Step duration must be greater than zero.");
+        if (step.DurationSeconds < 0)
+            throw new InvalidOperationException("Step duration must be greater than or equal to zero.");
 
         if (step.Oscillators.Count != OscillatorsPerStep)
             throw new InvalidOperationException(

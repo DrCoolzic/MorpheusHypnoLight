@@ -6,5 +6,11 @@
              x:Class="MPHEditor.Pages.RealtimeEditorPage"
              x:DataType="vm:RealtimeEditorViewModel"
              Title="Realtime Editor">
-    <controls:StepEditor Step="{Binding CurrentStep}" Title="Edit Step" />
+    <VerticalStackLayout Spacing="10" Padding="10">
+        <HorizontalStackLayout Spacing="10" HorizontalOptions="Center">
+            <Button Text="Play" Command="{Binding PlayCommand}" />
+            <Button Text="Stop" Command="{Binding StopCommand}" />
+        </HorizontalStackLayout>
+        <controls:StepEditor Step="{Binding CurrentStep}" Title="Edit Step" />
+    </VerticalStackLayout>
 </ContentPage>

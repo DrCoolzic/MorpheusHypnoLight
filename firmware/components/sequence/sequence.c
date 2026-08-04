@@ -523,7 +523,9 @@ esp_err_t sequence_stop(void) {
   taskENTER_CRITICAL(&sequence_lock);
   sequence_playing = false;
   sequence_paused = false;
-  sequence_realtime = false;
+  /* Keep sequence_realtime: a stopped realtime sequence should stay realtime
+   * so that the next play() still operates in hold mode without starting the
+   * periodic timer. */
   sequence_current_step = 0U;
   sequence_elapsed_ms = 0U;
   taskEXIT_CRITICAL(&sequence_lock);

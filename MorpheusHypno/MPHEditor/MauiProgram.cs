@@ -26,6 +26,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<IMPHElementService, MPHElementService>();
         builder.Services.AddSingleton<MainViewModel>();
         builder.Services.AddSingleton<MainPage>();
+        builder.Services.AddSingleton<RealtimeEditorViewModel>();
+        builder.Services.AddSingleton<RealtimeEditorPage>();
 
 #if DEBUG
         // Configure debug logging

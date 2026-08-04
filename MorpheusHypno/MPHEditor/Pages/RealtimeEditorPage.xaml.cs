@@ -2,14 +2,14 @@ using MPHEditor.ViewModels;
 
 namespace MPHEditor.Pages;
 
-/**
- * @brief Test page that hosts the StepEditor control.
- */
+/// <summary>
+/// Page for the realtime step editor.
+/// </summary>
 public partial class RealtimeEditorPage : ContentPage
 {
-    public RealtimeEditorPage()
+    public RealtimeEditorPage(RealtimeEditorViewModel viewModel)
     {
         InitializeComponent();
-        BindingContext = new RealtimeEditorViewModel();
+        BindingContext = viewModel;
     }
 }
