@@ -37,6 +37,10 @@ public class ModulatorEditor : ContentView
         nameof(ValueDisplayFormat), typeof(string), typeof(ModulatorEditor), "F1",
         propertyChanged: (bindable, _, __) => ((ModulatorEditor)bindable).RebuildEditor());
 
+    public static readonly BindableProperty ValueScaleProperty = BindableProperty.Create(
+        nameof(ValueScale), typeof(double), typeof(ModulatorEditor), 1.0,
+        propertyChanged: (bindable, _, __) => ((ModulatorEditor)bindable).RebuildEditor());
+
     public static readonly BindableProperty TitleProperty = BindableProperty.Create(
         nameof(Title), typeof(string), typeof(ModulatorEditor), string.Empty,
         propertyChanged: (bindable, _, __) => ((ModulatorEditor)bindable).RebuildEditor());
@@ -79,6 +83,12 @@ public class ModulatorEditor : ContentView
     {
         get => (string)GetValue(ValueDisplayFormatProperty);
         set => SetValue(ValueDisplayFormatProperty, value);
+    }
+
+    public double ValueScale
+    {
+        get => (double)GetValue(ValueScaleProperty);
+        set => SetValue(ValueScaleProperty, value);
     }
 
     public string Title
@@ -181,7 +191,7 @@ public class ModulatorEditor : ContentView
         switch (newMode)
         {
             case ModulatorMode.Static:
-                Modulator.Value = currentValue;
+                Modulator.Value = currentValue / ValueScale;
                 Modulator.Start = null;
                 Modulator.End = null;
                 Modulator.LfoWaveform = null;
@@ -192,8 +202,8 @@ public class ModulatorEditor : ContentView
 
             case ModulatorMode.Linear:
                 Modulator.Value = null;
-                Modulator.Start = currentValue;
-                Modulator.End = currentValue;
+                Modulator.Start = currentValue / ValueScale;
+                Modulator.End = currentValue / ValueScale;
                 Modulator.LfoWaveform = null;
                 Modulator.LfoFrequency = null;
                 Modulator.Low = null;
@@ -206,8 +216,8 @@ public class ModulatorEditor : ContentView
                 Modulator.End = null;
                 Modulator.LfoWaveform = MPHCore.Models.LfoWaveform.Sine;
                 Modulator.LfoFrequency = 1.0;
-                Modulator.Low = ValueMinimum;
-                Modulator.High = ValueMaximum;
+                Modulator.Low = ValueMinimum / ValueScale;
+                Modulator.High = ValueMaximum / ValueScale;
                 break;
         }
 
@@ -222,13 +232,15 @@ public class ModulatorEditor : ContentView
             return ValueMinimum;
         }
 
-        return Modulator.Mode switch
+        double scaled = Modulator.Mode switch
         {
-            ModulatorMode.Static => Modulator.Value ?? ValueMinimum,
-            ModulatorMode.Linear => Modulator.Start ?? ValueMinimum,
-            ModulatorMode.Lfo => Modulator.Low ?? ValueMinimum,
+            ModulatorMode.Static => (Modulator.Value ?? (ValueMinimum / ValueScale)) * ValueScale,
+            ModulatorMode.Linear => (Modulator.Start ?? (ValueMinimum / ValueScale)) * ValueScale,
+            ModulatorMode.Lfo => (Modulator.Low ?? (ValueMinimum / ValueScale)) * ValueScale,
             _ => ValueMinimum,
         };
+
+        return Math.Clamp(scaled, ValueMinimum, ValueMaximum);
     }
 
     private void RebuildEditor()
@@ -237,7 +249,7 @@ public class ModulatorEditor : ContentView
 
         _titleLabel.Text = Title;
 
-        Modulator ??= new Modulator { Mode = ModulatorMode.Static, Value = ValueMinimum };
+        Modulator ??= new Modulator { Mode = ModulatorMode.Static, Value = ValueMinimum / ValueScale };
 
         _modePicker.SelectedIndex = Modulator.Mode switch
         {
@@ -287,15 +299,15 @@ public class ModulatorEditor : ContentView
             return;
         }
 
-        Modulator.Value ??= ValueMinimum;
+        Modulator.Value ??= ValueMinimum / ValueScale;
 
         RotaryButton valueButton = CreateValueButton(
-            Modulator.Value.Value,
+            Modulator.Value.Value * ValueScale,
             (sender, e) =>
             {
                 if (Modulator is not null)
                 {
-                    Modulator.Value = e.NewValue;
+                    Modulator.Value = e.NewValue / ValueScale;
                     OnModulatorChanged();
                 }
             });
@@ -310,27 +322,27 @@ public class ModulatorEditor : ContentView
             return;
         }
 
-        Modulator.Start ??= ValueMinimum;
-        Modulator.End ??= ValueMaximum;
+        Modulator.Start ??= ValueMinimum / ValueScale;
+        Modulator.End ??= ValueMaximum / ValueScale;
 
         RotaryButton startButton = CreateValueButton(
-            Modulator.Start.Value,
+            Modulator.Start.Value * ValueScale,
             (sender, e) =>
             {
                 if (Modulator is not null)
                 {
-                    Modulator.Start = e.NewValue;
+                    Modulator.Start = e.NewValue / ValueScale;
                     OnModulatorChanged();
                 }
             });
 
         RotaryButton endButton = CreateValueButton(
-            Modulator.End.Value,
+            Modulator.End.Value * ValueScale,
             (sender, e) =>
             {
                 if (Modulator is not null)
                 {
-                    Modulator.End = e.NewValue;
+                    Modulator.End = e.NewValue / ValueScale;
                     OnModulatorChanged();
                 }
             });
@@ -348,8 +360,8 @@ public class ModulatorEditor : ContentView
 
         Modulator.LfoWaveform ??= MPHCore.Models.LfoWaveform.Sine;
         Modulator.LfoFrequency ??= 1.0;
-        Modulator.Low ??= ValueMinimum;
-        Modulator.High ??= ValueMaximum;
+        Modulator.Low ??= ValueMinimum / ValueScale;
+        Modulator.High ??= ValueMaximum / ValueScale;
 
         bool isSquare = Modulator.LfoWaveform.Value == MPHCore.Models.LfoWaveform.Square;
         Switch waveformSwitch = new Switch
@@ -398,23 +410,23 @@ public class ModulatorEditor : ContentView
         frequencyButton.CoarseIncrement = 1.0;
 
         RotaryButton lowButton = CreateValueButton(
-            Modulator.Low.Value,
+            Modulator.Low.Value * ValueScale,
             (sender, e) =>
             {
                 if (Modulator is not null)
                 {
-                    Modulator.Low = e.NewValue;
+                    Modulator.Low = e.NewValue / ValueScale;
                     OnModulatorChanged();
                 }
             });
 
         RotaryButton highButton = CreateValueButton(
-            Modulator.High.Value,
+            Modulator.High.Value * ValueScale,
             (sender, e) =>
             {
                 if (Modulator is not null)
                 {
-                    Modulator.High = e.NewValue;
+                    Modulator.High = e.NewValue / ValueScale;
                     OnModulatorChanged();
                 }
             });

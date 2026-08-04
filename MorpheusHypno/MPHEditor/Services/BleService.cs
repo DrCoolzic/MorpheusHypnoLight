@@ -793,7 +793,8 @@ public class BleService : IBleService
         if (!IsConnected || MHLCommandChannel is null)
             return;
 
-        byte[] compact = CompactSequenceEncoder.EncodeStep(step);
+        var sequence = new Sequence { Steps = [step] };
+        byte[] compact = CompactSequenceEncoder.EncodeSequence(sequence);
         _logger.LogInformation("Uploading step {index} update ({size} bytes)", stepIndex, compact.Length);
 
         var sizeBytes = ToLittleEndian(BitConverter.GetBytes((ushort)compact.Length));

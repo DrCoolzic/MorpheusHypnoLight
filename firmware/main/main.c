@@ -74,26 +74,11 @@ static int cmd_sequence_stop(int argc, char **argv) {
   (void)argc;
   (void)argv;
 
-  /* Stop is equivalent to pause; use seek 0 to return to the beginning. */
-  esp_err_t error = sequence_pause();
+  const esp_err_t error = sequence_stop();
   if (error != ESP_OK) {
     printf("sequence_stop failed: %d\n", error);
     return 1;
   }
-  error = sequence_seek(0U);
-  if (error != ESP_OK) {
-    printf("sequence_seek(0) failed: %d\n", error);
-    return 1;
-  }
-
-  /* Force every oscillator to a static zero output so the LEDs stay off
-   * even though the 1 kHz led_engine tick keeps running. */
-  for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
-       oscillator_id++) {
-    ESP_ERROR_CHECK(led_engine_set_frequency(oscillator_id, 0.0f));
-    ESP_ERROR_CHECK(led_engine_set_brightness(oscillator_id, 0.0f));
-  }
-  ESP_ERROR_CHECK(led_engine_all_off());
 
   printf("sequence stopped\n");
   return 0;

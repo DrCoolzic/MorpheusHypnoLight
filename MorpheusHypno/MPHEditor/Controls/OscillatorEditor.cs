@@ -108,6 +108,7 @@ public class OscillatorEditor : ContentView
             ValueMaximum = 100.0,
             ValueIncrement = 1.0,
             ValueDisplayFormat = "F1",
+            ValueScale = 100.0,
             Title = "Bright",
         };
 
@@ -117,6 +118,7 @@ public class OscillatorEditor : ContentView
             ValueMaximum = 100.0,
             ValueIncrement = 1.0,
             ValueDisplayFormat = "F1",
+            ValueScale = 100.0,
             Title = "Duty",
         };
 
