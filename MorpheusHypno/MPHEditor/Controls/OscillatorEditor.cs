@@ -35,6 +35,16 @@ public class OscillatorEditor : ContentView
         set => SetValue(TitleProperty, value);
     }
 
+    /// <summary>
+    /// Raised when any editable oscillator property changes.
+    /// </summary>
+    public event EventHandler? OscillatorChanged;
+
+    private void OnOscillatorChanged()
+    {
+        OscillatorChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     private readonly Label _titleLabel;
     private readonly ScrollView _contentLayout;
     private readonly Picker _waveformPicker;
@@ -109,6 +119,10 @@ public class OscillatorEditor : ContentView
             ValueDisplayFormat = "F1",
             Title = "Duty",
         };
+
+        _frequencyEditor.ModulatorChanged += (_, _) => OnOscillatorChanged();
+        _brightnessEditor.ModulatorChanged += (_, _) => OnOscillatorChanged();
+        _dutyEditor.ModulatorChanged += (_, _) => OnOscillatorChanged();
 
         HorizontalStackLayout modulatorRow = new HorizontalStackLayout
         {
@@ -213,6 +227,8 @@ public class OscillatorEditor : ContentView
             3 => OscillatorWaveform.Custom,
             _ => OscillatorWaveform.Square,
         };
+
+        OnOscillatorChanged();
     }
 
     private void OnPhaseChanged(object? sender, ValueChangedEventArgs e)
@@ -220,6 +236,7 @@ public class OscillatorEditor : ContentView
         if (Oscillator is not null)
         {
             Oscillator.PhaseDegrees = e.NewValue;
+            OnOscillatorChanged();
         }
     }
 

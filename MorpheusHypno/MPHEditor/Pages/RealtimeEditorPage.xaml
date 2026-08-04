@@ -11,6 +11,6 @@
             <Button Text="Play" Command="{Binding PlayCommand}" />
             <Button Text="Stop" Command="{Binding StopCommand}" />
         </HorizontalStackLayout>
-        <controls:StepEditor Step="{Binding CurrentStep}" Title="Edit Step" />
+        <controls:StepEditor Step="{Binding CurrentStep}" Title="Edit Step" StepChangedCommand="{Binding UpdateStepCommand}" />
     </VerticalStackLayout>
 </ContentPage>

@@ -47,6 +47,16 @@ public class ModulatorEditor : ContentView
         set => SetValue(ModulatorProperty, value);
     }
 
+    /// <summary>
+    /// Raised when any editable modulator property changes.
+    /// </summary>
+    public event EventHandler? ModulatorChanged;
+
+    private void OnModulatorChanged()
+    {
+        ModulatorChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     public double ValueMinimum
     {
         get => (double)GetValue(ValueMinimumProperty);
@@ -202,6 +212,7 @@ public class ModulatorEditor : ContentView
         }
 
         RebuildEditor();
+        OnModulatorChanged();
     }
 
     private double GetCurrentValue()
@@ -285,6 +296,7 @@ public class ModulatorEditor : ContentView
                 if (Modulator is not null)
                 {
                     Modulator.Value = e.NewValue;
+                    OnModulatorChanged();
                 }
             });
 
@@ -308,6 +320,7 @@ public class ModulatorEditor : ContentView
                 if (Modulator is not null)
                 {
                     Modulator.Start = e.NewValue;
+                    OnModulatorChanged();
                 }
             });
 
@@ -318,6 +331,7 @@ public class ModulatorEditor : ContentView
                 if (Modulator is not null)
                 {
                     Modulator.End = e.NewValue;
+                    OnModulatorChanged();
                 }
             });
 
@@ -361,6 +375,7 @@ public class ModulatorEditor : ContentView
                 Modulator.LfoWaveform = e.Value
                     ? MPHCore.Models.LfoWaveform.Square
                     : MPHCore.Models.LfoWaveform.Sine;
+                OnModulatorChanged();
             }
         };
 
@@ -373,6 +388,7 @@ public class ModulatorEditor : ContentView
                 if (Modulator is not null)
                 {
                     Modulator.LfoFrequency = e.NewValue;
+                    OnModulatorChanged();
                 }
             });
         frequencyButton.Minimum = 0.1;
@@ -388,6 +404,7 @@ public class ModulatorEditor : ContentView
                 if (Modulator is not null)
                 {
                     Modulator.Low = e.NewValue;
+                    OnModulatorChanged();
                 }
             });
 
@@ -398,6 +415,7 @@ public class ModulatorEditor : ContentView
                 if (Modulator is not null)
                 {
                     Modulator.High = e.NewValue;
+                    OnModulatorChanged();
                 }
             });
 

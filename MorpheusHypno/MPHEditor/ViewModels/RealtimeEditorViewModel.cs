@@ -1,3 +1,4 @@
+using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -14,6 +15,7 @@ public partial class RealtimeEditorViewModel : ObservableObject
 {
     private readonly IBleService _bleService;
     private readonly ILogger<RealtimeEditorViewModel> _logger;
+    private CancellationTokenSource? _updateCts;
 
     [ObservableProperty]
     public partial Step CurrentStep { get; set; }
@@ -65,6 +67,35 @@ public partial class RealtimeEditorViewModel : ObservableObject
     {
         _logger.LogInformation("Sending realtime STOP command");
         await _bleService.StopAsync();
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task UpdateStepAsync()
+    {
+        _updateCts?.Cancel();
+        _updateCts?.Dispose();
+        _updateCts = new CancellationTokenSource();
+        try
+        {
+            _logger.LogDebug("Scheduling realtime UPDATE_STEP");
+            await Task.Delay(200, _updateCts.Token);
+            if (!_bleService.IsConnected)
+            {
+                _logger.LogWarning("Not connected, skipping realtime step update");
+                return;
+            }
+            _logger.LogInformation("Sending realtime UPDATE_STEP");
+            await _bleService.UpdateStepAsync(0, CurrentStep);
+            _logger.LogInformation("Realtime step updated");
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogDebug("Realtime step update cancelled");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update realtime step");
+        }
     }
 
     private static Step CreateSampleStep()

@@ -1,3 +1,4 @@
+using System.Windows.Input;
 using MPHCore.Models;
 
 namespace MPHEditor.Controls;
@@ -23,6 +24,9 @@ public class StepEditor : ContentView
         nameof(Title), typeof(string), typeof(StepEditor), string.Empty,
         propertyChanged: (bindable, _, __) => ((StepEditor)bindable).UpdateTitle());
 
+    public static readonly BindableProperty StepChangedCommandProperty = BindableProperty.Create(
+        nameof(StepChangedCommand), typeof(ICommand), typeof(StepEditor), null);
+
     public Step? Step
     {
         get => (Step?)GetValue(StepProperty);
@@ -33,6 +37,23 @@ public class StepEditor : ContentView
     {
         get => (string)GetValue(TitleProperty);
         set => SetValue(TitleProperty, value);
+    }
+
+    public ICommand? StepChangedCommand
+    {
+        get => (ICommand?)GetValue(StepChangedCommandProperty);
+        set => SetValue(StepChangedCommandProperty, value);
+    }
+
+    /// <summary>
+    /// Raises the step changed command when any oscillator changes.
+    /// </summary>
+    private void OnStepChanged()
+    {
+        if (StepChangedCommand is not null && StepChangedCommand.CanExecute(Step))
+        {
+            StepChangedCommand.Execute(Step);
+        }
     }
 
     private readonly Label _titleLabel;
@@ -103,6 +124,7 @@ public class StepEditor : ContentView
                     Oscillator = Step.Oscillators[i],
                     Title = $"OSCILLATOR {i + 1}",
                 };
+                editor.OscillatorChanged += (_, _) => OnStepChanged();
                 _oscillatorsLayout.Children.Add(editor);
             }
         }
