@@ -77,7 +77,7 @@ public class ModulatorEditor : ContentView
 
     private readonly Label _titleLabel;
     private readonly Picker _modePicker;
-    private readonly VerticalStackLayout _contentLayout;
+    private readonly HorizontalStackLayout _contentLayout;
 
     private bool _isRebuilding;
 
@@ -94,30 +94,44 @@ public class ModulatorEditor : ContentView
         {
             Title = "Mode",
             HorizontalOptions = LayoutOptions.Center,
+            VerticalOptions = LayoutOptions.Start,
             TextColor = Colors.White,
             TitleColor = Colors.Gray,
+            WidthRequest = 80,
         };
         _modePicker.Items.Add("FIX");
         _modePicker.Items.Add("LIN");
         _modePicker.Items.Add("LFO");
         _modePicker.SelectedIndexChanged += OnModeChanged;
 
-        _contentLayout = new VerticalStackLayout
+        _contentLayout = new HorizontalStackLayout
         {
             Spacing = 4,
         };
 
-        Content = new VerticalStackLayout
+        Grid grid = new Grid
         {
-            Spacing = 4,
-            Children =
+            RowSpacing = 4,
+            ColumnSpacing = 6,
+            RowDefinitions =
             {
-                _titleLabel,
-                _modePicker,
-                _contentLayout,
+                new RowDefinition { Height = GridLength.Auto },
+                new RowDefinition { Height = GridLength.Auto },
+            },
+            ColumnDefinitions =
+            {
+                new ColumnDefinition { Width = GridLength.Auto },
+                new ColumnDefinition { Width = GridLength.Star },
             },
         };
 
+        grid.Add(_titleLabel, 0, 0);
+        Grid.SetColumnSpan(_titleLabel, 2);
+
+        grid.Add(_modePicker, 0, 1);
+        grid.Add(_contentLayout, 1, 1);
+
+        Content = grid;
         BackgroundColor = Colors.Transparent;
         RebuildEditor();
     }
@@ -268,8 +282,6 @@ public class ModulatorEditor : ContentView
         Modulator.Start ??= ValueMinimum;
         Modulator.End ??= ValueMaximum;
 
-        HorizontalStackLayout row = new HorizontalStackLayout { Spacing = 4 };
-
         RotaryButton startButton = CreateValueButton(
             "Start",
             Modulator.Start.Value,
@@ -292,9 +304,8 @@ public class ModulatorEditor : ContentView
                 }
             });
 
-        row.Children.Add(startButton);
-        row.Children.Add(endButton);
-        _contentLayout.Children.Add(row);
+        _contentLayout.Children.Add(startButton);
+        _contentLayout.Children.Add(endButton);
     }
 
     private void BuildLfoEditor()
@@ -339,8 +350,8 @@ public class ModulatorEditor : ContentView
             CoarseIncrement = 1.0,
             DisplayFormat = "F1",
             Value = Modulator.LfoFrequency.Value,
-            WidthRequest = 80,
-            HeightRequest = 120,
+            WidthRequest = 70,
+            HeightRequest = 100,
         };
         frequencyButton.ValueChanged += (sender, e) =>
         {
@@ -372,13 +383,10 @@ public class ModulatorEditor : ContentView
                 }
             });
 
-        HorizontalStackLayout row = new HorizontalStackLayout { Spacing = 4 };
-        row.Children.Add(frequencyButton);
-        row.Children.Add(lowButton);
-        row.Children.Add(highButton);
-
         _contentLayout.Children.Add(waveformPicker);
-        _contentLayout.Children.Add(row);
+        _contentLayout.Children.Add(frequencyButton);
+        _contentLayout.Children.Add(lowButton);
+        _contentLayout.Children.Add(highButton);
     }
 
     private RotaryButton CreateValueButton(string title, double initialValue, EventHandler<ValueChangedEventArgs> handler)
@@ -393,8 +401,8 @@ public class ModulatorEditor : ContentView
             CoarseIncrement = ValueIncrement * 10.0,
             DisplayFormat = ValueDisplayFormat,
             Value = initialValue,
-            WidthRequest = 80,
-            HeightRequest = 120,
+            WidthRequest = 70,
+            HeightRequest = 100,
         };
         button.ValueChanged += handler;
         return button;

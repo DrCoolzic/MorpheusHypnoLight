@@ -35,7 +35,7 @@ public class OscillatorEditor : ContentView
     }
 
     private readonly Label _titleLabel;
-    private readonly HorizontalStackLayout _contentLayout;
+    private readonly ScrollView _contentLayout;
     private readonly Picker _waveformPicker;
     private readonly RotaryButton _phaseButton;
     private readonly ModulatorEditor _frequencyEditor;
@@ -107,7 +107,7 @@ public class OscillatorEditor : ContentView
             Title = "Duty",
         };
 
-        _contentLayout = new HorizontalStackLayout
+        HorizontalStackLayout modulatorRow = new HorizontalStackLayout
         {
             Spacing = 8,
             Children =
@@ -118,6 +118,12 @@ public class OscillatorEditor : ContentView
                 _brightnessEditor,
                 _dutyEditor,
             },
+        };
+
+        _contentLayout = new ScrollView
+        {
+            Orientation = ScrollOrientation.Horizontal,
+            Content = modulatorRow,
         };
 
         Content = new VerticalStackLayout

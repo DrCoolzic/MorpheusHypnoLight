@@ -243,7 +243,7 @@ public class RotaryButton : GraphicsView
         {
             float width = dirtyRect.Width;
             float height = dirtyRect.Height;
-            float labelHeight = 24.0f;
+            float labelHeight = 18.0f;
             float knobSize = Math.Min(width, height - (labelHeight * 2.0f));
             float centerX = width / 2.0f;
             float centerY = labelHeight + (knobSize / 2.0f);
@@ -255,7 +255,7 @@ public class RotaryButton : GraphicsView
             // Title at the top.
             if (!string.IsNullOrEmpty(_button.Title))
             {
-                canvas.FontSize = 14.0f;
+                canvas.FontSize = 12.0f;
                 canvas.DrawString(
                     _button.Title,
                     0.0f,
@@ -266,7 +266,8 @@ public class RotaryButton : GraphicsView
                     VerticalAlignment.Center);
             }
 
-            // Background track arc (270 degrees, from 135 deg to 405 deg).
+            // Background track (full 360-degree circle, drawn in two 180-degree
+            // arcs because DrawArc treats identical start/end angles as zero-length).
             canvas.StrokeColor = _button.TrackColor;
             canvas.StrokeSize = strokeWidth;
             canvas.StrokeLineCap = LineCap.Round;
@@ -275,29 +276,47 @@ public class RotaryButton : GraphicsView
                 centerY - radius,
                 radius * 2.0f,
                 radius * 2.0f,
-                135.0f,
-                405.0f,
+                -90.0f,
+                90.0f,
+                true,
+                false);
+            canvas.DrawArc(
+                centerX - radius,
+                centerY - radius,
+                radius * 2.0f,
+                radius * 2.0f,
+                90.0f,
+                270.0f,
                 true,
                 false);
 
             // Progress arc.
             double t = (_button.Value - _button.Minimum) / (_button.Maximum - _button.Minimum);
             t = Clamp(t, 0.0, 1.0);
-            float endAngle = 135.0f + (float)(t * 270.0);
 
-            canvas.StrokeColor = _button.ProgressColor;
-            canvas.DrawArc(
-                centerX - radius,
-                centerY - radius,
-                radius * 2.0f,
-                radius * 2.0f,
-                135.0f,
-                endAngle,
-                true,
-                false);
+            if (t > 0.0)
+            {
+                canvas.StrokeColor = _button.ProgressColor;
+
+                // Draw the clockwise arc from the bottom (90 deg) to the
+                // current value angle. Using startAngle > endAngle makes
+                // MAUI/Win2D take the short arc in the desired direction.
+                float startAngle = 90.0f;
+                float endAngle = startAngle - (float)(t * 360.0);
+                canvas.DrawArc(
+                    centerX - radius,
+                    centerY - radius,
+                    radius * 2.0f,
+                    radius * 2.0f,
+                    startAngle,
+                    endAngle,
+                    true,
+                    false);
+            }
 
             // Indicator line from the center to the current value angle.
-            double angleRadians = DegreesToRadians(endAngle);
+            float indicatorAngle = -90.0f + (float)(t * 360.0);
+            double angleRadians = DegreesToRadians(indicatorAngle);
             float indicatorRadius = radius * 0.65f;
             float endX = centerX + (indicatorRadius * (float)Math.Cos(angleRadians));
             float endY = centerY + (indicatorRadius * (float)Math.Sin(angleRadians));
@@ -308,7 +327,7 @@ public class RotaryButton : GraphicsView
 
             // Value label at the bottom.
             string valueText = _button.Value.ToString(_button.DisplayFormat, CultureInfo.InvariantCulture);
-            canvas.FontSize = 14.0f;
+            canvas.FontSize = 12.0f;
             canvas.DrawString(
                 valueText,
                 0.0f,
