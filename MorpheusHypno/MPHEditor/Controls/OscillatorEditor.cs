@@ -49,9 +49,10 @@ public class OscillatorEditor : ContentView
     {
         _titleLabel = new Label
         {
-            FontSize = 16,
+            FontSize = 12,
             HorizontalOptions = LayoutOptions.Start,
             TextColor = Colors.White,
+            VerticalOptions = LayoutOptions.Center,
         };
 
         _waveformPicker = new Picker
@@ -59,7 +60,8 @@ public class OscillatorEditor : ContentView
             Title = "Wave",
             TextColor = Colors.White,
             TitleColor = Colors.Gray,
-            WidthRequest = 90,
+            WidthRequest = 110,
+            HeightRequest = 60,
         };
         _waveformPicker.Items.Add("Sine");
         _waveformPicker.Items.Add("Square");
@@ -69,15 +71,15 @@ public class OscillatorEditor : ContentView
 
         _phaseButton = new RotaryButton
         {
-            Title = "Phase",
             Minimum = 0.0,
             Maximum = 360.0,
             Increment = 1.0,
             FineIncrement = 0.1,
             CoarseIncrement = 10.0,
-            DisplayFormat = "F0",
-            WidthRequest = 80,
-            HeightRequest = 120,
+            Value = 0.0,
+            WidthRequest = 50,
+            HeightRequest = 50,
+            DisplayFormat = string.Empty,
         };
         _phaseButton.ValueChanged += OnPhaseChanged;
 
@@ -113,8 +115,6 @@ public class OscillatorEditor : ContentView
             Spacing = 8,
             Children =
             {
-                _waveformPicker,
-                _phaseButton,
                 _frequencyEditor,
                 _brightnessEditor,
                 _dutyEditor,
@@ -127,15 +127,63 @@ public class OscillatorEditor : ContentView
             Content = modulatorRow,
         };
 
-        VerticalStackLayout layout = new VerticalStackLayout
+        // Left column with title, wave picker, phase knob and phase value.
+        Grid leftColumn = new Grid
         {
-            Spacing = 4,
-            Children =
+            RowSpacing = 2,
+            ColumnSpacing = 8,
+            RowDefinitions =
             {
-                _titleLabel,
-                _contentLayout,
+                new RowDefinition { Height = GridLength.Auto },
+                new RowDefinition { Height = GridLength.Auto },
+                new RowDefinition { Height = GridLength.Auto },
+            },
+            ColumnDefinitions =
+            {
+                new ColumnDefinition { Width = GridLength.Auto },
+                new ColumnDefinition { Width = GridLength.Auto },
             },
         };
+
+        Label phaseHeader = new Label
+        {
+            Text = "Phase",
+            FontSize = 12,
+            HorizontalOptions = LayoutOptions.Center,
+            TextColor = Colors.White,
+            VerticalOptions = LayoutOptions.Center,
+        };
+
+        Label phaseValue = new Label
+        {
+            Text = _phaseButton.Value.ToString("F0", System.Globalization.CultureInfo.InvariantCulture),
+            FontSize = 12,
+            HorizontalOptions = LayoutOptions.Center,
+            TextColor = Colors.White,
+            VerticalOptions = LayoutOptions.Center,
+        };
+        _phaseButton.ValueChanged += (sender, e) =>
+        {
+            phaseValue.Text = e.NewValue.ToString("F0", System.Globalization.CultureInfo.InvariantCulture);
+        };
+
+        leftColumn.Add(_titleLabel, 0, 0);
+        leftColumn.Add(_waveformPicker, 0, 1);
+        leftColumn.Add(phaseHeader, 1, 0);
+        leftColumn.Add(_phaseButton, 1, 1);
+        leftColumn.Add(phaseValue, 1, 2);
+
+        Grid grid = new Grid
+        {
+            ColumnSpacing = 8,
+            ColumnDefinitions =
+            {
+                new ColumnDefinition { Width = GridLength.Auto },
+                new ColumnDefinition { Width = GridLength.Star },
+            },
+        };
+        grid.Add(leftColumn, 0, 0);
+        grid.Add(_contentLayout, 1, 0);
 
         Content = new Border
         {
@@ -144,7 +192,7 @@ public class OscillatorEditor : ContentView
             StrokeShape = new RoundRectangle { CornerRadius = 8 },
             Padding = 8,
             BackgroundColor = Colors.Transparent,
-            Content = layout,
+            Content = grid,
         };
 
         RebuildEditor();

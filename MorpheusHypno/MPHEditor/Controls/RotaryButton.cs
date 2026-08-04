@@ -236,16 +236,20 @@ public class RotaryButton : GraphicsView
             float width = dirtyRect.Width;
             float height = dirtyRect.Height;
             float labelHeight = 18.0f;
-            float knobSize = Math.Min(width, height - (labelHeight * 2.0f));
+            bool hasTitle = !string.IsNullOrEmpty(_button.Title);
+            bool hasValue = !string.IsNullOrEmpty(_button.DisplayFormat);
+            float topSpace = hasTitle ? labelHeight : 0.0f;
+            float bottomSpace = hasValue ? labelHeight : 0.0f;
+            float knobSize = Math.Min(width, height - topSpace - bottomSpace);
             float centerX = width / 2.0f;
-            float centerY = labelHeight + (knobSize / 2.0f);
+            float centerY = topSpace + (knobSize / 2.0f);
             float radius = (knobSize / 2.0f) - 8.0f;
             float strokeWidth = Math.Max(4.0f, radius * 0.12f);
 
             canvas.FontColor = _button.TextColor;
 
             // Title at the top.
-            if (!string.IsNullOrEmpty(_button.Title))
+            if (hasTitle)
             {
                 canvas.FontSize = 12.0f;
                 canvas.DrawString(
@@ -318,16 +322,19 @@ public class RotaryButton : GraphicsView
             canvas.DrawLine(centerX, centerY, endX, endY);
 
             // Value label at the bottom.
-            string valueText = _button.Value.ToString(_button.DisplayFormat, CultureInfo.InvariantCulture);
-            canvas.FontSize = 12.0f;
-            canvas.DrawString(
-                valueText,
-                0.0f,
-                centerY + radius + 4.0f,
-                width,
-                labelHeight,
-                HorizontalAlignment.Center,
-                VerticalAlignment.Center);
+            if (hasValue)
+            {
+                string valueText = _button.Value.ToString(_button.DisplayFormat, CultureInfo.InvariantCulture);
+                canvas.FontSize = 12.0f;
+                canvas.DrawString(
+                    valueText,
+                    0.0f,
+                    centerY + radius + 4.0f,
+                    width,
+                    labelHeight,
+                    HorizontalAlignment.Center,
+                    VerticalAlignment.Center);
+            }
         }
 
         private static double DegreesToRadians(double degrees)
