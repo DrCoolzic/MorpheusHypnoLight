@@ -130,7 +130,7 @@ public class OscillatorEditor : ContentView
         // Left column with title, wave picker, phase knob and phase value.
         Grid leftColumn = new Grid
         {
-            RowSpacing = 2,
+            RowSpacing = 1,
             ColumnSpacing = 8,
             RowDefinitions =
             {

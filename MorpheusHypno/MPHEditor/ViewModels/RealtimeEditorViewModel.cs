@@ -9,12 +9,12 @@ namespace MPHEditor.ViewModels;
  * Exposes a sample Step pre-filled with default oscillators so the editor
  * controls can be visualized immediately.
  */
-public partial class StepEditorViewModel : ObservableObject
+public partial class RealtimeEditorViewModel : ObservableObject
 {
     [ObservableProperty]
     public partial Step CurrentStep { get; set; }
 
-    public StepEditorViewModel()
+    public RealtimeEditorViewModel()
     {
         CurrentStep = CreateSampleStep();
     }
@@ -29,7 +29,7 @@ public partial class StepEditorViewModel : ObservableObject
             {
                 Waveform = OscillatorWaveform.Sine,
                 PhaseDegrees = i * 90.0,
-                Frequency = new Modulator { Mode = ModulatorMode.Static, Value = 1.0 + i },
+                Frequency = new Modulator { Mode = ModulatorMode.Static, Value = 10.0 + i },
                 Brightness = new Modulator { Mode = ModulatorMode.Static, Value = 50.0 },
                 Duty = new Modulator { Mode = ModulatorMode.Static, Value = 50.0 },
             });

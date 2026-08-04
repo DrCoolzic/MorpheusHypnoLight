@@ -3,8 +3,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:controls="clr-namespace:MPHEditor.Controls;assembly=MPHEditor"
              xmlns:vm="clr-namespace:MPHEditor.ViewModels;assembly=MPHEditor"
-             x:Class="MPHEditor.Pages.StepEditorPage"
-             x:DataType="vm:StepEditorViewModel"
-             Title="Step Editor">
+             x:Class="MPHEditor.Pages.RealtimeEditorPage"
+             x:DataType="vm:RealtimeEditorViewModel"
+             Title="Realtime Editor">
     <controls:StepEditor Step="{Binding CurrentStep}" Title="Edit Step" />
 </ContentPage>

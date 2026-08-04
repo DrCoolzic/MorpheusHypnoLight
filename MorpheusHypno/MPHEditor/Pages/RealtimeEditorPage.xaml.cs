@@ -5,11 +5,11 @@ namespace MPHEditor.Pages;
 /**
  * @brief Test page that hosts the StepEditor control.
  */
-public partial class StepEditorPage : ContentPage
+public partial class RealtimeEditorPage : ContentPage
 {
-    public StepEditorPage()
+    public RealtimeEditorPage()
     {
         InitializeComponent();
-        BindingContext = new StepEditorViewModel();
+        BindingContext = new RealtimeEditorViewModel();
     }
 }

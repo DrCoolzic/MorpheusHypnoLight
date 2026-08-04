@@ -10,10 +10,10 @@
                       Route="MainPage" />
     </FlyoutItem>
 
-    <FlyoutItem Title="Step Editor">
-        <ShellContent Title="Step Editor"
-                      ContentTemplate="{DataTemplate pages:StepEditorPage}"
-                      Route="StepEditorPage" />
+    <FlyoutItem Title="Realtime Editor">
+        <ShellContent Title="Realtime Editor"
+                      ContentTemplate="{DataTemplate pages:RealtimeEditorPage}"
+                      Route="RealtimeEditorPage" />
     </FlyoutItem>
 
 </Shell>

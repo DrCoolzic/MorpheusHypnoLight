@@ -42,4 +42,10 @@
     <ProjectReference Include="..\MPHCore\MPHCore.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Update="Pages\RealtimeEditorPage.xaml.cs">
+      <DependentUpon>RealtimeEditorPage.xaml</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
 </Project>

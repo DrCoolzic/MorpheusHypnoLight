@@ -78,7 +78,7 @@ public class ModulatorEditor : ContentView
     }
 
     private const float LabelRowHeight = 18.0f;
-    private const float RowSpacing = 2.0f;
+    private const float RowSpacing = 0.0f;
     private const float ColumnSpacing = 6.0f;
 
     private readonly Picker _modePicker;
@@ -95,11 +95,11 @@ public class ModulatorEditor : ContentView
             VerticalOptions = LayoutOptions.Center,
             TextColor = Colors.White,
             TitleColor = Colors.Gray,
-            WidthRequest = 80,
+            WidthRequest = 90,
         };
-        _modePicker.Items.Add("FIX");
-        _modePicker.Items.Add("LIN");
-        _modePicker.Items.Add("LFO");
+        _modePicker.Items.Add("Static");
+        _modePicker.Items.Add("Linear");
+        _modePicker.Items.Add("Lfo");
         _modePicker.SelectedIndexChanged += OnModeChanged;
 
         _titleLabel = new Label
