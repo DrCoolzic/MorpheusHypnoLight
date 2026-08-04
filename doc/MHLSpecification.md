@@ -223,7 +223,22 @@ Square and triangle are generated directly from the phase accumulator each tick 
 
 ---
 
-## Player Mode of Operation
+## Bluetooth Communication
+
+The device is controlled over a Bluetooth Low Energy (BLE) connection. The transport uses a command/response protocol over a single write characteristic and a status notification characteristic. All message formats, service UUIDs, fragmentation rules, and error codes are detailed in [BLE Transport Protocol](ble_protocol.md).
+
+The main high-level commands supported by the firmware are:
+
+- **Load full sequence** — transfers a complete compact sequence to the device and loads it as the active sequence.
+- **Update step** — transfers a single step and updates the corresponding step in the currently loaded sequence.
+- **Play** — starts or resumes sequence playback.
+- **Pause** — freezes the current playback state.
+- **Stop** — stops playback and resets to the beginning.
+- **Seek** — jumps to an absolute position in the sequence, in milliseconds.
+
+The following sections describe the data produced by these commands. The precise binary command format is documented in [BLE Transport Protocol](ble_protocol.md).
+
+## Sequence Description
 
 ### Overview
 
@@ -372,9 +387,60 @@ flowchart LR
 |led_engine|1 ms|Evaluate modulators, call `oscillator_tick()`, write `led_control`|
 |LEDC peripheral|Every 1 ms (carrier period)|Output PWM to AL8860 banks PB1..PB4 and central group CG|
 
-## Editor Mode of Operation
+## Mode of Operation
 
-In Editor mode the device is controlled live, without a fixed sequence timeline. The same modulator modes (`static`, `linear`, `lfo`) are available for frequency, brightness, and duty cycle. When the Editor is paused, the current LED state is frozen and any parameter can be adjusted directly, for example with potentiometers or on-screen controls. When a sequence is playing inside the Editor, the behavior is identical to Player mode.
+The device can be used in two distinct operating modes: **Sequence Mode** and **Realtime Mode**. Both modes use the same Bluetooth transport and the same underlying oscillator/modulator engine, but they differ in how parameters are supplied and how playback is controlled.
+
+### Sequence Mode
+
+In Sequence Mode the device plays a pre-loaded sequence of steps. Each step has a fixed duration and the sequencer advances automatically unless a control command changes the state.
+
+#### Bluetooth Commands in Sequence Mode
+
+The high-level commands used in Sequence Mode are summarized below. The complete binary message format, fragmentation rules, and error codes are documented in [BLE Transport Protocol](ble_protocol.md).
+
+| Command | Description |
+| --- | --- |
+| `loadSequence` | Loads a complete sequence into device memory. The host transfers the compact sequence in chunks; the firmware validates it and replaces the active sequence. |
+| `updateStep` | Updates a single step in the currently loaded sequence. The host transfers the new step data; the firmware validates it and replaces the step in the active sequence. If the updated step is the currently playing step, the change is applied immediately. |
+| `play` | Starts or resumes playback from the current position. |
+| `pause` | Freezes playback on the current step. |
+| `stop` | Stops playback and returns to the beginning of the sequence. |
+| `seek` | Jumps to an absolute position in the sequence, expressed in milliseconds. |
+
+#### Playback State Machine
+
+The firmware maintains a simple three-state playback machine: `Stop`, `Play`, and `Pause`.
+
+- **Stop state.** No playback is active. The LED output is off and the sequencer cursor is positioned at the beginning of the sequence (or at the last `seek` position if one was issued). `loadSequence` and `updateStep` can be used to modify the loaded sequence. A `play` command transitions to the `Play` state; a `seek` command updates the cursor without producing light.
+
+- **Play state.** The sequencer advances through steps according to their durations. At each step start the oscillator phase, modulator start values, and static parameters are applied; linear ramps and LFO modulators evolve over time. When the last step finishes, the sequence ends and the firmware automatically transitions back to the `Stop` state.
+
+- **Pause state.** Playback is suspended on the current step. Static and linear modulator values are frozen at the values they had when the pause occurred, and the oscillator phase is held. LFO modulators continue to run, so any parameters controlled by an LFO keep breathing. This lets the user preview the current step while retaining its modulation character. `play` resumes from the paused position; `stop` resets to the beginning; `seek` jumps to a new position while remaining paused.
+
+#### Seek Behavior
+
+A `seek` can be issued in any of the three states. The result depends on the active state:
+
+- **Seek in Stop.** The target position is set as the starting point for the next `play`. The LED output remains off; only the internal cursor is updated.
+
+- **Seek in Play.** The sequencer jumps to the step containing the requested position, applies that step's static and start parameters, and resumes playing from the new position.
+
+- **Seek in Pause.** The sequencer jumps to the requested position, evaluates the step's parameters at the new time, and pauses there. Static and linear values are frozen at the new position and LFOs continue from that point.
+
+### Realtime Mode
+
+Realtime Mode is entered by loading a sequence that contains a single step with `duration = 0`. It is intended for live control of the light output without any automatic time progression.
+
+Only two states exist in this mode: `Stop` and an active frozen state called `Hold` (the active state is not a true "play" state, because nothing advances with time).
+
+- **Stop state.** The LED output is off. A `play` command transitions the device to the `Hold` state using the current step's parameters.
+
+- **Hold state.** The timeline is frozen, but the LED engine remains active. Linear modulators are treated as if they were static: only their `start` value is used because no elapsed time exists. LFOs continue to run, so any parameters controlled by an LFO keep breathing. Static values and oscillator phase are held until a new step arrives.
+
+Parameters are updated by sending an `updateStep` command with a new single-step sequence. The firmware validates and applies the new step immediately, replacing the current live parameters while remaining in the `Hold` state. This allows live editing of frequency, brightness, duty, phase, waveform, or modulator configuration without stopping the light.
+
+A `stop` command returns the device to the `Stop` state and turns the LEDs off. Since there is no timeline, `seek` and `pause` are not applicable in Realtime Mode.
 
 ## Hardware Prototype
 
