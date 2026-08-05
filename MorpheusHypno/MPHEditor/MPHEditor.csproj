@@ -52,7 +52,7 @@
       </MauiFont>
 
       <!-- Font Assets for Android - Exclude fonts already defined as MauiFont -->
-      <MauiAsset Include="Resources\Fonts\*.ttf" Exclude="Resources\Fonts\OpenSans-Semibold.ttf" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+      <MauiFont Include="Resources\Fonts\*.ttf" Exclude="Resources\Fonts\OpenSans-Semibold.ttf" />
 
   </ItemGroup>
 

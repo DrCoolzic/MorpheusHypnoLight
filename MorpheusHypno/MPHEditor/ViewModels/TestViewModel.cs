@@ -17,8 +17,6 @@ public partial class TestViewModel : ObservableObject
 
     private Sequence? _currentSequence;
     private MPHSequence? _currentMphSequence;
-    private bool _connectCommand = false;
-
     public TestViewModel(
         ILogger<TestViewModel> logger,
         IBleService bleService,
@@ -81,7 +79,7 @@ public partial class TestViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(BleIcon))]
     public partial bool IsConnected { get; set; }
-    public object BleIcon => IsConnected ? "ble_on.png" : "ble_off.png";
+    public ImageSource BleIcon => ImageSource.FromFile(IsConnected ? "ble_on.png" : "ble_off.png");
 
     [ObservableProperty]
     public partial string BleStatusMessage { get; set; } = string.Empty;
@@ -103,56 +101,63 @@ public partial class TestViewModel : ObservableObject
 
     private async Task InitializeAsync()
     {
-        _logger.LogInformation("Starting TestViewModel initialization...");
-
-        if (!_bleService.IsConnected)
+        try
         {
+            _logger.LogInformation("Starting TestViewModel initialization...");
 
-            // Always check and connect BLE (asynchronous, non-blocking)
-            bool bluetoothEnabled = await _bleService.CheckBluetoothStatusAsync();
-            if (!bluetoothEnabled)
+            if (!_bleService.IsConnected)
             {
-                _logger.LogWarning("Bluetooth is not enabled or available");
-                // await ShowBluetoothDisabledPopupAsync();
 
-                // Start auto-connect attempts even when Bluetooth is initially disabled
-                _logger.LogInformation("Starting auto-connect timer to retry when Bluetooth is enabled");
-                _ = _bleService.ConnectAsync();
+                // Always check and connect BLE (asynchronous, non-blocking)
+                bool bluetoothEnabled = await _bleService.CheckBluetoothStatusAsync();
+                if (!bluetoothEnabled)
+                {
+                    _logger.LogWarning("Bluetooth is not enabled or available");
+                    // await ShowBluetoothDisabledPopupAsync();
+
+                    // Start auto-connect attempts even when Bluetooth is initially disabled
+                    _logger.LogInformation("Starting auto-connect timer to retry when Bluetooth is enabled");
+                    _ = _bleService.ConnectAsync();
+                }
+                else
+                {
+                    _logger.LogInformation("Starting Bluetooth connection");
+                    _ = _bleService.ConnectAsync();
+                }
             }
             else
             {
-                _logger.LogInformation("Starting Bluetooth connection");
-                _ = _bleService.ConnectAsync();
+                _logger.LogInformation("Already connected to device");
+                IsConnected = true;
             }
+
+            // load database
+            _mes.MPHRoot.RootPath = AppDirectories.GetAppDataDirectory();
+            await _mes.LoadLocalDb();
+            _logger.LogInformation("MPEditor database loaded");
+
+
+            _currentMphSequence = _mes.MPHRoot.Collections
+                .FirstOrDefault()
+                ?.SequenceItems
+                .FirstOrDefault();
+
+            if (_currentMphSequence is null)
+            {
+                _logger.LogWarning("No sequence found to load");
+                return;
+            }
+
+            var sequenceDir = _currentMphSequence.DirPath;
+            _logger.LogInformation("Sequence directory: {SequenceDir}", sequenceDir);
+            _currentSequence = await _mes.LoadSequenceAsync(sequenceDir);
+            _currentMphSequence.Sequence = _currentSequence;
+            CurrentSequence = _currentSequence?.Name ?? "None";
         }
-        else
+        catch (Exception ex)
         {
-            _logger.LogInformation("Already connected to device");
-            IsConnected = true;
+            _logger.LogError(ex, "TestViewModel initialization failed");
         }
-
-        // load database
-        _mes.MPHRoot.RootPath = AppDirectories.GetAppDataDirectory();
-        await _mes.LoadLocalDb();
-        _logger.LogInformation("MPEditor database loaded");
-
-
-        _currentMphSequence = _mes.MPHRoot.Collections
-            .FirstOrDefault()
-            ?.SequenceItems
-            .FirstOrDefault();
-
-        if (_currentMphSequence is null)
-        {
-            _logger.LogWarning("No sequence found to load");
-            return;
-        }
-
-        var sequenceDir = _currentMphSequence.DirPath;
-        _logger.LogInformation("Sequence directory: {SequenceDir}", sequenceDir);
-        _currentSequence = await _mes.LoadSequenceAsync(sequenceDir);
-        _currentMphSequence.Sequence = _currentSequence;
-        CurrentSequence = _currentSequence?.Name ?? "None";
     }
 
     [RelayCommand]
@@ -257,15 +262,13 @@ public partial class TestViewModel : ObservableObject
     private async Task ToggleBle()
     {
         _logger.LogInformation("Toggle BLE");
-        if (_connectCommand)
+        if (IsConnected)
         {
-            await _bleService.ConnectAsync();
-            _connectCommand = false;
+            await _bleService.ForceDisconnectAsync();
         }
         else
         {
-            await _bleService.ForceDisconnectAsync();
-            _connectCommand = true;
+            await _bleService.ConnectAsync();
         }
     }
 }
