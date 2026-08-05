@@ -87,12 +87,25 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     public partial MPHSequence? SelectedSequence { get; set; }
 
+    private MPHSequence? _expandedSequence;
+
     partial void OnSelectedCollectionChanged(MPHCollection? value)
     {
         Sequences = value is not null
             ? new ObservableCollection<MPHSequence>(value.SequenceItems)
             : [];
-        SelectedSequence = Sequences.FirstOrDefault();
+        SelectedSequence = null;
+    }
+
+    partial void OnSelectedSequenceChanged(MPHSequence? value)
+    {
+        if (_expandedSequence is not null)
+            _expandedSequence.IsExpanded = false;
+
+        _expandedSequence = value;
+
+        if (value is not null)
+            value.IsExpanded = true;
     }
 
     //[ObservableProperty]

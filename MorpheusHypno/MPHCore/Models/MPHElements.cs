@@ -143,6 +143,39 @@ public class MPHSequence : MPHElement
     /// Duration of the sequence formatted as "mm:ss".
     /// </summary>
     public string FormattedDuration => TimeSpan.FromSeconds(Metadata.DurationSeconds).ToString(@"mm\:ss");
+
+    /// <summary>
+    /// Summary description for this sequence, taken from the metadata summary items.
+    /// Falls back to the first non-empty entry if no English summary is available.
+    /// </summary>
+    public string DisplaySummary
+    {
+        get
+        {
+            if (Metadata.SummaryItems.TryGetValue("en", out var summary) && !string.IsNullOrWhiteSpace(summary))
+                return summary;
+
+            return Metadata.SummaryItems.Values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v)) ?? string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// UI-only state indicating whether this sequence is expanded in the sequence list.
+    /// Not persisted.
+    /// </summary>
+    private bool _isExpanded;
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set
+        {
+            if (_isExpanded != value)
+            {
+                _isExpanded = value;
+                OnPropertyChanged();
+            }
+        }
+    }
 }
 
 /// <summary>
