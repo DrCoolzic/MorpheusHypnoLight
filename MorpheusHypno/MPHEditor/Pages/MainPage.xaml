@@ -40,8 +40,9 @@
                                            StrokeThickness="1"
                                            StrokeShape="RoundRectangle 10"
                                            Padding="10,5">
-                                          <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10">
-                                                 <Label Grid.Column="0" Text="{Binding FormattedDuration}" FontSize="14" />
+                                          <Grid ColumnDefinitions="45,25,*" ColumnSpacing="10">
+                                                 <Label Grid.Column="0" Text="{Binding FormattedDuration}" FontSize="14"
+                                                        HorizontalTextAlignment="End" />
                                                  <Label Grid.Column="1" Text="🔊" FontSize="14" IsVisible="{Binding HasAudio}" />
                                                  <Label Grid.Column="2" Text="{Binding DisplayName}" FontSize="14" FontAttributes="Bold" />
                                           </Grid>
