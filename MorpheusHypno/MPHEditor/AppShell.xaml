@@ -10,7 +10,7 @@
                       Route="MainPage" />
     </FlyoutItem>
 
-    <FlyoutItem Title="Realtime Editor">
+    <FlyoutItem x:Name="RealtimeEditorFlyoutItem" Title="Realtime Editor" IsVisible="False">
         <ShellContent Title="Realtime Editor"
                       ContentTemplate="{DataTemplate pages:RealtimeEditorPage}"
                       Route="RealtimeEditorPage" />

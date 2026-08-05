@@ -15,6 +15,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IBleService _bleService;
     //private readonly ISequencePlayerService _sequencePlayerService;
     private readonly IMPHElementService _mes;
+    private readonly IEditorModeService _editorModeService;
 
     //private Sequence? _currentSequence;
     //private MPHSequence? _currentMphSequence;
@@ -24,12 +25,20 @@ public partial class MainViewModel : ObservableObject
         ILogger<MainViewModel> logger,
         IBleService bleService,
         ISequencePlayerService sequencePlayerService,
-        IMPHElementService mpHElementService)
+        IMPHElementService mpHElementService,
+        IEditorModeService editorModeService)
     {
         _logger = logger;
         _bleService = bleService;
         //_sequencePlayerService = sequencePlayerService;
         _mes = mpHElementService;
+        _editorModeService = editorModeService;
+
+        IsEditorMode = _editorModeService.IsEditorMode;
+        _editorModeService.PropertyChanged += (_, _) =>
+        {
+            MainThread.BeginInvokeOnMainThread(() => IsEditorMode = _editorModeService.IsEditorMode);
+        };
 
         // Subscribe to ble status changes
         _bleService.StatusChanged += (sender, status) =>
@@ -74,6 +83,9 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     public partial string BleStatusMessage { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool IsEditorMode { get; set; }
 
     [ObservableProperty]
     public partial ObservableCollection<MPHCollection> Collections { get; set; } = [];

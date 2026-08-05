@@ -20,6 +20,7 @@ public static class MauiProgram
 
         builder.Services.AddSingleton(AudioManager.Current);
 
+        builder.Services.AddSingleton<IEditorModeService, EditorModeService>();
         builder.Services.AddSingleton<IBleService, BleService>();
         builder.Services.AddSingleton<ISequencePlayerService, SequencePlayerService>();
         builder.Services.AddSingleton<MetadataService>();

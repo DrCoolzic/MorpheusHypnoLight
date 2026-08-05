@@ -13,7 +13,7 @@
 
        <Grid RowDefinitions="Auto, *, Auto">
               <!-- Collection Selector -->
-              <Grid Grid.Row="0" ColumnDefinitions="Auto, *" Padding="10" ColumnSpacing="5">
+              <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto, Auto" Padding="10" ColumnSpacing="5">
                      <Label Grid.Column="0" Text="Collection"
                             VerticalOptions="Center" FontSize="24" FontAttributes="Bold" />
                      <Picker x:Name="CollectionPicker" Grid.Column="1"
@@ -21,6 +21,8 @@
                             ItemDisplayBinding="{Binding DirName}"
                             SelectedItem="{Binding SelectedCollection, Mode=TwoWay}"
                             Margin="5,0,0,0" FontSize="20" VerticalOptions="Center" />
+                     <Button Grid.Column="2" Text="Add" IsVisible="{Binding IsEditorMode}" />
+                     <Button Grid.Column="3" Text="Delete" IsVisible="{Binding IsEditorMode}" />
               </Grid>
 
               <!-- Sequence List -->
@@ -56,10 +58,24 @@
                                                  <VerticalStackLayout IsVisible="{Binding IsExpanded}" Spacing="8">
                                                         <Label FormattedText="{Binding DisplaySummary, Converter={StaticResource HtmlToFormattedStringConverter}}" FontSize="13" />
                                                         <HorizontalStackLayout Spacing="10">
-                                                               <Button Text="+" WidthRequest="40" />
-                                                               <Button Text="✎" WidthRequest="40" />
-                                                               <Button Text="▶" WidthRequest="40" />
-                                                        </HorizontalStackLayout>
+                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                        <ImageButton Grid.Column="0" Padding="0"
+                                            Source="plus.png"   
+                                            WidthRequest="40" HeightRequest="40" Margin="0" BorderColor="Transparent"
+                                            BackgroundColor= "Transparent">
+                                        </ImageButton>
+                                        <ImageButton Grid.Column="2" Padding="0"
+                                         Source="edit.png"   
+                                           WidthRequest="40" HeightRequest="40" Margin="0" BorderColor="Transparent"
+                                           BackgroundColor= "Transparent">
+                                        </ImageButton>
+                                        <ImageButton Grid.Column="3" Padding="0"
+                                         Source="play.png"   
+                                           WidthRequest="40" HeightRequest="40" Margin="0" BorderColor="Transparent"
+                                           BackgroundColor= "Transparent">
+                                        </ImageButton>
+                                    </Grid>
+                                </HorizontalStackLayout>
                                                  </VerticalStackLayout>
                                           </VerticalStackLayout>
                                    </Border>
