@@ -5,9 +5,20 @@
              x:Class="MPHEditor.Pages.MainPage"
              x:DataType="vm:MainViewModel">
 
-       <Grid RowDefinitions="Auto, *">
+       <Grid RowDefinitions="Auto, Auto, *">
+              <!-- Collection Selector -->
+              <Grid Grid.Row="0" ColumnDefinitions="Auto, *" Padding="10" ColumnSpacing="5">
+                     <Label Grid.Column="0" Text="Collection"
+                            VerticalOptions="Center" FontSize="24" FontAttributes="Bold" />
+                     <Picker x:Name="CollectionPicker" Grid.Column="1"
+                            ItemsSource="{Binding Collections}"
+                            ItemDisplayBinding="{Binding DirName}"
+                            SelectedItem="{Binding SelectedCollection, Mode=TwoWay}"
+                            Margin="5,0,0,0" FontSize="20" VerticalOptions="Center" />
+              </Grid>
+
               <!-- Bluetooth Status Icon -->
-              <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto">
+              <Grid Grid.Row="1" ColumnDefinitions="Auto, *, Auto">
                      <Label Grid.Column="0" Text="{Binding BleStatusMessage, StringFormat='BLE Status: {0}'}"
                             FontSize="14"
                             VerticalOptions="Center"

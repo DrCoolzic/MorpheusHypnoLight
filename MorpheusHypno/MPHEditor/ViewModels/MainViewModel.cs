@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -74,6 +75,12 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     public partial string BleStatusMessage { get; set; } = string.Empty;
 
+    [ObservableProperty]
+    public partial ObservableCollection<MPHCollection> Collections { get; set; } = [];
+
+    [ObservableProperty]
+    public partial MPHCollection? SelectedCollection { get; set; }
+
     //[ObservableProperty]
     //public partial string CurrentSequence { get; set; } = "None";
 
@@ -114,6 +121,12 @@ public partial class MainViewModel : ObservableObject
         _mes.MPHRoot.RootPath = AppDirectories.GetAppDataDirectory();
         await _mes.LoadLocalDb();
         _logger.LogInformation("MPEditor database loaded");
+
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            Collections = new ObservableCollection<MPHCollection>(_mes.MPHRoot.Collections);
+            SelectedCollection = Collections.FirstOrDefault();
+        });
 
 
         //_currentMphSequence = _mes.MPHRoot.Collections
