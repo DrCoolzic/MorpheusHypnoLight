@@ -7,105 +7,112 @@
              x:Class="MPHEditor.Pages.MainPage"
              x:DataType="vm:MainViewModel">
 
-       <ContentPage.Resources>
-              <converters:HtmlToFormattedStringConverter x:Key="HtmlToFormattedStringConverter" />
-       </ContentPage.Resources>
+    <ContentPage.Resources>
+        <converters:HtmlToFormattedStringConverter x:Key="HtmlToFormattedStringConverter" />
+    </ContentPage.Resources>
 
-       <Grid RowDefinitions="Auto, *, Auto">
-              <!-- Collection Selector -->
-              <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto, Auto" Padding="10" ColumnSpacing="5">
-                     <Label Grid.Column="0" Text="Collection"
+    <Grid RowDefinitions="Auto, *, Auto">
+        <!-- Collection Selector -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto, Auto" Padding="10" ColumnSpacing="5">
+            <Label Grid.Column="0" Text="Collection"
                             VerticalOptions="Center" FontSize="24" FontAttributes="Bold" />
-                     <Picker x:Name="CollectionPicker" Grid.Column="1"
+            <Picker x:Name="CollectionPicker" Grid.Column="1"
                             ItemsSource="{Binding Collections}"
                             ItemDisplayBinding="{Binding DirName}"
                             SelectedItem="{Binding SelectedCollection, Mode=TwoWay}"
                             Margin="5,0,0,0" FontSize="20" VerticalOptions="Center" />
-                     <Button Grid.Column="2" Text="Add" IsVisible="{Binding IsEditorMode}" />
-                     <Button Grid.Column="3" Text="Delete" IsVisible="{Binding IsEditorMode}" />
-              </Grid>
+            <Button Grid.Column="2" Text="Add" IsVisible="{Binding IsEditorMode}" Command="{Binding AddProgramCommand}"/>
+            <Button Grid.Column="3" Text="Delete" IsVisible="{Binding IsEditorMode}" Command="{Binding DeleteProgramCommand}" />
+        </Grid>
 
-              <!-- Sequence List -->
-              <CollectionView x:Name="SequenceList" Grid.Row="1"
+        <!-- Sequence List -->
+        <CollectionView x:Name="SequenceList" Grid.Row="1"
                      ItemsSource="{Binding Sequences}"
                      SelectedItem="{Binding SelectedSequence, Mode=TwoWay}"
                      SelectionMode="Single"
                      Margin="10">
 
-                     <CollectionView.EmptyView>
-                            <Label Text="No Sequences" HorizontalOptions="Center" VerticalOptions="Center"
+            <CollectionView.EmptyView>
+                <Label Text="No Sequences" HorizontalOptions="Center" VerticalOptions="Center"
                                    FontSize="24" FontAttributes="Bold" />
-                     </CollectionView.EmptyView>
+            </CollectionView.EmptyView>
 
-                     <CollectionView.ItemsLayout>
-                            <LinearItemsLayout Orientation="Vertical" ItemSpacing="2" />
-                     </CollectionView.ItemsLayout>
+            <CollectionView.ItemsLayout>
+                <LinearItemsLayout Orientation="Vertical" ItemSpacing="2" />
+            </CollectionView.ItemsLayout>
 
-                     <CollectionView.ItemTemplate>
-                            <DataTemplate x:DataType="models:MPHSequence">
-                                   <Border Stroke="Gray"
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:MPHSequence">
+                    <Border Stroke="Gray"
                                            StrokeThickness="1"
                                            StrokeShape="RoundRectangle 10"
                                            Padding="10,5">
-                                          <VerticalStackLayout Spacing="8">
-                                                 <Grid ColumnDefinitions="45,25,*" ColumnSpacing="10">
-                                                        <Label Grid.Column="0" Text="{Binding FormattedDuration}" FontSize="14"
+                        <VerticalStackLayout Spacing="8">
+                            <Grid ColumnDefinitions="45,25,*" ColumnSpacing="10">
+                                <Label Grid.Column="0" Text="{Binding FormattedDuration}" FontSize="14"
                                                                HorizontalTextAlignment="End" />
-                                                        <Label Grid.Column="1" Text="🔊" FontSize="14" IsVisible="{Binding HasAudio}" />
-                                                        <Label Grid.Column="2" Text="{Binding DisplayName}" FontSize="14" FontAttributes="Bold" />
-                                                 </Grid>
+                                <Label Grid.Column="1" Text="🔊" FontSize="14" IsVisible="{Binding HasAudio}" />
+                                <Label Grid.Column="2" Text="{Binding DisplayName}" FontSize="14" FontAttributes="Bold" />
+                            </Grid>
 
-                                                 <VerticalStackLayout IsVisible="{Binding IsExpanded}" Spacing="8">
-                                                        <Label FormattedText="{Binding DisplaySummary, Converter={StaticResource HtmlToFormattedStringConverter}}" FontSize="13" />
-                                                        <HorizontalStackLayout Spacing="10">
-                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto">
-                                        <ImageButton Grid.Column="0" Padding="0"
-                                            Source="plus.png"   
+                            <VerticalStackLayout IsVisible="{Binding IsExpanded}" Spacing="8">
+                                <Label FormattedText="{Binding DisplaySummary, Converter={StaticResource HtmlToFormattedStringConverter}}" FontSize="13" />
+                                <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                    <ImageButton Grid.Column="0" Padding="0"
+                                            Source="plus.png"
+                                            Command="{Binding Source={x:Reference SequenceList}, Path=BindingContext.PlaylistCommand, x:DataType=vm:MainViewModel}"
+                                            CommandParameter="{Binding .}"
                                             WidthRequest="40" HeightRequest="40" Margin="0" BorderColor="Transparent"
                                             BackgroundColor= "Transparent">
-                                        </ImageButton>
-                                        <ImageButton Grid.Column="2" Padding="0"
-                                         Source="edit.png"   
+                                    </ImageButton>
+                                    <ImageButton Grid.Column="2" Padding="0"
+                                         Source="edit.png"
+                                         IsVisible="{Binding Source={x:Reference SequenceList}, Path=BindingContext.IsEditorMode, x:DataType=vm:MainViewModel}"
+                                         Command="{Binding Source={x:Reference SequenceList}, Path=BindingContext.GoToEditCommand, x:DataType=vm:MainViewModel}"
+                                         CommandParameter="{Binding .}"
                                            WidthRequest="40" HeightRequest="40" Margin="0" BorderColor="Transparent"
                                            BackgroundColor= "Transparent">
-                                        </ImageButton>
-                                        <ImageButton Grid.Column="3" Padding="0"
-                                         Source="play.png"   
+                                    </ImageButton>
+                                    <ImageButton Grid.Column="3" Padding="0"
+                                         Source="play.png"
+                                         Command="{Binding Source={x:Reference SequenceList}, Path=BindingContext.GoToPlayCommand, x:DataType=vm:MainViewModel}"
+                                         CommandParameter="{Binding .}"
                                            WidthRequest="40" HeightRequest="40" Margin="0" BorderColor="Transparent"
                                            BackgroundColor= "Transparent">
-                                        </ImageButton>
-                                    </Grid>
-                                </HorizontalStackLayout>
-                                                 </VerticalStackLayout>
-                                          </VerticalStackLayout>
-                                   </Border>
-                            </DataTemplate>
-                     </CollectionView.ItemTemplate>
-              </CollectionView>
+                                    </ImageButton>
+                                </Grid>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
 
-              <!-- Bluetooth Status Icon -->
-              <Grid Grid.Row="2" ColumnDefinitions="Auto, *, Auto">
-                     <Label Grid.Column="0" Text="{Binding BleStatusMessage, StringFormat='BLE Status: {0}'}"
+        <!-- Sequence Count / Add-Delete / Bluetooth Status Icon -->
+        <Grid Grid.Row="2" ColumnDefinitions="Auto, Auto, Auto, *, Auto">
+            <Label Grid.Column="0" Text="{Binding Sequences.Count, StringFormat='{0} Sequences'}"
                             FontSize="14"
                             VerticalOptions="Center"
                             HorizontalOptions="Start" />
-                     <ImageButton Grid.Column="2" Margin="5,0,5,0" WidthRequest="50" HeightRequest="50" Padding="5" VerticalOptions="Center"
+            <Button Grid.Column="1" Text="Add" IsVisible="{Binding IsEditorMode}" Command="{Binding AddSequenceCommand}" />
+            <Button Grid.Column="2" Text="Delete" IsVisible="{Binding IsEditorMode}" Command="{Binding DeleteSequenceCommand}" />
+            <ImageButton Grid.Column="4" Margin="5,0,5,0" WidthRequest="50" HeightRequest="50" Padding="5" VerticalOptions="Center"
                             Source="{Binding BleIcon}"
                             Command="{Binding ToggleBleCommand}"
                             ToolTipProperties.Text="Start/Stop MorpheusHypno search"
                             BorderColor="Blue" BorderWidth="2" CornerRadius="5" 
                             BackgroundColor="#9999FF" />
 
-                     <ActivityIndicator Grid.Column="2" 
+            <ActivityIndicator Grid.Column="4" 
                             IsRunning="{Binding IsConnecting}"
                             HeightRequest="20" 
                             BackgroundColor="Transparent"
                             WidthRequest="35"
                             HorizontalOptions="Center">
-                            <ActivityIndicator.GestureRecognizers>
-                            <TapGestureRecognizer Command="{Binding ToggleBleCommand}" />
-                            </ActivityIndicator.GestureRecognizers>
-                     </ActivityIndicator>
-              </Grid>
+                <ActivityIndicator.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding ToggleBleCommand}" />
+                </ActivityIndicator.GestureRecognizers>
+            </ActivityIndicator>
+        </Grid>
     </Grid>
 </ContentPage>

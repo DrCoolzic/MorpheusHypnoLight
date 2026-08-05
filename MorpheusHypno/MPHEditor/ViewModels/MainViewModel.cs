@@ -231,4 +231,46 @@ public partial class MainViewModel : ObservableObject
             _connectCommand = true;
         }
     }
+
+    [RelayCommand]
+    private void AddProgram()
+    {
+        // TODO: implement adding a new collection.
+    }
+
+    [RelayCommand]
+    private void DeleteProgram()
+    {
+        // TODO: implement deleting the selected collection.
+    }
+
+    [RelayCommand]
+    private void AddSequence()
+    {
+        // TODO: implement adding a new sequence to the selected collection.
+    }
+
+    [RelayCommand]
+    private void DeleteSequence()
+    {
+        // TODO: implement deleting the selected sequence.
+    }
+
+    [RelayCommand]
+    private void Playlist(MPHSequence sequence)
+    {
+        // TODO: implement adding the sequence to a playlist.
+    }
+
+    [RelayCommand]
+    private void GoToEdit(MPHSequence sequence)
+    {
+        // TODO: implement navigation to the sequence editor.
+    }
+
+    [RelayCommand]
+    private void GoToPlay(MPHSequence sequence)
+    {
+        // TODO: implement navigation to the sequence player.
+    }
 }
