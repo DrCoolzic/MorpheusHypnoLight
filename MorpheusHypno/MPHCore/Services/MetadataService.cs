@@ -126,7 +126,7 @@ public class MetadataService(ILogger<MetadataService> logger)
                     { "en", sequence.Name },
                     { "fr", sequence.Name }
                 },
-                Duration = sequence.DurationMs,
+                DurationSeconds = sequence.DurationSeconds,
                 Parent = parent ?? string.Empty,
                 Version = ProgramMetadata.MetadataVersion,
                 LastUpdated = DateTime.Now
@@ -154,7 +154,7 @@ public class MetadataService(ILogger<MetadataService> logger)
                 },
                 Category = 0,
                 Level = 0,
-                Duration = sequence.DurationMs,
+                DurationSeconds = sequence.DurationSeconds,
                 Parent = parent ?? string.Empty,
                 Version = ProgramMetadata.MetadataVersion,
                 LastUpdated = DateTime.Now

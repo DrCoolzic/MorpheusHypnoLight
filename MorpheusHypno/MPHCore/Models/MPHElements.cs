@@ -142,7 +142,7 @@ public class MPHSequence : MPHElement
     /// <summary>
     /// Duration of the sequence formatted as "mm:ss".
     /// </summary>
-    public string FormattedDuration => TimeSpan.FromSeconds(Metadata.Duration).ToString(@"mm\:ss");
+    public string FormattedDuration => TimeSpan.FromSeconds(Metadata.DurationSeconds).ToString(@"mm\:ss");
 }
 
 /// <summary>

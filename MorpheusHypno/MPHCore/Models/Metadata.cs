@@ -65,10 +65,10 @@ public class SequenceMetadata : ProgramMetadata
     public Dictionary<string, string> DetailItems { get; set; } = new Dictionary<string, string> { { "en", "" }, { "fr", "" } };
 
     /// <summary>
-    /// Duration of the sequence in milliseconds.
+    /// Duration of the sequence in seconds.
     /// </summary>
     [JsonProperty("duration")]
-    public int Duration { get; set; } = 0;
+    public double DurationSeconds { get; set; } = 0;
 
     /// <summary>
     /// Category identifier for the sequence.
