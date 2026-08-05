@@ -22,10 +22,40 @@
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
     <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
- 
-		<!-- Fixing MVVM Toolkit warning MVVMTK0045 and MVVM Toolkit error MVVMTK0041 -->
-    <LangVersion>preview</LangVersion> 
+
+    <!-- Add these lines for XAML compilation -->
+    <EnableDefaultXamlItems>true</EnableDefaultXamlItems>
+    <EnableDefaultMauiItems>true</EnableDefaultMauiItems>
+    <MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
+
   </PropertyGroup>
+
+  <ItemGroup>
+      <!-- App Icon -->
+      <MauiIcon Include="Resources\AppIcon\appicon.png" Color="#00649F" />
+
+      <!-- Splash Screen -->
+      <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
+      
+      <!-- Windows-specific splash screen PNG (workaround for MSIX packaging issue) -->
+      <None Include="Resources\Splash\splash.png" Condition="Exists('Resources\Splash\splash.png')">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+          <Link>splashSplashScreen.png</Link>
+      </None>
+
+      <!-- Images -->
+      <MauiImage Include="Resources\Images\*" />
+
+      <!-- Custom Fonts -->
+      <MauiFont Include="Resources\Fonts\OpenSans-Semibold.ttf">
+          <Alias>OpenSansSemibold</Alias>
+      </MauiFont>
+
+      <!-- Font Assets for Android - Exclude fonts already defined as MauiFont -->
+      <MauiAsset Include="Resources\Fonts\*.ttf" Exclude="Resources\Fonts\OpenSans-Semibold.ttf" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+
+  </ItemGroup>
+
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
@@ -43,9 +73,18 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Update="Pages\TestPage.xaml.cs">
+      <DependentUpon>TestPage.xaml</DependentUpon>
+    </Compile>
     <Compile Update="Pages\RealtimeEditorPage.xaml.cs">
       <DependentUpon>RealtimeEditorPage.xaml</DependentUpon>
     </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <MauiXaml Update="Pages\TestPage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </MauiXaml>
   </ItemGroup>
 
 </Project>

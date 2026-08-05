@@ -16,4 +16,10 @@
                       Route="RealtimeEditorPage" />
     </FlyoutItem>
 
+    <FlyoutItem Title="Test">
+    <ShellContent Title="Test"
+                    ContentTemplate="{DataTemplate pages:TestPage}"
+                    Route="TestPage" />
+    </FlyoutItem>
+
 </Shell>
