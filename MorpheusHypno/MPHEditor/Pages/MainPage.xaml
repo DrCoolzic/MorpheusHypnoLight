@@ -2,10 +2,11 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:MPHEditor.ViewModels;assembly=MPHEditor"
+             xmlns:models="clr-namespace:MPHCore.Models;assembly=MPHCore"
              x:Class="MPHEditor.Pages.MainPage"
              x:DataType="vm:MainViewModel">
 
-       <Grid RowDefinitions="Auto, Auto, *">
+       <Grid RowDefinitions="Auto, *, Auto">
               <!-- Collection Selector -->
               <Grid Grid.Row="0" ColumnDefinitions="Auto, *" Padding="10" ColumnSpacing="5">
                      <Label Grid.Column="0" Text="Collection"
@@ -17,8 +18,40 @@
                             Margin="5,0,0,0" FontSize="20" VerticalOptions="Center" />
               </Grid>
 
+              <!-- Sequence List -->
+              <CollectionView x:Name="SequenceList" Grid.Row="1"
+                     ItemsSource="{Binding Sequences}"
+                     SelectedItem="{Binding SelectedSequence, Mode=TwoWay}"
+                     SelectionMode="Single"
+                     Margin="10">
+
+                     <CollectionView.EmptyView>
+                            <Label Text="No Sequences" HorizontalOptions="Center" VerticalOptions="Center"
+                                   FontSize="24" FontAttributes="Bold" />
+                     </CollectionView.EmptyView>
+
+                     <CollectionView.ItemsLayout>
+                            <LinearItemsLayout Orientation="Vertical" ItemSpacing="2" />
+                     </CollectionView.ItemsLayout>
+
+                     <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:MPHSequence">
+                                   <Border Stroke="Gray"
+                                           StrokeThickness="1"
+                                           StrokeShape="RoundRectangle 10"
+                                           Padding="10,5">
+                                          <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10">
+                                                 <Label Grid.Column="0" Text="{Binding FormattedDuration}" FontSize="14" />
+                                                 <Label Grid.Column="1" Text="🔊" FontSize="14" IsVisible="{Binding HasAudio}" />
+                                                 <Label Grid.Column="2" Text="{Binding DisplayName}" FontSize="14" FontAttributes="Bold" />
+                                          </Grid>
+                                   </Border>
+                            </DataTemplate>
+                     </CollectionView.ItemTemplate>
+              </CollectionView>
+
               <!-- Bluetooth Status Icon -->
-              <Grid Grid.Row="1" ColumnDefinitions="Auto, *, Auto">
+              <Grid Grid.Row="2" ColumnDefinitions="Auto, *, Auto">
                      <Label Grid.Column="0" Text="{Binding BleStatusMessage, StringFormat='BLE Status: {0}'}"
                             FontSize="14"
                             VerticalOptions="Center"

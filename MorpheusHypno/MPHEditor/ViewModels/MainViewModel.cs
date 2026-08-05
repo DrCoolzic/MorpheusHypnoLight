@@ -81,6 +81,20 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     public partial MPHCollection? SelectedCollection { get; set; }
 
+    [ObservableProperty]
+    public partial ObservableCollection<MPHSequence> Sequences { get; set; } = [];
+
+    [ObservableProperty]
+    public partial MPHSequence? SelectedSequence { get; set; }
+
+    partial void OnSelectedCollectionChanged(MPHCollection? value)
+    {
+        Sequences = value is not null
+            ? new ObservableCollection<MPHSequence>(value.SequenceItems)
+            : [];
+        SelectedSequence = Sequences.FirstOrDefault();
+    }
+
     //[ObservableProperty]
     //public partial string CurrentSequence { get; set; } = "None";
 

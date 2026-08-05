@@ -122,6 +122,27 @@ public class MPHSequence : MPHElement
             return 0;
         }
     }
+
+    /// <summary>
+    /// Display name for this sequence, taken from the metadata name items.
+    /// Falls back to the directory name if no name is available.
+    /// </summary>
+    public string DisplayName
+    {
+        get
+        {
+            if (Metadata.NameItems.TryGetValue("en", out var name) && !string.IsNullOrWhiteSpace(name))
+                return name;
+
+            var firstNonEmpty = Metadata.NameItems.Values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+            return firstNonEmpty ?? DirName;
+        }
+    }
+
+    /// <summary>
+    /// Duration of the sequence formatted as "mm:ss".
+    /// </summary>
+    public string FormattedDuration => TimeSpan.FromSeconds(Metadata.Duration).ToString(@"mm\:ss");
 }
 
 /// <summary>
