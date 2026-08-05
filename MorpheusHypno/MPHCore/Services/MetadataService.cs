@@ -31,7 +31,7 @@ public class MetadataService(ILogger<MetadataService> logger)
             // This section uses the new metadata format (found metadata files)
             // ****************************************************************
             SequenceMetadata metadata = await JsonBase.LoadJsonFileAsync<SequenceMetadata>(metadataFile);
-            if (metadata.Version < ProgramMetadata.MetadataVersion) // unless new version
+            if (metadata.Version < SequenceMetadata.MetadataVersion) // unless new version
                 _logger?.LogWarning("The metadata file {} uses an older version {}", metadataFile, metadata.Version);
 
             return metadata;
@@ -128,7 +128,7 @@ public class MetadataService(ILogger<MetadataService> logger)
                 },
                 DurationSeconds = sequence.DurationSeconds,
                 Parent = parent ?? string.Empty,
-                Version = ProgramMetadata.MetadataVersion,
+                Version = SequenceMetadata.MetadataVersion,
                 LastUpdated = DateTime.Now
             };
         }
@@ -156,7 +156,7 @@ public class MetadataService(ILogger<MetadataService> logger)
                 Level = 0,
                 DurationSeconds = sequence.DurationSeconds,
                 Parent = parent ?? string.Empty,
-                Version = ProgramMetadata.MetadataVersion,
+                Version = SequenceMetadata.MetadataVersion,
                 LastUpdated = DateTime.Now
             };
         }
@@ -174,59 +174,6 @@ public class MetadataService(ILogger<MetadataService> logger)
     }
 
 
-
-    /// <summary>
-    /// Reads all metadata files in a sequenceDir and combines them into a LibMetadataContent object
-    /// </summary>
-    /// <param name="directory">Directory containing metadata_xx.json files</param>
-    /// <returns>Combined metadata sb from all language files</returns>
-    public async Task<ProgramMetadata> LoadProgramMetadataAsync(string directory)
-    {
-        try
-        {
-            // Get metadata
-            var metadataFile = Path.Combine(directory, "metadata.json");
-            if (File.Exists(metadataFile))
-            {
-                var metadata = await JsonBase.LoadJsonFileAsync<ProgramMetadata>(metadataFile);
-                if (metadata.Version >= ProgramMetadata.MetadataVersion) // unless new version
-                    return metadata;
-            }
-
-            _logger?.LogWarning("Need to create/update metadata for program {}", directory);
-            var content = new ProgramMetadata
-            {
-                Parent = Directory.GetParent(directory)?.Name ?? string.Empty,
-                NameItems = new Dictionary<string, string>
-                    {
-                        { "en", Path.GetFileName(directory) },
-                        { "fr", Path.GetFileName(directory) }
-                    },
-                SummaryItems = new Dictionary<string, string>
-                    {
-                        { "en", "Sorry no description" },
-                        { "fr", "Désolé pas de description" }
-                    },
-                Version = ProgramMetadata.MetadataVersion,
-                LastUpdated = DateTime.Now
-            };
-            // if metafile did not exist we create one for further use
-            await content.SaveJsonFileAsync(metadataFile);
-            return content;
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError("Error reading metadata content from {sequenceDir}: {ex.Message}", directory, ex.Message);
-            return new ProgramMetadata();
-        }
-    }
-
-    public async Task SaveProgramMetadataAsync(ProgramMetadata metadata, string programDir)
-    {
-        var metadataFile = Path.Combine(programDir, "metadata.json");
-        _logger?.LogInformation("Saving metadata for program {}", programDir);
-        await metadata.SaveJsonFileAsync(metadataFile);
-    }
 
     public static async Task<SequenceMetadata> LoadPlaylistMetadataAsync(string fileName)
     {

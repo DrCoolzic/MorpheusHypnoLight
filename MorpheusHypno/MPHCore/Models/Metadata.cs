@@ -6,26 +6,26 @@ namespace MPHCore.Models;
 
 
 /// <summary>
-/// Contains metadata for MPHCollection and MPHSequence objects.
+/// Metadata for MPHSequence objects.
 /// </summary>
-public class ProgramMetadata : JsonBase
+public class SequenceMetadata : JsonBase
 {
     public static readonly float MetadataVersion = 1.0F;
 
     /// <summary>
-    /// the parent directory of the object.
+    /// the parent directory of the sequence.
     /// </summary>
     [JsonProperty("parent")]
     public string Parent { get; set; } = string.Empty;
 
     /// <summary>
-    /// The name of the object as a dictionary of language keys and values.
+    /// The name of the sequence as a dictionary of language keys and values.
     /// </summary>
     [JsonProperty("name")]
     public Dictionary<string, string> NameItems { get; set; } = new() { { "en", "" }, { "fr", "" } };
 
     /// <summary>
-    /// A summary description of the object as a dictionary of language keys and values.
+    /// A summary description of the sequence as a dictionary of language keys and values.
     /// </summary>
     [JsonProperty("summary")]
     public Dictionary<string, string> SummaryItems { get; set; } = new() { { "en", "" }, { "fr", "" } };
@@ -34,29 +34,21 @@ public class ProgramMetadata : JsonBase
     /// the version number of the metadata format
     /// </summary>
     [JsonProperty("version")]
-    public float Version { get; set; } = ProgramMetadata.MetadataVersion;
+    public float Version { get; set; } = SequenceMetadata.MetadataVersion;
 
     /// <summary>
-    /// The last time the Program or the Sequence was updated.
+    /// The last time the sequence was updated.
     /// </summary>
     [JsonProperty("last_updated")]
     public DateTime LastUpdated { get; set; }
 
     /// <summary>
-    /// Indicates whether the program or sequence is protected from modifications.
-    /// When true, prevents adding/deleting sequences in programs and editing sequences.
+    /// Indicates whether the sequence is protected from modifications.
+    /// When true, prevents editing the sequence.
     /// </summary>
     [JsonProperty("protected")]
     public bool IsProtected { get; set; } = true;
-}
 
-
-/// <summary>
-/// Extended metadata specific to sequences, containing additional properties like duration, category, etc.
-/// Inherits from ProgramMetadata to maintain compatibility with the base metadata system.
-/// </summary>
-public class SequenceMetadata : ProgramMetadata
-{
     /// <summary>
     /// Detailed description of the sequence in multiple languages.
     /// Keys are language codes (e.g., "en", "fr"), values are the descriptions.
