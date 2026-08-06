@@ -30,6 +30,7 @@ All command messages are written to the command characteristic. The first byte i
 | `0x03` | `STOP` | none | Stop and return to the beginning. |
 | `0x04` | `SEEK` | 4 bytes: position_ms | Jump to the absolute position in milliseconds. |
 | `0x05` | `BRIGHTNESS` | 1 byte: 0–100 | Set the global brightness multiplier. |
+| `0x06` | `SET_MODE` | 1 byte: `0x00` player, `0x01` editor | Set the device operating mode. In player mode `PAUSE` turns the LEDs off; in editor mode `PAUSE` freezes the current LED state. |
 | `0x10` | `LOAD_START` | 4 bytes: total_size | Start a new full-sequence transfer. |
 | `0x11` | `LOAD_CHUNK` | 2 bytes: offset + data | Place data bytes at the given offset in the transfer buffer. |
 | `0x12` | `LOAD_COMMIT` | none | Validate and load the transferred full sequence. |

@@ -41,9 +41,13 @@ static bool sequence_playing = false;
 /** @brief Whether playback is currently paused (step state is preserved). */
 static bool sequence_paused = false;
 
-/** @brief Whether the loaded sequence is a single zero-duration realtime step.
+/**
+ * @brief Whether the loaded sequence is a single zero-duration realtime step.
  */
 static bool sequence_realtime = false;
+
+/** @brief Current pause behaviour mode. */
+static sequence_mode_t s_sequence_mode = SEQUENCE_MODE_EDITOR;
 
 /** @brief Internal periodic timer that drives playback. */
 static esp_timer_handle_t sequence_timer = NULL;
@@ -435,6 +439,14 @@ esp_err_t sequence_replace_step(uint32_t step_index,
   return ESP_OK;
 }
 
+/**
+ * @brief Set the operating mode used when pausing playback.
+ *
+ * @param[in] mode SEQUENCE_MODE_PLAYER turns the LEDs off on pause;
+ *                 SEQUENCE_MODE_EDITOR freezes the current LED state.
+ */
+void sequence_set_mode(sequence_mode_t mode) { s_sequence_mode = mode; }
+
 esp_err_t sequence_play(void) {
   taskENTER_CRITICAL(&sequence_lock);
   if (sequence_step_count == 0U || sequence_playing) {
@@ -509,6 +521,19 @@ esp_err_t sequence_pause(void) {
     for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
          oscillator_id++) {
       led_engine_pause_modulators(oscillator_id);
+    }
+    if (s_sequence_mode == SEQUENCE_MODE_PLAYER) {
+      /* led_engine_all_off() only writes the hardware once.  The 1 kHz
+       * led_engine_tick() keeps re-evaluating the modulators and would
+       * immediately turn the LEDs back on.  Force every oscillator to a
+       * static zero frequency/brightness so the engine produces black frames
+       * until play() re-applies the current step. */
+      for (uint8_t oscillator_id = 0; oscillator_id < OSCILLATOR_COUNT;
+           oscillator_id++) {
+        (void)led_engine_set_frequency(oscillator_id, 0.0f);
+        (void)led_engine_set_brightness(oscillator_id, 0.0f);
+      }
+      (void)led_engine_all_off();
     }
   }
 

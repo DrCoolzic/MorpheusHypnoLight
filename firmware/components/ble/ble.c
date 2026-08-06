@@ -177,6 +177,16 @@ static void mhl_process_command(uint16_t conn, const uint8_t *data,
     }
     break;
 
+  case 0x06U: /* SET_MODE */
+    if (len < 2U || data[1] > 1U) {
+      result = 0x02U;
+    } else {
+      sequence_set_mode(data[1] == 0U ? SEQUENCE_MODE_PLAYER
+                                      : SEQUENCE_MODE_EDITOR);
+      result = 0x00U;
+    }
+    break;
+
   case 0x10U: /* LOAD_START */
     if (len < 5U) {
       result = 0x02U;

@@ -25,6 +25,17 @@
 #define SEQUENCE_STEP_TICK_PERIOD_MS 100U
 
 /**
+ * @brief Operating mode for pause behaviour.
+ *
+ * - PLAYER: pause turns off the LEDs.
+ * - EDITOR: pause freezes the current LED state (the LEDs remain on).
+ */
+typedef enum {
+  SEQUENCE_MODE_PLAYER = 0U,
+  SEQUENCE_MODE_EDITOR = 1U,
+} sequence_mode_t;
+
+/**
  * @brief Per-oscillator data for one sequence step.
  *
  * The modulator configurations are evaluated by `led_engine` at 1 kHz. The
@@ -105,6 +116,14 @@ esp_err_t sequence_replace_step(uint32_t step_index,
  * @return ESP_OK on success.
  */
 esp_err_t sequence_play(void);
+
+/**
+ * @brief Set the operating mode used when pausing playback.
+ *
+ * @param[in] mode SEQUENCE_MODE_PLAYER turns the LEDs off on pause;
+ *                 SEQUENCE_MODE_EDITOR freezes the current LED state.
+ */
+void sequence_set_mode(sequence_mode_t mode);
 
 /**
  * @brief Pause playback without changing the current step.
