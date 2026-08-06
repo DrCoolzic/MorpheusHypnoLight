@@ -5,6 +5,15 @@ using MPHCore.Models;
 namespace MPHEditor.Services;
 
 /// <summary>
+/// Operating modes of the Morpheus HypnoLight device.
+/// </summary>
+public enum BleMode : byte
+{
+    Player = 0,
+    Editor = 1
+}
+
+/// <summary>
 /// Service for managing Bluetooth Low Energy (BLE) communications with Morpheus HypnoLight devices.
 /// Handles device discovery, connection management, and command transmission.
 /// </summary>
@@ -128,6 +137,14 @@ public interface IBleService
     /// </summary>
     /// <param name="brightness">The brightness percentage.</param>
     Task SendBrightnessAsync(int brightness);
+
+    /// <summary>
+    /// Sets the device operating mode (Player or Editor).
+    /// In Player mode, pausing playback turns the LEDs off.
+    /// In Editor mode, pausing playback leaves the LEDs on.
+    /// </summary>
+    /// <param name="mode">The desired operating mode.</param>
+    Task SetModeAsync(BleMode mode);
 
     /// <summary>
     /// Writes a raw byte buffer to the command characteristic.

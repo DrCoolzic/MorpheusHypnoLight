@@ -9,15 +9,31 @@ public partial class PlayerPage : ContentPage
     private readonly ILogger<PlayerPage> _logger;
     private readonly PlayerViewModel _playerViewModel;
     private readonly ISequencePlayerService _sequencePlayerService;
+    private readonly IBleService _bleService;
 
-    public PlayerPage(PlayerViewModel viewModel, ILogger<PlayerPage> logger, ISequencePlayerService sequencePlayerService)
+    public PlayerPage(PlayerViewModel viewModel, ILogger<PlayerPage> logger, ISequencePlayerService sequencePlayerService, IBleService bleService)
     {
         InitializeComponent();
         _logger = logger;
         _playerViewModel = viewModel;
         _sequencePlayerService = sequencePlayerService;
+        _bleService = bleService;
         BindingContext = viewModel;
         _logger.LogInformation("PlayerPage created successfully");
+    }
+
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        _logger.LogInformation("PlayerPage OnAppearing: Setting player mode");
+        try
+        {
+            await _bleService.SetModeAsync(BleMode.Player);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to set player mode");
+        }
     }
 
     private void Slider_DragStarted(object sender, EventArgs e)

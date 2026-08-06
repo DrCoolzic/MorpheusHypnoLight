@@ -939,6 +939,24 @@ public class BleService : IBleService
     }
 
     /// <summary>
+    /// Sends the <c>SET_MODE</c> command (opcode <c>0x06</c>) to switch the device mode.
+    /// </summary>
+    /// <param name="mode">The desired operating mode.</param>
+    /// <remarks>
+    /// In Player mode, pausing playback turns the LEDs off.
+    /// In Editor mode, pausing playback freezes the current LED state (LEDs remain on).
+    /// </remarks>
+    public async Task SetModeAsync(BleMode mode)
+    {
+        if (!IsConnected || MHLCommandChannel is null)
+            return;
+
+        _logger.LogInformation("Sending SET_MODE command: {mode}", mode);
+        var command = new byte[] { 0x06, (byte)mode };
+        await WriteBufferAsync(MHLCommandChannel, command);
+    }
+
+    /// <summary>
     /// Writes a data buffer to a BLE characteristic with a small inter-write delay.
     /// </summary>
     /// <param name="characteristic">The target BLE characteristic.</param>
