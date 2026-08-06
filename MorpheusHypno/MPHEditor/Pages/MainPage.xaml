@@ -9,6 +9,7 @@
 
     <ContentPage.Resources>
         <converters:HtmlToFormattedStringConverter x:Key="HtmlToFormattedStringConverter" />
+        <converters:RatingToStarsConverter x:Key="RatingToStarsConverter" />
     </ContentPage.Resources>
 
     <Grid RowDefinitions="Auto, *, Auto">
@@ -48,11 +49,14 @@
                                            StrokeShape="RoundRectangle 10"
                                            Padding="10,5">
                         <VerticalStackLayout Spacing="8">
-                            <Grid ColumnDefinitions="45,25,*" ColumnSpacing="10">
+                            <Grid ColumnDefinitions="45,25,*,Auto" ColumnSpacing="10">
                                 <Label Grid.Column="0" Text="{Binding FormattedDuration}" FontSize="14"
                                                                HorizontalTextAlignment="End" />
                                 <Label Grid.Column="1" Text="🔊" FontSize="14" IsVisible="{Binding HasAudio}" />
                                 <Label Grid.Column="2" Text="{Binding DisplayName}" FontSize="14" FontAttributes="Bold" />
+                                <ContentView Grid.Column="3"
+                                             Content="{Binding Userdata.Rating, Converter={StaticResource RatingToStarsConverter}}"
+                                             VerticalOptions="Center" HorizontalOptions="End" />
                             </Grid>
 
                             <VerticalStackLayout IsVisible="{Binding IsExpanded}" Spacing="8">

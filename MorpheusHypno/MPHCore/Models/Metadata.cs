@@ -1,5 +1,7 @@
 // Ignore Spelling: Metadata
 
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using Newtonsoft.Json;
 
 namespace MPHCore.Models;
@@ -78,11 +80,37 @@ public class SequenceMetadata : JsonBase
 
 
 
-public class Userdata : JsonBase
+public class Userdata : JsonBase, INotifyPropertyChanged
 {
+    private int _rating;
+
     /// <summary>
     /// User rating or quality score for the sequence.
     /// </summary>
     [JsonProperty("rating")]
-    public int Rating { get; set; } = 0; // User rating, not serialized
+    public int Rating
+    {
+        get => _rating;
+        set
+        {
+            if (_rating == value)
+                return;
+
+            _rating = value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// Occurs when a property value changes.
+    /// </summary>
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>
+    /// Raises the <see cref="PropertyChanged"/> event for the given property.
+    /// </summary>
+    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 }
