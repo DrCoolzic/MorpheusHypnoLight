@@ -159,6 +159,22 @@ public class MPHSequence : MPHElement
         }
     }
 
+
+    /// <summary>
+    /// Summary description for this sequence, taken from the metadata summary items.
+    /// Falls back to the first non-empty entry if no English summary is available.
+    /// </summary>
+    public string DisplayDetail
+    {
+        get
+        {
+            if (Metadata.DetailItems.TryGetValue("en", out var detail) && !string.IsNullOrWhiteSpace(detail))
+                return detail;
+
+            return Metadata.SummaryItems.Values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v)) ?? string.Empty;
+        }
+    }
+
     /// <summary>
     /// UI-only state indicating whether this sequence is expanded in the sequence list.
     /// Not persisted.

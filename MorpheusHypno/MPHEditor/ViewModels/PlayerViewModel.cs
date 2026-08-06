@@ -190,9 +190,6 @@ public partial class PlayerViewModel : ObservableObject
     public partial string Name { get; set; } = string.Empty;
 
     [ObservableProperty]
-    public partial bool HasAudio { get; set; } = false;
-
-    [ObservableProperty]
     public partial Sequence? Sequence { get; set; }
 
     [ObservableProperty]
@@ -252,8 +249,8 @@ public partial class PlayerViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(AudioIcon))]
-    public partial bool AudioOn { get; set; } = true;
-    public object AudioIcon => AudioOn ? "sound.png" : "nosound.png";
+    public partial bool HasAudio { get; set; } = false;
+    public object AudioIcon => HasAudio ? "sound.png" : "nosound.png";
 
     [ObservableProperty]
     public partial int Rating { get; set; } = -1;
@@ -413,16 +410,14 @@ public partial class PlayerViewModel : ObservableObject
                 value.DisplayName, Sequence.DurationSeconds);
 
             Name = value.DisplayName;
-            Detail = value.DisplaySummary;
+            Detail = value.DisplayDetail;
             Rating = value.Userdata.Rating;
+            HasAudio = value.HasAudio;
+            PlayerDuration = Sequence.DurationSeconds;
 
             // Set the sequence into the player service
-            HasAudio = await _sequencePlayerService.SetPlayerAsync(value) != string.Empty;
-
-            // Set duration from sequence data (this should now be managed by the service)
-            PlayerDuration = Sequence.DurationSeconds;
+            _ =await _sequencePlayerService.SetPlayerAsync(value) != string.Empty;
             PlayerCurrentPosition = 0;
-
             _sequenceChangeCompletion.TrySetResult(true);
         }
         catch (Exception ex)
