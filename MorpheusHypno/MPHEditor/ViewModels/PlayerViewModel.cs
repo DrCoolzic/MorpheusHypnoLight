@@ -29,6 +29,7 @@ public partial class PlayerViewModel : ObservableObject
 
     private TaskCompletionSource<bool>? _sequenceChangeCompletion;
     private MPHSequence? _currentMphSequence;
+    private CancellationTokenSource? _brightnessDebounceCts;
 
     // /////////////////////////////////////////////////
     // Constructor
@@ -489,12 +490,36 @@ public partial class PlayerViewModel : ObservableObject
 
     public ICommand PlayPausePlayerCommand { get; private set; }
 
+    /// <summary>
+    /// Debounce delay before sending a BLE brightness command, to avoid flooding
+    /// the device while the user drags the slider.
+    /// </summary>
+    private const int BrightnessDebounceMs = 200;
+
     partial void OnBrightnessValueChanged(int value)
+    {
+        _brightnessDebounceCts?.Cancel();
+        _brightnessDebounceCts?.Dispose();
+        _brightnessDebounceCts = new CancellationTokenSource();
+
+        _ = DebouncedSendBrightnessAsync(value, _brightnessDebounceCts.Token);
+    }
+
+    private async Task DebouncedSendBrightnessAsync(int value, CancellationToken token)
     {
         try
         {
-            _ = _bleService.SendBrightnessAsync(value);
+            await Task.Delay(BrightnessDebounceMs, token);
+
+            if (token.IsCancellationRequested)
+                return;
+
+            await _bleService.SendBrightnessAsync(value);
             _logger.LogInformation("Brightness changed to: {value}", value);
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when a newer brightness value arrives before the delay expires.
         }
         catch (Exception ex)
         {
