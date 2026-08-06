@@ -113,5 +113,17 @@ Deferred/not implemented in this pass:
   not needed since `MPHSequence`/`Userdata` are shared references between `MainViewModel`'s
   `Sequences` collection and the `PlayerViewModel`, so rating changes are reflected in the
   same objects automatically (no explicit list refresh required with current UI).
-- Not yet tested on a real device/emulator (BLE brightness, play/pause/stop, slider drag
-  seek, rating persistence, loop/playlist-advance) - should be tested next session.
+- Tested on a real Android device (2026-08-06): PlayerPage navigation, BLE brightness,
+  play/pause/stop, audio playback, slider drag seek, and rating persistence/display all work.
+  Remaining: loop/playlist-advance behavior and any final polish.
+
+## Player mode functional milestone (2026-08-06)
+
+The player mode can be considered fully functional after end-to-end validation on Android:
+- Editor-only controls are correctly hidden in player mode (no Realtime Editor flyout, no edit button).
+- MainPage -> PlayerPage navigation passes the selected `MPHSequence` and loads it.
+- BLE connection, sequence upload, playback, and audio are working.
+- Brightness slider is debounced to avoid BLE flooding.
+- User rating is displayed on MainPage and updated from PlayerPage.
+
+Build status: solution builds successfully and has been validated on device.

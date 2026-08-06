@@ -47,6 +47,7 @@
                     <Border Stroke="Gray"
                                            StrokeThickness="1"
                                            StrokeShape="RoundRectangle 10"
+                                           BackgroundColor="#303030"
                                            Padding="10,5">
                         <VerticalStackLayout Spacing="8">
                             <Grid ColumnDefinitions="45,25,*,Auto" ColumnSpacing="10">
