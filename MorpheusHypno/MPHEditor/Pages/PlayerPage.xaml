@@ -1,17 +1,19 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:viewmodel="clr-namespace:MPEditor.ViewModel"
-             xmlns:converters="clr-namespace:MPMaui.Converters;assembly=MPMaui"
-             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
-             x:DataType="viewmodel:PlayerViewModel"
-             x:Class="MPEditor.View.PlayerPage"
-             Style="{StaticResource GradientPageStyle}"
+             xmlns:vm="clr-namespace:MPHEditor.ViewModels;assembly=MPHEditor"
+             xmlns:converters="clr-namespace:MPHEditor.Converters;assembly=MPHEditor"
+             x:DataType="vm:PlayerViewModel"
+             x:Class="MPHEditor.Pages.PlayerPage"
              Title="Play Sequence">
 
     <ContentPage.Resources>
         <ResourceDictionary>
-            <!-- All converters are declared globally in App.xaml -->
+            <converters:PlayImageConverter x:Key="PlayImageConverter" />
+            <converters:RatingToStarsConverter x:Key="RatingToStarsConverter" />
+            <converters:StringToBoolConverter x:Key="StringToBoolConverter" />
+            <converters:NullToBoolConverter x:Key="NullToBoolConverter" />
+            <converters:HtmlToFormattedStringConverter x:Key="HtmlToFormattedStringConverter" />
         </ResourceDictionary>
     </ContentPage.Resources>
 
@@ -25,116 +27,84 @@
 
         <!-- Display Sequence Info -->
         <Border Grid.Row="0" IsVisible="{Binding DisplayText}"
-                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray500}}"
+                Stroke="Gray"
                 StrokeThickness="1"
                 StrokeShape="RoundRectangle 10"
-                Opacity="{AppThemeBinding Light=1, Dark=0.8}"
+                BackgroundColor="#303030"
                 Padding="0" Margin="10,10,10,0" >
-            <Border.Background>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                    <GradientStopCollection>
-                        <GradientStop Color="{Binding GradientStops[0]}" Offset="0.0" />
-                        <GradientStop Color="{Binding GradientStops[1]}" Offset="0.5" />
-                        <GradientStop Color="{Binding GradientStops[2]}" Offset="1.0" />
-                    </GradientStopCollection>
-                </LinearGradientBrush>
-            </Border.Background>
-            <Grid RowDefinitions="auto,auto,auto,auto, *" Padding="10" ColumnDefinitions="2*">
+            <Grid RowDefinitions="auto,auto,auto, *" Padding="10" ColumnDefinitions="2*">
                 <!--Title-->
                 <Label Grid.Row="0"
-                       Text="{Binding Name, Converter={StaticResource StringCleanupConverter}}"
-                       Style="{StaticResource DescriptionTitleLabel}"
-                       FontSize="20" HorizontalOptions="Start" Margin="0,5,0,5"
+                       Text="{Binding Name}"
+                       FontSize="20" FontAttributes="Bold" HorizontalOptions="Start" Margin="0,5,0,5"
                        VerticalOptions="Center" />
 
                 <!--Metadata (Author, Version, CreatedAt) - only visible if at least one has a value-->
                 <HorizontalStackLayout Grid.Row="1" IsVisible="{Binding HasMetadata}" Margin="0,0,0,5">
                     <Label Text="Author:" FontAttributes="Bold" IsVisible="{Binding Author, Converter={StaticResource StringToBoolConverter}}" Margin="0,0,5,0"/>
                     <Label Text="{Binding Author}" IsVisible="{Binding Author, Converter={StaticResource StringToBoolConverter}}" Margin="0,0,15,0"/>
-                    
+
                     <Label Text="Version:" FontAttributes="Bold" IsVisible="{Binding Version, Converter={StaticResource StringToBoolConverter}}" Margin="0,0,5,0"/>
                     <Label Text="{Binding Version}" IsVisible="{Binding Version, Converter={StaticResource StringToBoolConverter}}" Margin="0,0,15,0"/>
-                    
+
                     <Label Text="Created:" FontAttributes="Bold" IsVisible="{Binding CreatedAt, Converter={StaticResource NullToBoolConverter}}" Margin="0,0,5,0"/>
                     <Label Text="{Binding FormattedCreatedAt}" IsVisible="{Binding CreatedAt, Converter={StaticResource NullToBoolConverter}}"/>
                 </HorizontalStackLayout>
 
-                <!-- Time, Category, Level, Audio -->
+                <!-- Time, Audio, Rating -->
                 <Grid Grid.Row="2" RowSpacing="5"
                       ColumnDefinitions="70, 30, *, 40, 40"
-                      RowDefinitions="auto,auto,auto,auto,auto">
-                    <Label Grid.Row="0" Grid.Column="0" HorizontalOptions="Start" TextColor="Black"
+                      RowDefinitions="auto,auto,auto">
+                    <Label Grid.Row="0" Grid.Column="0" HorizontalOptions="Start"
                            Text="Time:" />
                     <Label Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2"
-                           Text="{Binding FormattedEndTime, StringFormat='{0:0.#}'}"
+                           Text="{Binding FormattedEndTime}"
                            Margin="5,0,5,0"
-                           Style="{StaticResource DescriptionTitleLabel}"/>
+                           FontAttributes="Bold"/>
 
-                    <Label Grid.Row="1" Grid.Column="0" HorizontalOptions="Start" TextColor="Black"
-                           Text="Category:"/>
-                    <Image Grid.Row="1" Grid.Column="1" 
-                           Style="{StaticResource IconImage}"
-                           Source="{Binding Category, Converter={StaticResource GenericImageConverter}, ConverterParameter='Category'}" />
-                    <Label Grid.Row="1" Grid.Column="2" HorizontalOptions="Start"
-                           Text="{Binding CategoryName}" Margin="5,0,10,0"
-                           Style="{StaticResource DescriptionTitleLabel}"/>
-
-                    <Label Grid.Row="2" Grid.Column="0" HorizontalOptions="Start"  TextColor="Black"
-                           Text="Level:"/>
-                    <Image Grid.Row="2" Grid.Column="1" 
-                           Style="{StaticResource IconImage}"
-                           Source="{Binding Level, Converter={StaticResource GenericImageConverter}, ConverterParameter='Level'}" />
-                    <Label Grid.Row="2" Grid.Column="2"
-                           Text="{Binding LevelName}" Margin="5,0,10,0" Style="{StaticResource DescriptionTitleLabel}"></Label>
-
-                    <Label Grid.Row="3" Grid.Column="0" HorizontalOptions="Start" TextColor="Black"
+                    <Label Grid.Row="1" Grid.Column="0" HorizontalOptions="Start"
                            Text="Audio:"/>
-                    <Image Grid.Row="3" Grid.Column="1" 
-                           Style="{StaticResource IconImage}"
-                           Source="{Binding DmSequence.Audio, Converter={StaticResource GenericImageConverter}, ConverterParameter='Audio'}" />
+                    <Image Grid.Row="1" Grid.Column="1"
+                           Source="sound.png" WidthRequest="24" HeightRequest="24"
+                           IsVisible="{Binding HasAudio}" />
 
-                    <Label Grid.Row="4" Grid.Column="0" HorizontalOptions="Start" TextColor="Black"
+                    <Label Grid.Row="2" Grid.Column="0" HorizontalOptions="Start"
                            Text="Rating:"
                            VerticalOptions="Center"/>
-                    <ContentView Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2"
+                    <ContentView Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2"
                                  Content="{Binding Rating, Converter={StaticResource RatingToStarsConverter}}" />
-                    <Image Grid.Row="4" Grid.Column="3" Style="{StaticResource IconImage}" Source="minus_sign.png" Margin="5,0,5,0" WidthRequest="40">
+                    <Image Grid.Row="2" Grid.Column="3" Source="minus_sign.png" Margin="5,0,5,0" WidthRequest="40">
                         <Image.GestureRecognizers>
-                            <TapGestureRecognizer 
-                                           Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodel:PlayerViewModel}}, x:DataType=viewmodel:PlayerViewModel, Path=MinusRatingCommand}"
-                                           CommandParameter="{Binding .}"/>
+                            <TapGestureRecognizer Command="{Binding MinusRatingCommand}"/>
                         </Image.GestureRecognizers>
                     </Image>
-                    <Image Grid.Row="4" Grid.Column="4" Style="{StaticResource IconImage}" Source="plus_sign.png" Margin="5,0,5,0" WidthRequest="40">
+                    <Image Grid.Row="2" Grid.Column="4" Source="plus_sign.png" Margin="5,0,5,0" WidthRequest="40">
                         <Image.GestureRecognizers>
-                            <TapGestureRecognizer 
-                                           Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodel:PlayerViewModel}}, x:DataType=viewmodel:PlayerViewModel, Path=PlusRatingCommand}"
-                                           CommandParameter="{Binding .}"/>
+                            <TapGestureRecognizer Command="{Binding PlusRatingCommand}"/>
                         </Image.GestureRecognizers>
                     </Image>
                 </Grid>
 
                 <!-- Detail -->
-                <ScrollView Grid.Row="4">
-                    <Label Grid.Row="0" Text="{Binding Detail}"  Margin="0,20,0,0" Style="{StaticResource HtmlDetailLabel}" />
+                <ScrollView Grid.Row="3">
+                    <Label Grid.Row="0" FormattedText="{Binding Detail, Converter={StaticResource HtmlToFormattedStringConverter}}" Margin="0,20,0,0" />
                 </ScrollView>
             </Grid>
         </Border>
 
         <!-- Alternative Display Clock -->
         <Border Grid.Row="0" IsVisible="{Binding DisplayClock}"
-                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray500}}"
+                Stroke="Gray"
                 StrokeThickness="1"
                 StrokeShape="RoundRectangle 10"
-                BackgroundColor="{AppThemeBinding Light=#44b, Dark=#303030}"
+                BackgroundColor="#303030"
                 Margin="10" >
             <Grid IsVisible="{Binding DisplayClock}"
                   Grid.ColumnDefinitions="*"
-                  Grid.RowDefinitions="auto, auto,auto,auto,auto,auto, Auto, Auto, *">
+                  Grid.RowDefinitions="auto, auto,auto,auto,auto,auto, *">
 
                 <Label Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3"
-                    Text="{Binding Name, Converter={StaticResource StringCleanupConverter}}"
-                    Style="{StaticResource DescriptionTitleLabel}" TextColor="{AppThemeBinding Light={StaticResource Black}, Dark={StaticResource White}}"
+                    Text="{Binding Name}"
                     FontSize="30" FontAttributes="Bold"
                     HorizontalOptions="Center"
                     Margin="10">
@@ -162,13 +132,6 @@
                 <Label Grid.Row="6" Grid.Column="1"
                    Text="{Binding FormattedPlayerRemainingTime}" 
                    FontSize="40" FontAttributes="Bold" HorizontalOptions="Center"/>
-                <Label Grid.Row="7" Grid.Column="1" 
-                   Text="Frequencies"
-                   Margin="0,20,0,-10"
-                   FontSize="24" HorizontalTextAlignment="Center"/>
-                <Label Grid.Row="8" Grid.Column="1"
-                   Text="{Binding Frequencies}" 
-                   FontSize="40" FontAttributes="Bold" HorizontalTextAlignment="Center"/>
             </Grid>
         </Border>
 
@@ -219,7 +182,7 @@
         </Grid>
 
         <!-- Player -->
-        <Grid Grid.Row="3" Margin="10,0,10,0" ColumnDefinitions="auto,auto,*,auto,auto,auto,*,auto,auto">
+        <Grid Grid.Row="3" Margin="10,0,10,0" ColumnDefinitions="auto,auto,*,auto,auto,auto,*,auto">
             <!-- Delay button -->
             <ImageButton Grid.Column="0" WidthRequest="45" HeightRequest="48" Padding="5"
                          VerticalOptions="Center" HorizontalOptions="Start"
@@ -258,21 +221,12 @@
                     WidthRequest="45" HeightRequest="48"
                     Command="{Binding StopPlayerCommand}" Margin="5,5,5,5"/>
 
-            <!-- Language Icon -->
-            <ImageButton Grid.Column="7" Margin="0,0,5,0" WidthRequest="45" HeightRequest="48" Padding="3"
-                         VerticalOptions="Center" HorizontalOptions="End"
-                         Source="{Binding CurrentLanguageIcon}"
-                         Command="{Binding ShowLanguagePickerCommand}"
-                         ToolTipProperties.Text="Change language"
-                         BorderColor="Blue" BorderWidth="2" CornerRadius="5" BackgroundColor="#9999FF">
-            </ImageButton>
-
             <!-- Bluetooth & Activity -->
-            <ImageButton Grid.Column="8" Margin="0" WidthRequest="45" HeightRequest="48" Padding="3" VerticalOptions="Center"
+            <ImageButton Grid.Column="7" Margin="0" WidthRequest="45" HeightRequest="48" Padding="3" VerticalOptions="Center"
                          Source="{Binding DmIcon}" HorizontalOptions="End"
                          BorderColor="Blue" BorderWidth="2" CornerRadius="5" BackgroundColor="#9999FF">
             </ImageButton>
-            <ActivityIndicator Grid.Column="8" 
+            <ActivityIndicator Grid.Column="7" 
                                IsRunning="{Binding IsConnecting}"
                                HeightRequest="30" 
                                WidthRequest="30"

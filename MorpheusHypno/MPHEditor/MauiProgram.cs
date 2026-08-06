@@ -29,6 +29,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<MainPage>();
         builder.Services.AddSingleton<RealtimeEditorViewModel>();
         builder.Services.AddSingleton<RealtimeEditorPage>();
+        builder.Services.AddSingleton<PlayerViewModel>();
+        builder.Services.AddSingleton<PlayerPage>();
         builder.Services.AddSingleton<TestViewModel>();
         builder.Services.AddSingleton<TestPage>();
 

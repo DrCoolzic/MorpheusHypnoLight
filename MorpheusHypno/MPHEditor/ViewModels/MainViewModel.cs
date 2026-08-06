@@ -87,6 +87,13 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsEditorMode { get; set; }
 
+    /// <summary>
+    /// Whether playback should advance to the next sequence in the playlist when the
+    /// current one ends with loop mode enabled.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool PlaylistMode { get; set; }
+
     [ObservableProperty]
     public partial ObservableCollection<MPHCollection> Collections { get; set; } = [];
 
@@ -269,8 +276,11 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void GoToPlay(MPHSequence sequence)
+    private async Task GoToPlay(MPHSequence sequence)
     {
-        // TODO: implement navigation to the sequence player.
+        await Shell.Current.GoToAsync(nameof(Pages.PlayerPage), new Dictionary<string, object>
+        {
+            ["MPHSequence"] = sequence,
+        });
     }
 }

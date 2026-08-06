@@ -72,3 +72,46 @@ Decision history (see chat for full reasoning):
 
 Build status: solution builds successfully (`dotnet build MorpheusHypno.sln`) as of the
 last change in this session.
+
+## Session 2 (2026-08-06): PlayerPage adapted from old Morpheus project
+
+Copied `PlayerPage.xaml`, `PlayerPage.xaml.cs`, `PlayerViewModel.cs` from the old Morpheus
+project and adapted them in place (kept the same file names/locations):
+- `MPHEditor/ViewModels/PlayerViewModel.cs`: renamed namespaces (`MPEditor.ViewModel` ->
+  `MPHEditor.ViewModels`), `DmSequence` -> `MPHSequence`, `BaseViewModel` -> `ObservableObject`.
+  Removed Category/Level display, language picker/`ILanguageService`/`CustomPickerPopup`
+  dependency, and the `DmDSP`-based "Frequencies" clock readout entirely (none of that
+  infra exists in this project). Aligned with the existing `ISequencePlayerService` API
+  (`SetPlayerAsync`, `PausePlayerAsync` instead of the old sync `SetPlayer`/`PausePlayer`).
+  Uses `IMPHElementService.LoadSequenceAsync` to lazily load full `Sequence` content
+  on `[QueryProperty(nameof(MphSequence), "MPHSequence")]` change. Rating persists via
+  `Userdata.SaveJsonFileAsync` (already existed on `JsonBase`).
+  IMPORTANT FIX vs old code: `ISequencePlayerService` is a shared singleton in this project
+  (unlike the old project) - removed the erroneous `_sequencePlayerService.Dispose()` call
+  in `PlayerPage.xaml.cs`'s `OnDisappearing` (would have broken the service for the whole app).
+- `MPHEditor/ViewModels/MainViewModel.cs`: added `PlaylistMode` stub property (used by
+  `PlayerViewModel.SequenceEnded` for loop-vs-advance-to-next-playlist-item logic).
+  `GoToPlayCommand` now navigates via `Shell.Current.GoToAsync(nameof(PlayerPage), ...)`
+  passing the `MPHSequence` as a query parameter.
+- `MPHEditor/AppShell.xaml.cs`: registered `PlayerPage` route via `Routing.RegisterRoute`
+  (not a flyout item - reached only via `GoToPlayCommand` with a sequence parameter).
+- New converters created (none of these existed, and none of the old project's XAML
+  styles like `GradientPageStyle`/`DescriptionTitleLabel`/`IconImage`/`HtmlDetailLabel`
+  existed either - replaced with plain inline properties):
+  - `MPHEditor/Converters/PlayImageConverter.cs` (PlayerStateEnum -> play/pause icon)
+  - `MPHEditor/Converters/RatingToStarsConverter.cs` (int 0-5 -> row of star images)
+  - `MPHEditor/Converters/StringToBoolConverter.cs`, `NullToBoolConverter.cs` (visibility
+    helpers for the optional Author/Version/CreatedAt metadata row - these DO exist on
+    `MPHCore.Models.Sequence`, so that row was kept, just needed local converters)
+- DI registration added in `MauiProgram.cs` for `PlayerViewModel`/`PlayerPage` (singleton,
+  consistent with `RealtimeEditorPage` pattern).
+
+Build status: solution builds successfully after this adaptation.
+
+Deferred/not implemented in this pass:
+- `MainPage.NeedsRefresh` static-flag refresh mechanism from the old project was dropped -
+  not needed since `MPHSequence`/`Userdata` are shared references between `MainViewModel`'s
+  `Sequences` collection and the `PlayerViewModel`, so rating changes are reflected in the
+  same objects automatically (no explicit list refresh required with current UI).
+- Not yet tested on a real device/emulator (BLE brightness, play/pause/stop, slider drag
+  seek, rating persistence, loop/playlist-advance) - should be tested next session.
