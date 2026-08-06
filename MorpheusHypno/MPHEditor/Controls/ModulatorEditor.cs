@@ -116,6 +116,7 @@ public class ModulatorEditor : ContentView
             TextColor = Colors.White,
             TitleColor = Colors.Gray,
             WidthRequest = 90,
+            HeightRequest = 30,
         };
         _modePicker.Items.Add("Static");
         _modePicker.Items.Add("Linear");
@@ -156,7 +157,7 @@ public class ModulatorEditor : ContentView
             Stroke = Colors.Gray,
             StrokeThickness = 1,
             StrokeShape = new RoundRectangle { CornerRadius = 6 },
-            Padding = 6,
+            Padding = new Thickness(6, 4, 6, 0),
             BackgroundColor = Colors.Transparent,
             Content = _contentGrid,
         };
@@ -492,8 +493,8 @@ public class ModulatorEditor : ContentView
             FineIncrement = ValueIncrement / 10.0,
             CoarseIncrement = ValueIncrement * 10.0,
             Value = initialValue,
-            WidthRequest = 50,
-            HeightRequest = 50,
+            WidthRequest = 40,
+            HeightRequest = 40,
             Title = string.Empty,
             DisplayFormat = string.Empty,
         };

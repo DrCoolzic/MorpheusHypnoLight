@@ -67,11 +67,11 @@ public class OscillatorEditor : ContentView
 
         _waveformPicker = new Picker
         {
-            Title = "Wave",
+            //Title = "Wave",
             TextColor = Colors.White,
             TitleColor = Colors.Gray,
-            WidthRequest = 110,
-            HeightRequest = 60,
+            WidthRequest = 100,
+            HeightRequest = 30,
         };
         _waveformPicker.Items.Add("Sine");
         _waveformPicker.Items.Add("Square");
@@ -87,8 +87,8 @@ public class OscillatorEditor : ContentView
             FineIncrement = 0.1,
             CoarseIncrement = 10.0,
             Value = 0.0,
-            WidthRequest = 50,
-            HeightRequest = 50,
+            WidthRequest = 40,
+            HeightRequest = 40,
             DisplayFormat = string.Empty,
         };
         _phaseButton.ValueChanged += OnPhaseChanged;
@@ -129,6 +129,7 @@ public class OscillatorEditor : ContentView
         HorizontalStackLayout modulatorRow = new HorizontalStackLayout
         {
             Spacing = 8,
+            VerticalOptions = LayoutOptions.Start,
             Children =
             {
                 _frequencyEditor,
@@ -141,13 +142,15 @@ public class OscillatorEditor : ContentView
         {
             Orientation = ScrollOrientation.Horizontal,
             Content = modulatorRow,
+            VerticalOptions = LayoutOptions.Start,
         };
 
         // Left column with title, wave picker, phase knob and phase value.
         Grid leftColumn = new Grid
         {
-            RowSpacing = 1,
+            RowSpacing = 0,
             ColumnSpacing = 8,
+            VerticalOptions = LayoutOptions.Start,
             RowDefinitions =
             {
                 new RowDefinition { Height = GridLength.Auto },
@@ -192,11 +195,16 @@ public class OscillatorEditor : ContentView
         Grid grid = new Grid
         {
             ColumnSpacing = 8,
+            RowDefinitions =
+            {
+                new RowDefinition { Height = GridLength.Auto },
+            },
             ColumnDefinitions =
             {
                 new ColumnDefinition { Width = GridLength.Auto },
                 new ColumnDefinition { Width = GridLength.Star },
             },
+            VerticalOptions = LayoutOptions.Start,
         };
         grid.Add(leftColumn, 0, 0);
         grid.Add(_contentLayout, 1, 0);
@@ -206,7 +214,7 @@ public class OscillatorEditor : ContentView
             Stroke = Colors.Gray,
             StrokeThickness = 1,
             StrokeShape = new RoundRectangle { CornerRadius = 8 },
-            Padding = 8,
+            Padding = 4,
             BackgroundColor = Colors.Transparent,
             Content = grid,
         };

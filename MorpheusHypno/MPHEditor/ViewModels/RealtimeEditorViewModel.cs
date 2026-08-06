@@ -16,15 +16,20 @@ public partial class RealtimeEditorViewModel : ObservableObject
     private readonly IBleService _bleService;
     private readonly ILogger<RealtimeEditorViewModel> _logger;
     private CancellationTokenSource? _updateCts;
+    private CancellationTokenSource? _brightnessCts;
 
     [ObservableProperty]
     public partial Step CurrentStep { get; set; }
+
+    [ObservableProperty]
+    public partial double Brightness { get; set; }
 
     public RealtimeEditorViewModel(IBleService bleService, ILogger<RealtimeEditorViewModel> logger)
     {
         _bleService = bleService;
         _logger = logger;
         CurrentStep = CreateSampleStep();
+        Brightness = 80.0;
         _ = LoadSequenceAsync();
     }
 
@@ -46,7 +51,7 @@ public partial class RealtimeEditorViewModel : ObservableObject
         {
             _logger.LogInformation("Loading realtime sequence");
             await _bleService.LoadSequenceAsync(sequence);
-            await _bleService.SendBrightnessAsync(80);
+            await _bleService.SendBrightnessAsync((int)Brightness);
             _logger.LogInformation("Realtime sequence loaded");
         }
         catch (Exception ex)
@@ -95,6 +100,37 @@ public partial class RealtimeEditorViewModel : ObservableObject
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to update realtime step");
+        }
+    }
+
+    partial void OnBrightnessChanged(double value)
+    {
+        _brightnessCts?.Cancel();
+        _brightnessCts?.Dispose();
+        _brightnessCts = new CancellationTokenSource();
+
+        _ = DebouncedSendBrightnessAsync((int)value, _brightnessCts.Token);
+    }
+
+    private async Task DebouncedSendBrightnessAsync(int value, CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(200, token);
+
+            if (token.IsCancellationRequested)
+                return;
+
+            await _bleService.SendBrightnessAsync(value);
+            _logger.LogInformation("Brightness changed to: {value}", value);
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when a newer brightness value arrives before the delay expires.
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating brightness");
         }
     }
 

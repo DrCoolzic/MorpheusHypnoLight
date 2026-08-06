@@ -20,9 +20,6 @@ public class StepEditor : ContentView
         coerceValue: (bindable, value) => value ?? new Step(),
         propertyChanged: (bindable, _, __) => ((StepEditor)bindable).RebuildEditor());
 
-    public static readonly BindableProperty TitleProperty = BindableProperty.Create(
-        nameof(Title), typeof(string), typeof(StepEditor), string.Empty,
-        propertyChanged: (bindable, _, __) => ((StepEditor)bindable).UpdateTitle());
 
     public static readonly BindableProperty StepChangedCommandProperty = BindableProperty.Create(
         nameof(StepChangedCommand), typeof(ICommand), typeof(StepEditor), null);
@@ -33,11 +30,6 @@ public class StepEditor : ContentView
         set => SetValue(StepProperty, value);
     }
 
-    public string Title
-    {
-        get => (string)GetValue(TitleProperty);
-        set => SetValue(TitleProperty, value);
-    }
 
     public ICommand? StepChangedCommand
     {
@@ -56,19 +48,11 @@ public class StepEditor : ContentView
         }
     }
 
-    private readonly Label _titleLabel;
     private readonly VerticalStackLayout _oscillatorsLayout;
     private bool _isRebuilding;
 
     public StepEditor()
     {
-        _titleLabel = new Label
-        {
-            FontSize = 18,
-            HorizontalOptions = LayoutOptions.Start,
-            TextColor = Colors.White,
-        };
-
         _oscillatorsLayout = new VerticalStackLayout
         {
             Spacing = 12,
@@ -76,24 +60,11 @@ public class StepEditor : ContentView
 
         Content = new ScrollView
         {
-            Content = new VerticalStackLayout
-            {
-                Spacing = 8,
-                Children =
-                {
-                    _titleLabel,
-                    _oscillatorsLayout,
-                },
-            },
+            Content = _oscillatorsLayout,
         };
 
         BackgroundColor = Colors.Transparent;
         RebuildEditor();
-    }
-
-    private void UpdateTitle()
-    {
-        _titleLabel.Text = Title;
     }
 
     private void RebuildEditor()
@@ -106,8 +77,6 @@ public class StepEditor : ContentView
         _isRebuilding = true;
         try
         {
-            UpdateTitle();
-
             Step ??= new Step();
 
             while (Step.Oscillators.Count < 5)

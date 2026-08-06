@@ -7,12 +7,20 @@
              x:DataType="vm:RealtimeEditorViewModel"
              Title="Realtime Editor">
     <Grid RowDefinitions="Auto,*" Padding="10" RowSpacing="10">
-        <HorizontalStackLayout Grid.Row="0" Spacing="10" HorizontalOptions="Center">
+        <HorizontalStackLayout Grid.Row="0" Spacing="10" HorizontalOptions="Start">
             <Button Text="Play" Command="{Binding PlayCommand}" />
             <Button Text="Stop" Command="{Binding StopCommand}" />
+            <Label Text="Global brightness" VerticalTextAlignment="Center" />
+            <Slider VerticalOptions="Center" WidthRequest="200"
+                    MaximumTrackColor="#00BBFF"
+                    MinimumTrackColor="#0066FF"
+                    Minimum="0" Maximum="100"
+                    Value="{Binding Brightness, Mode=TwoWay}" />
+            <Label Text="{Binding Brightness, StringFormat='{0:0}'}" VerticalTextAlignment="Center" />
+
         </HorizontalStackLayout>
         <ScrollView Grid.Row="1">
-            <controls:StepEditor Step="{Binding CurrentStep}" Title="Edit Step" StepChangedCommand="{Binding UpdateStepCommand}" />
+            <controls:StepEditor Step="{Binding CurrentStep}" StepChangedCommand="{Binding UpdateStepCommand}" />
         </ScrollView>
     </Grid>
 </ContentPage>
