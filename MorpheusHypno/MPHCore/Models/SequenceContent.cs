@@ -211,6 +211,24 @@ public class Modulator : JsonBase
             High = High
         };
     }
+
+    /// <summary>
+    /// Copies all field values from <paramref name="source"/> into this instance in place.
+    /// </summary>
+    /// <param name="source">The modulator to copy values from.</param>
+    public void CopyFrom(Modulator source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        Mode = source.Mode;
+        Value = source.Value;
+        Start = source.Start;
+        End = source.End;
+        LfoWaveform = source.LfoWaveform;
+        LfoFrequency = source.LfoFrequency;
+        Low = source.Low;
+        High = source.High;
+    }
 }
 
 /// <summary>
@@ -261,6 +279,22 @@ public class Oscillator : JsonBase
             Brightness = Brightness.Clone(),
             Duty = Duty.Clone()
         };
+    }
+
+    /// <summary>
+    /// Copies waveform, phase, and all modulator values from <paramref name="source"/>
+    /// into this instance in place.
+    /// </summary>
+    /// <param name="source">The oscillator to copy values from.</param>
+    public void CopyFrom(Oscillator source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        Waveform = source.Waveform;
+        PhaseDegrees = source.PhaseDegrees;
+        Frequency.CopyFrom(source.Frequency);
+        Brightness.CopyFrom(source.Brightness);
+        Duty.CopyFrom(source.Duty);
     }
 }
 

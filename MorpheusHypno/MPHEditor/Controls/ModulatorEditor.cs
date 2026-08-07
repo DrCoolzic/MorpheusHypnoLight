@@ -101,9 +101,15 @@ public class ModulatorEditor : ContentView
     private const float RowSpacing = 0.0f;
     private const float ColumnSpacing = 6.0f;
 
+    private static readonly Color DefaultBorderColor = Colors.Gray;
+    private static readonly Color CopiedBorderColor = Colors.Orange;
+
     private readonly Picker _modePicker;
     private readonly Label _titleLabel;
+    private readonly ImageButton _copyButton;
+    private readonly ImageButton _pasteButton;
     private readonly Grid _contentGrid;
+    private readonly Border _border;
 
     private bool _isRebuilding;
 
@@ -132,6 +138,37 @@ public class ModulatorEditor : ContentView
             VerticalOptions = LayoutOptions.Center,
         };
 
+        _copyButton = new ImageButton
+        {
+            Source = "copy.png",
+            WidthRequest = 16,
+            HeightRequest = 16,
+            Padding = 0,
+            BackgroundColor = Colors.Transparent,
+            BorderColor = Colors.Transparent,
+            VerticalOptions = LayoutOptions.Center,
+        };
+        _copyButton.Clicked += OnCopyClicked;
+
+        _pasteButton = new ImageButton
+        {
+            Source = "paste.png",
+            WidthRequest = 16,
+            HeightRequest = 16,
+            Padding = 0,
+            BackgroundColor = Colors.Transparent,
+            BorderColor = Colors.Transparent,
+            VerticalOptions = LayoutOptions.Center,
+        };
+        _pasteButton.Clicked += OnPasteClicked;
+
+        HorizontalStackLayout titleRow = new HorizontalStackLayout
+        {
+            Spacing = 2,
+            VerticalOptions = LayoutOptions.Center,
+            Children = { _titleLabel, _copyButton, _pasteButton },
+        };
+
         _contentGrid = new Grid
         {
             RowSpacing = RowSpacing,
@@ -149,19 +186,70 @@ public class ModulatorEditor : ContentView
         };
 
         // Fixed first column: modulator title, mode picker, (empty bottom row).
-        _contentGrid.Add(_titleLabel, 0, 0);
+        _contentGrid.Add(titleRow, 0, 0);
         _contentGrid.Add(_modePicker, 0, 1);
 
-        Content = new Border
+        _border = new Border
         {
-            Stroke = Colors.Gray,
+            Stroke = DefaultBorderColor,
             StrokeThickness = 1,
             StrokeShape = new RoundRectangle { CornerRadius = 6 },
             Padding = new Thickness(6, 4, 6, 0),
             BackgroundColor = Colors.Transparent,
             Content = _contentGrid,
         };
+        Content = _border;
+
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
+
         RebuildEditor();
+    }
+
+    private void OnLoaded(object? sender, EventArgs e)
+    {
+        EditorClipboard.Changed += OnClipboardChanged;
+        RefreshHighlight();
+    }
+
+    private void OnUnloaded(object? sender, EventArgs e)
+    {
+        EditorClipboard.Changed -= OnClipboardChanged;
+    }
+
+    private void OnClipboardChanged(object? sender, EventArgs e)
+    {
+        RefreshHighlight();
+    }
+
+    private void RefreshHighlight()
+    {
+        bool isCopiedSource = Modulator is not null &&
+            ReferenceEquals(EditorClipboard.CopiedModulatorSource, Modulator);
+        _border.Stroke = isCopiedSource ? CopiedBorderColor : DefaultBorderColor;
+    }
+
+    private void OnCopyClicked(object? sender, EventArgs e)
+    {
+        if (Modulator is null)
+        {
+            return;
+        }
+
+        EditorClipboard.CopyModulator(Modulator, Title);
+    }
+
+    private void OnPasteClicked(object? sender, EventArgs e)
+    {
+        if (Modulator is null || EditorClipboard.CopiedModulator is null ||
+            EditorClipboard.CopiedModulatorRole != Title)
+        {
+            return;
+        }
+
+        Modulator.CopyFrom(EditorClipboard.CopiedModulator);
+        RebuildEditor();
+        OnModulatorChanged();
     }
 
     private void OnModeChanged(object? sender, EventArgs e)
@@ -242,6 +330,17 @@ public class ModulatorEditor : ContentView
         };
 
         return Math.Clamp(scaled, ValueMinimum, ValueMaximum);
+    }
+
+    /// <summary>
+    /// Forces the editor to rebuild its UI from the current <see cref="Modulator"/> state.
+    /// Needed after an in-place mutation (e.g. <see cref="Modulator.CopyFrom"/>) where the
+    /// object reference does not change, so the bindable property's propertyChanged
+    /// callback is not triggered automatically.
+    /// </summary>
+    public void RefreshFromModel()
+    {
+        RebuildEditor();
     }
 
     private void RebuildEditor()

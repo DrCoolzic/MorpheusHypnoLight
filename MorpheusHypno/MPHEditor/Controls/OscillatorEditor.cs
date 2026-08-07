@@ -45,13 +45,19 @@ public class OscillatorEditor : ContentView
         OscillatorChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    private static readonly Color DefaultBorderColor = Colors.Gray;
+    private static readonly Color CopiedBorderColor = Colors.Orange;
+
     private readonly Label _titleLabel;
+    private readonly ImageButton _copyButton;
+    private readonly ImageButton _pasteButton;
     private readonly ScrollView _contentLayout;
     private readonly Picker _waveformPicker;
     private readonly RotaryButton _phaseButton;
     private readonly ModulatorEditor _frequencyEditor;
     private readonly ModulatorEditor _brightnessEditor;
     private readonly ModulatorEditor _dutyEditor;
+    private readonly Border _border;
 
     private bool _isRebuilding;
 
@@ -65,6 +71,30 @@ public class OscillatorEditor : ContentView
             TextColor = Colors.White,
             VerticalOptions = LayoutOptions.Center,
         };
+
+        _copyButton = new ImageButton
+        {
+            Source = "copy.png",
+            WidthRequest = 16,
+            HeightRequest = 16,
+            Padding = 0,
+            BackgroundColor = Colors.Transparent,
+            BorderColor = Colors.Transparent,
+            VerticalOptions = LayoutOptions.Center,
+        };
+        _copyButton.Clicked += OnCopyClicked;
+
+        _pasteButton = new ImageButton
+        {
+            Source = "paste.png",
+            WidthRequest = 16,
+            HeightRequest = 16,
+            Padding = 0,
+            BackgroundColor = Colors.Transparent,
+            BorderColor = Colors.Transparent,
+            VerticalOptions = LayoutOptions.Center,
+        };
+        _pasteButton.Clicked += OnPasteClicked;
 
         _waveformPicker = new Picker
         {
@@ -188,7 +218,14 @@ public class OscillatorEditor : ContentView
             phaseValue.Text = e.NewValue.ToString("F0", System.Globalization.CultureInfo.InvariantCulture);
         };
 
-        leftColumn.Add(_titleLabel, 0, 0);
+        HorizontalStackLayout titleRow = new HorizontalStackLayout
+        {
+            Spacing = 2,
+            VerticalOptions = LayoutOptions.Center,
+            Children = { _titleLabel, _copyButton, _pasteButton },
+        };
+
+        leftColumn.Add(titleRow, 0, 0);
         leftColumn.Add(_waveformPicker, 0, 1);
         leftColumn.Add(phaseHeader, 1, 0);
         leftColumn.Add(_phaseButton, 1, 1);
@@ -211,17 +248,66 @@ public class OscillatorEditor : ContentView
         grid.Add(leftColumn, 0, 0);
         grid.Add(_contentLayout, 1, 0);
 
-        Content = new Border
+        _border = new Border
         {
-            Stroke = Colors.Gray,
+            Stroke = DefaultBorderColor,
             StrokeThickness = 1,
             StrokeShape = new RoundRectangle { CornerRadius = 8 },
             Padding = 4,
             BackgroundColor = Colors.Transparent,
             Content = grid,
         };
+        Content = _border;
+
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
 
         RebuildEditor();
+    }
+
+    private void OnLoaded(object? sender, EventArgs e)
+    {
+        EditorClipboard.Changed += OnClipboardChanged;
+        RefreshHighlight();
+    }
+
+    private void OnUnloaded(object? sender, EventArgs e)
+    {
+        EditorClipboard.Changed -= OnClipboardChanged;
+    }
+
+    private void OnClipboardChanged(object? sender, EventArgs e)
+    {
+        RefreshHighlight();
+    }
+
+    private void RefreshHighlight()
+    {
+        bool isCopiedSource = Oscillator is not null &&
+            ReferenceEquals(EditorClipboard.CopiedOscillatorSource, Oscillator);
+        _border.Stroke = isCopiedSource ? CopiedBorderColor : DefaultBorderColor;
+    }
+
+    private void OnCopyClicked(object? sender, EventArgs e)
+    {
+        if (Oscillator is null)
+        {
+            return;
+        }
+
+        EditorClipboard.CopyOscillator(Oscillator);
+    }
+
+    private void OnPasteClicked(object? sender, EventArgs e)
+    {
+        if (Oscillator is null || EditorClipboard.CopiedOscillator is null)
+        {
+            return;
+        }
+
+        Oscillator.CopyFrom(EditorClipboard.CopiedOscillator);
+        RebuildEditor();
+        OnOscillatorChanged();
     }
 
     private void OnWaveformChanged(object? sender, EventArgs e)
@@ -274,6 +360,13 @@ public class OscillatorEditor : ContentView
         _frequencyEditor.Modulator = Oscillator.Frequency;
         _brightnessEditor.Modulator = Oscillator.Brightness;
         _dutyEditor.Modulator = Oscillator.Duty;
+
+        // Modulator instances are mutated in place (e.g. by Oscillator.CopyFrom), so the
+        // reference does not change and the child editors' bindable property change
+        // callback above may not fire. Force a refresh so their UI matches the model.
+        _frequencyEditor.RefreshFromModel();
+        _brightnessEditor.RefreshFromModel();
+        _dutyEditor.RefreshFromModel();
 
         _isRebuilding = false;
     }
