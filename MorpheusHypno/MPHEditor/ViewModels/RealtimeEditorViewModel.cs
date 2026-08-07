@@ -2,8 +2,10 @@ using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using Microsoft.Maui.Controls;
 using MPHCore.Models;
 using MPHEditor.Services;
+using MPHEditor.Utilities;
 
 namespace MPHEditor.ViewModels;
 
@@ -77,6 +79,81 @@ public partial class RealtimeEditorViewModel : ObservableObject
         _logger.LogInformation("Sending realtime STOP command");
         await _bleService.StopAsync();
         IsPlaying = false;
+    }
+
+    [RelayCommand]
+    private async Task SaveStepAsync()
+    {
+        string? name = await Shell.Current.DisplayPromptAsync(
+            "Save Step", "Enter a name for this step:", initialValue: "Step");
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return;
+        }
+
+        foreach (char invalidChar in Path.GetInvalidFileNameChars())
+        {
+            name = name.Replace(invalidChar, '_');
+        }
+
+        string path = Path.Combine(AppDirectories.GetStepsDirectory(), name + ".json");
+        if (File.Exists(path))
+        {
+            bool overwrite = await Shell.Current.DisplayAlertAsync(
+                "Save Step", $"'{name}' already exists. Overwrite it?", "Overwrite", "Cancel");
+            if (!overwrite)
+            {
+                return;
+            }
+        }
+
+        try
+        {
+            await CurrentStep.SaveJsonFileAsync(path);
+            _logger.LogInformation("Step saved to {Path}", path);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save step to {Path}", path);
+            await Shell.Current.DisplayAlertAsync("Save Step", $"Failed to save step: {ex.Message}", "OK");
+        }
+    }
+
+    [RelayCommand]
+    private async Task LoadStepAsync()
+    {
+        string stepsDirectory = AppDirectories.GetStepsDirectory();
+        string[] names = Directory.GetFiles(stepsDirectory, "*.json")
+            .Select(Path.GetFileNameWithoutExtension)
+            .Where(n => n is not null)
+            .Select(n => n!)
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (names.Length == 0)
+        {
+            await Shell.Current.DisplayAlertAsync("Load Step", "No saved steps found.", "OK");
+            return;
+        }
+
+        string choice = await Shell.Current.DisplayActionSheetAsync("Load Step", "Cancel", null, names);
+        if (string.IsNullOrEmpty(choice) || choice == "Cancel")
+        {
+            return;
+        }
+
+        string path = Path.Combine(stepsDirectory, choice + ".json");
+        try
+        {
+            CurrentStep = await JsonBase.LoadJsonFileAsync<Step>(path);
+            _logger.LogInformation("Step loaded from {Path}", path);
+            await UpdateStepAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load step from {Path}", path);
+            await Shell.Current.DisplayAlertAsync("Load Step", $"Failed to load step: {ex.Message}", "OK");
+        }
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]

@@ -60,5 +60,17 @@ namespace MPHEditor.Utilities
         {
             return GetAppDataDirectory();
         }
+
+        /// <summary>
+        /// Returns the path to the directory where individual realtime-editor steps are
+        /// saved/loaded (as standalone JSON files), creating it if it does not exist yet.
+        /// </summary>
+        /// <returns>The path to the "Steps" directory under the app data directory.</returns>
+        public static string GetStepsDirectory()
+        {
+            var stepsPath = Path.Combine(GetAppDataDirectory(), "Steps");
+            Directory.CreateDirectory(stepsPath);
+            return stepsPath;
+        }
     }
 }
