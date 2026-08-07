@@ -127,3 +127,77 @@ The player mode can be considered fully functional after end-to-end validation o
 - User rating is displayed on MainPage and updated from PlayerPage.
 
 Build status: solution builds successfully and has been validated on device.
+
+## Session 2026-08-06 (suite): RealtimeEditor auto-play fix + Copy/Paste plan
+
+### Terminé
+- Correction du passage auto en mode Play quand on modifie un parametre d'oscillateur en Stop.
+  - Fichier: `MPHEditor/ViewModels/RealtimeEditorViewModel.cs`.
+  - Ajout propriete `IsPlaying` (true apres `PlayAsync`, false apres `StopAsync`).
+  - `UpdateStepAsync` ne fait plus rien (pas d'envoi BLE UPDATE_STEP) si `IsPlaying == false`.
+  - Build valide.
+
+### En cours / a faire prochaine session : Copy/Paste Modulateur & Oscillateur
+
+Objectif demande par l'utilisateur:
+1. Copy/Paste d'un modulateur (Freq, Bright ou Duty) vers un modulateur du MEME role
+   dans un autre oscillateur (ex: Duty -> Duty uniquement).
+2. Copy/Paste d'un oscillateur complet (waveform, phase, + les 3 modulateurs) vers un
+   autre oscillateur.
+3. Feedback visuel indiquant quel element est actuellement "copie" (bordure en surbrillance).
+
+Plan valide avec l'utilisateur (voir conversation Cascade pour details complets):
+
+1. Ajouter des methodes de mutation en place dans `MPHCore/Models/SequenceContent.cs`:
+   - `Modulator.CopyFrom(Modulator source)` -> copie tous les champs (Mode, Value, Start,
+     End, LfoWaveform, LfoFrequency, Low, High)
+   - `Oscillator.CopyFrom(Oscillator source)` -> copie Waveform, PhaseDegrees, puis delegue
+     aux 3 `Modulator.CopyFrom` (Frequency, Brightness, Duty)
+   IMPORTANT: ne PAS remplacer la reference de l'objet (Modulator/Oscillator ne sont pas
+   `INotifyPropertyChanged`), toujours muter en place puis appeler `RebuildEditor()` +
+   declencher l'evenement Changed manuellement (meme pattern que le reste du code existant).
+
+2. Nouveau clipboard en memoire (nouvelle petite classe, ex:
+   `MPHEditor/Services/EditorClipboard.cs` ou statique dans Controls):
+   - Stocke soit un `Modulator` clone + son "role" (Title: "Freq"/"Bright"/"Duty") pour
+     valider que paste ne se fait qu'entre memes roles,
+   - soit un `Oscillator` clone pour le clipboard "oscillateur complet".
+   - Ces deux clipboards sont independants (on peut avoir copie un modulateur ET un
+     oscillateur en meme temps sans conflit).
+   - Doit exposer un evenement/notification (ou etre observable) pour rafraichir le
+     highlight visuel sur tous les editeurs ouverts quand le contenu change.
+
+3. `ModulatorEditor.cs` (`MPHEditor/Controls/`):
+   - Ajouter boutons Copy/Paste (icones) pres du titre (`_titleLabel`) ou menu contextuel.
+   - Copy: stocke `Modulator.Clone()` + Title dans le clipboard modulateur.
+   - Paste: actif seulement si `clipboard.Role == this.Title`. Utilise `Modulator.CopyFrom`,
+     puis `RebuildEditor()` + `OnModulatorChanged()`.
+   - Feedback visuel: le `Border` externe change de couleur de bordure (ex orange) quand ce
+     modulateur EST la source actuellement copiee ; revient a la normale si un autre
+     element devient la source.
+
+4. `OscillatorEditor.cs` (`MPHEditor/Controls/`):
+   - Meme principe au niveau oscillateur (boutons dans `leftColumn` pres du titre).
+   - Copy: `Oscillator.Clone()` dans le clipboard oscillateur.
+   - Paste: `Oscillator.CopyFrom(source)`, `RebuildEditor()`, `OnOscillatorChanged()`.
+   - Meme feedback visuel sur la `Border` externe du controle.
+
+5. Verification:
+   - Confirmer que le paste declenche bien `StepChangedCommand`/`UpdateStepCommand` comme
+     un changement normal (donc respecte la logique `IsPlaying` ajoutee cette session:
+     si Stop, pas d'envoi BLE; si Play, envoi BLE apres paste).
+   - Tester visuellement l'apparition/disparition du highlight de copie.
+
+### Question ouverte posee a l'utilisateur (pas encore de reponse)
+Preference d'UX pour declencher Copy/Paste:
+- (a) boutons/icones toujours visibles pres du titre, ou
+- (b) menu contextuel (clic droit / appui long) ?
+=> A demander en debut de prochaine session si pas encore tranche.
+
+### Fichiers cles pour reprendre le contexte
+- `MPHCore/Models/SequenceContent.cs` (Modulator, Oscillator, Step - `Clone()` existants a
+  cote desquels ajouter `CopyFrom()`)
+- `MPHEditor/Controls/ModulatorEditor.cs`
+- `MPHEditor/Controls/OscillatorEditor.cs`
+- `MPHEditor/Controls/StepEditor.cs` (heberge les 5 `OscillatorEditor`)
+- `MPHEditor/ViewModels/RealtimeEditorViewModel.cs` (`IsPlaying`, `UpdateStepAsync`)

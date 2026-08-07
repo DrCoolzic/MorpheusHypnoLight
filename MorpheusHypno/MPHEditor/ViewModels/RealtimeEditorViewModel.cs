@@ -24,6 +24,9 @@ public partial class RealtimeEditorViewModel : ObservableObject
     [ObservableProperty]
     public partial double Brightness { get; set; }
 
+    [ObservableProperty]
+    public partial bool IsPlaying { get; set; }
+
     public RealtimeEditorViewModel(IBleService bleService, ILogger<RealtimeEditorViewModel> logger)
     {
         _bleService = bleService;
@@ -65,6 +68,7 @@ public partial class RealtimeEditorViewModel : ObservableObject
     {
         _logger.LogInformation("Sending realtime PLAY command");
         await _bleService.PlayAsync();
+        IsPlaying = true;
     }
 
     [RelayCommand]
@@ -72,6 +76,7 @@ public partial class RealtimeEditorViewModel : ObservableObject
     {
         _logger.LogInformation("Sending realtime STOP command");
         await _bleService.StopAsync();
+        IsPlaying = false;
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]
@@ -84,6 +89,11 @@ public partial class RealtimeEditorViewModel : ObservableObject
         {
             _logger.LogDebug("Scheduling realtime UPDATE_STEP");
             await Task.Delay(200, _updateCts.Token);
+            if (!IsPlaying)
+            {
+                _logger.LogDebug("Skipping realtime update while stopped");
+                return;
+            }
             if (!_bleService.IsConnected)
             {
                 _logger.LogWarning("Not connected, skipping realtime step update");

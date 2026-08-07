@@ -55,7 +55,7 @@ public class StepEditor : ContentView
     {
         _oscillatorsLayout = new VerticalStackLayout
         {
-            Spacing = 12,
+            Spacing = 10,
         };
 
         Content = new ScrollView
@@ -91,7 +91,7 @@ public class StepEditor : ContentView
                 OscillatorEditor editor = new OscillatorEditor
                 {
                     Oscillator = Step.Oscillators[i],
-                    Title = $"OSCILLATOR {i + 1}",
+                    Title = $"Oscillator {i + 1}",
                 };
                 editor.OscillatorChanged += (_, _) => OnStepChanged();
                 _oscillatorsLayout.Children.Add(editor);

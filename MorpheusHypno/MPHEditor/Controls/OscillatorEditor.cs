@@ -60,6 +60,7 @@ public class OscillatorEditor : ContentView
         _titleLabel = new Label
         {
             FontSize = 12,
+            FontAttributes = FontAttributes.Bold,
             HorizontalOptions = LayoutOptions.Start,
             TextColor = Colors.White,
             VerticalOptions = LayoutOptions.Center,
@@ -150,6 +151,7 @@ public class OscillatorEditor : ContentView
         {
             RowSpacing = 0,
             ColumnSpacing = 8,
+            Padding = new Thickness(0, 4, 0, 0),
             VerticalOptions = LayoutOptions.Start,
             RowDefinitions =
             {
@@ -194,7 +196,7 @@ public class OscillatorEditor : ContentView
 
         Grid grid = new Grid
         {
-            ColumnSpacing = 8,
+            ColumnSpacing = 6,
             RowDefinitions =
             {
                 new RowDefinition { Height = GridLength.Auto },

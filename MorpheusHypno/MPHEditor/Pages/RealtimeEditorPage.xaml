@@ -17,7 +17,6 @@
                     Minimum="0" Maximum="100"
                     Value="{Binding Brightness, Mode=TwoWay}" />
             <Label Text="{Binding Brightness, StringFormat='{0:0}'}" VerticalTextAlignment="Center" />
-
         </HorizontalStackLayout>
         <ScrollView Grid.Row="1">
             <controls:StepEditor Step="{Binding CurrentStep}" StepChangedCommand="{Binding UpdateStepCommand}" />
