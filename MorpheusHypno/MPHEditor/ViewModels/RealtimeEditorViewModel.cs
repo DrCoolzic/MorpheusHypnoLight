@@ -17,8 +17,8 @@ public partial class RealtimeEditorViewModel : ObservableObject
 {
     private readonly IBleService _bleService;
     private readonly ILogger<RealtimeEditorViewModel> _logger;
-    private CancellationTokenSource? _updateCts;
-    private CancellationTokenSource? _brightnessCts;
+    private int _updateRequestId;
+    private int _brightnessRequestId;
 
     [ObservableProperty]
     public partial Step CurrentStep { get; set; }
@@ -159,13 +159,19 @@ public partial class RealtimeEditorViewModel : ObservableObject
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task UpdateStepAsync()
     {
-        _updateCts?.Cancel();
-        _updateCts?.Dispose();
-        _updateCts = new CancellationTokenSource();
+        // "Latest request wins" debounce: bump a request id instead of cancelling a
+        // CancellationTokenSource, to avoid noisy (harmless) TaskCanceledException churn
+        // in the debugger output while dragging a RotaryButton.
+        int requestId = Interlocked.Increment(ref _updateRequestId);
         try
         {
             _logger.LogDebug("Scheduling realtime UPDATE_STEP");
-            await Task.Delay(200, _updateCts.Token);
+            await Task.Delay(200);
+            if (requestId != _updateRequestId)
+            {
+                _logger.LogDebug("Realtime step update superseded");
+                return;
+            }
             if (!IsPlaying)
             {
                 _logger.LogDebug("Skipping realtime update while stopped");
@@ -180,10 +186,6 @@ public partial class RealtimeEditorViewModel : ObservableObject
             await _bleService.UpdateStepAsync(0, CurrentStep);
             _logger.LogInformation("Realtime step updated");
         }
-        catch (OperationCanceledException)
-        {
-            _logger.LogDebug("Realtime step update cancelled");
-        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to update realtime step");
@@ -192,28 +194,24 @@ public partial class RealtimeEditorViewModel : ObservableObject
 
     partial void OnBrightnessChanged(double value)
     {
-        _brightnessCts?.Cancel();
-        _brightnessCts?.Dispose();
-        _brightnessCts = new CancellationTokenSource();
-
-        _ = DebouncedSendBrightnessAsync((int)value, _brightnessCts.Token);
+        _ = DebouncedSendBrightnessAsync((int)value);
     }
 
-    private async Task DebouncedSendBrightnessAsync(int value, CancellationToken token)
+    private async Task DebouncedSendBrightnessAsync(int value)
     {
+        int requestId = Interlocked.Increment(ref _brightnessRequestId);
         try
         {
-            await Task.Delay(200, token);
+            await Task.Delay(200);
 
-            if (token.IsCancellationRequested)
+            if (requestId != _brightnessRequestId)
+            {
+                // A newer brightness value arrived before the delay expired.
                 return;
+            }
 
             await _bleService.SendBrightnessAsync(value);
             _logger.LogInformation("Brightness changed to: {value}", value);
-        }
-        catch (OperationCanceledException)
-        {
-            // Expected when a newer brightness value arrives before the delay expires.
         }
         catch (Exception ex)
         {

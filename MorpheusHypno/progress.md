@@ -188,16 +188,27 @@ Plan valide avec l'utilisateur (voir conversation Cascade pour details complets)
      si Stop, pas d'envoi BLE; si Play, envoi BLE apres paste).
    - Tester visuellement l'apparition/disparition du highlight de copie.
 
-### Question ouverte posee a l'utilisateur (pas encore de reponse)
-Preference d'UX pour declencher Copy/Paste:
-- (a) boutons/icones toujours visibles pres du titre, ou
-- (b) menu contextuel (clic droit / appui long) ?
-=> A demander en debut de prochaine session si pas encore tranche.
+## Session 2026-08-07: Copy/Paste, Load/Save Step, debounce fix
 
-### Fichiers cles pour reprendre le contexte
-- `MPHCore/Models/SequenceContent.cs` (Modulator, Oscillator, Step - `Clone()` existants a
-  cote desquels ajouter `CopyFrom()`)
-- `MPHEditor/Controls/ModulatorEditor.cs`
-- `MPHEditor/Controls/OscillatorEditor.cs`
-- `MPHEditor/Controls/StepEditor.cs` (heberge les 5 `OscillatorEditor`)
-- `MPHEditor/ViewModels/RealtimeEditorViewModel.cs` (`IsPlaying`, `UpdateStepAsync`)
+### Termine
+
+1. **Copy/Paste modulateur et oscillateur** (UX icones pres du titre):
+   - `MPHCore/Models/SequenceContent.cs`: ajout `Modulator.CopyFrom` et `Oscillator.CopyFrom`.
+   - `MPHEditor/Controls/EditorClipboard.cs`: presse-papiers statique en memoire (modulateur + role, oscillateur complet), avec evenement `Changed`.
+   - `MPHEditor/Controls/ModulatorEditor.cs`: icones `copy.png`/`paste.png` apres le titre, paste restreint au meme role (Freq -> Freq, Bright -> Bright, Duty -> Duty), bordure orange sur la source copiee.
+   - `MPHEditor/Controls/OscillatorEditor.cs`: meme chose pour les oscillateurs, plus `RefreshFromModel()` et forçage du rafraîchissement des 3 modulateurs enfants apres un paste (car les `Modulator` sont mutés en place).
+
+2. **Load/Save Step**:
+   - `MPHEditor/Utilities/AppDirectories.cs`: ajout `GetStepsDirectory()` (`<AppData>/Steps`).
+   - `MPHEditor/ViewModels/RealtimeEditorViewModel.cs`: `SaveStepCommand` (saisie nom via `DisplayPromptAsync`, overwrite avec confirmation) et `LoadStepCommand` (liste via `DisplayActionSheetAsync`).
+   - `MPHEditor/Pages/RealtimeEditorPage.xaml`: boutons "Load Step" / "Save Step" apres le label de brightness.
+   - Les fichiers `.json` sont lus/ecrits avec `JsonBase.LoadJsonFileAsync<Step>` / `Step.SaveJsonFileAsync`.
+
+3. **Suppression du bruit `TaskCanceledException` lors du drag**:
+   - Remplacement du debounce par `CancellationTokenSource` (produisait beaucoup d'exceptions annulees bruyantes dans le debugger) par un mecanisme "derniere requete gagne" a base de `int` incrementes (`_updateRequestId`, `_brightnessRequestId`) dans `UpdateStepAsync` et `DebouncedSendBrightnessAsync`.
+   - Plus d'exception levee pour annuler un debounce, tout en gardant un delai de 200 ms.
+
+### Remarques / notes
+- Le paste du modulateur s'effectue sur un **clone fige au moment du copy** (comportement presse-papier classique), pas sur les valeurs actuelles si la source a ete modifiee entre-temps.
+- Future amelioration discutee: commande de suppression de steps sauvegardes (deferred).
+- Build valide pour les deux cibles (`net10.0-android` et `net10.0-windows10.0.19041.0`).

@@ -4,7 +4,7 @@
        xmlns:pages="clr-namespace:MPHEditor.Pages;assembly=MPHEditor"
        x:Class="MPHEditor.AppShell">
 
-    <FlyoutItem Title="Player">
+    <FlyoutItem Title="Home">
         <ShellContent Title="Morpheus Hypno"
                       ContentTemplate="{DataTemplate pages:MainPage}"
                       Route="MainPage" />
