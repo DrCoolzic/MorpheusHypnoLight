@@ -68,9 +68,29 @@ public partial class RealtimeEditorViewModel : ObservableObject
     [RelayCommand]
     private async Task PlayAsync()
     {
-        _logger.LogInformation("Sending realtime PLAY command");
-        await _bleService.PlayAsync();
-        IsPlaying = true;
+        if (!_bleService.IsConnected)
+        {
+            _logger.LogWarning("Not connected, skipping realtime play");
+            return;
+        }
+
+        try
+        {
+            // When stopped, the step updates are not sent to the device.  Push the
+            // current step and brightness now so the device starts from the values
+            // currently shown in the editor, not from a stale step.
+            _logger.LogInformation("Sending realtime step before play");
+            await _bleService.UpdateStepAsync(0, CurrentStep);
+            await _bleService.SendBrightnessAsync((int)Brightness);
+
+            _logger.LogInformation("Sending realtime PLAY command");
+            await _bleService.PlayAsync();
+            IsPlaying = true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to start realtime playback");
+        }
     }
 
     [RelayCommand]
